@@ -1,0 +1,92 @@
+#!/bin/bash
+# Calibrate light frames
+# Usage:
+# 	calibrate <dir>
+# Options:
+#	dir	directory of light frame FITS images
+
+Color_Off="\e[0m"  # Text Reset
+BRed="\e[1;31m"    # Red
+BGreen="\e[1;32m"  # Green
+Blue="\e[0;34m"    # Blue
+
+echo
+echo -e "${BGreen}calibrate, version 0.1.0${Color_Off}"
+echo -e "${Blue}calibrate light frames.${Color_Off}"
+echo
+
+DEFAULT_LIGHTDIR="Light"
+LIGHT_FILE_PREFIX="Light_"
+
+# Declare source and target directories
+# TODO: directory of master bias, dark and flat could be parametrized
+SOURCEDIR=$([ "$1" = "" ] && echo $DEFAULT_LIGHTDIR || echo $1)
+TARGETDIR=$SOURCEDIR
+BIASDIR="Bias"
+DARKDIR="Dark"
+FLATDIR="Flat"
+CALIBDIR="Calibrated"
+
+MASTER_BIAS=$BIASDIR/master-bias.fits
+MASTER_DARK=$DARKDIR/master-dark.fits
+MASTER_FLAT=$FLATDIR/master-flat.fits
+
+# Checking if source directory is exists
+if [ ! -d $SOURCEDIR ]; then
+  echo -e "${BRed}Error: Parameter is not a directory!${Color_Off}"
+  exit 1
+fi
+
+# Create dir for the calibrated images, if not exists
+if [ ! -e $CALIBDIR ]; then
+  mkdir $CALIBDIR
+fi
+
+# Check if master bias frame is exists
+if [ ! -e $MASTER_BIAS ]; then
+  echo -e "${BRed}Error: Master bias frame $MASTER_BIAS is not exist!${Color_Off}"
+  exit 1
+fi
+
+# Check if master dark frame is exists
+if [ ! -e $MASTER_DARK ]; then
+  echo -e "${BRed}Error: Master bias frame $MASTER_DARK is not exist!${Color_Off}"
+  exit 1
+fi
+
+# Check if master flat frame is exists
+if [ ! -e $MASTER_FLAT ]; then
+  echo -e "${BRed}Error: Master bias frame $MASTER_FLAT is not exist!${Color_Off}"
+  exit 1
+fi
+
+# Names of the individual files storing the raw bias, dark, flat and object frames:
+IOBJLIST=($SOURCEDIR/${LIGHT_FILE_PREFIX}*.fits)
+if [ ! -e ${IOBJLIST[0]} ]; then
+  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+  exit 1
+fi
+
+start=`date +%s`
+
+echo "$SOURCEDIR/${LIGHT_FILE_PREFIX}*.fits -> $TARGETDIR/${LIGHT_FILE_PREFIX}*.fits"
+
+# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
+R_IOBJLIST=($(for f in ${IOBJLIST[*]} ; do echo ${CALIBDIR}/`basename $f` ; done ))
+
+# Common arguments (saturation level, image section & trimming, etc.):
+# TODO: image size from FITS header NAXIS1, NAXIS2
+COMMON_ARGS="--saturation 16000 --image 0:0:2144:1427 --trim"
+
+# The calibration of the object images:
+ficalib -i ${IOBJLIST[*]} $COMMON_ARGS -o ${R_IOBJLIST[*]} --input-master-bias $MASTER_BIAS \
+--input-master-dark $MASTER_DARK --input-master-flat $MASTER_FLAT
+
+end=`date +%s`
+
+echo
+echo -e "${Blue}conversion ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+#end.
+

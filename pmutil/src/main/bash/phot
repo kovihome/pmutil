@@ -1,0 +1,71 @@
+#!/bin/bash
+# Make photometry on sequence of images
+# Usage:
+# 	phot <dir>
+# Options:
+#	dir	directory of light frame FITS images
+
+Color_Off="\e[0m"  # Text Reset
+BRed="\e[1;31m"    # Red
+BGreen="\e[1;32m"  # Green
+Blue="\e[0;34m"    # Blue
+
+echo
+echo -e "${BGreen}calibrate, version 0.1.0${Color_Off}"
+echo -e "${Blue}calibrate light frames.${Color_Off}"
+echo
+
+DEFAULT_SEQDIR="Sequence"
+SEQ_FILE_PREFIX="Seq_"
+
+# Declare source and target directories
+# TODO: directory of master bias, dark and flat could be parametrized
+SOURCEDIR=$([ "$1" = "" ] && echo $DEFAULT_SEQDIR || echo $1)
+TEMPDIR="temp"
+
+# Checking if source directory is exists
+if [ ! -d $SOURCEDIR ]; then
+  echo -e "${BRed}Error: Parameter is not a directory!${Color_Off}"
+  exit 1
+fi
+
+# Names of the individual files storing the raw bias, dark, flat and object frames:
+SEQLIST=($SOURCEDIR/${SEQ_FILE_PREFIX}*.fits)
+if [ ! -e ${SEQLIST[0]} ]; then
+  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+  exit 1
+fi
+
+start=`date +%s`
+
+# Common arguments (saturation level, image section & trimming, etc.):
+FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
+FIPHOT_ARGS="--col-xy 2,3 --col-id 1 --mag-flux 10,10000 --aperture 7:12:15 --disjoint-annuli --sky-fit mode,iterations=4,sigma=3 --format ISXY,MmBbFfXxYy --comment"
+
+# ------------------------------------
+
+# Photometry of the source images:
+for f in ${SEQLIST[*]:1} ; do
+
+  echo "photometry of $f"
+  fstars="${TEMPDIR}/`basename $f`.stars"
+
+  fistar $f $FISTAR_ARGS -o $fstars
+
+  fiphot $f --input-list $fstars $FIPHOT_ARGS --output ${TEMPDIR}/`basename $f`.phot
+
+done
+
+grcollect ${TEMPDIR}/${SEQ_FILE_PREFIX}*.phot --col-base 2 --prefix ${TEMPDIR}/ --extension lc --max-memory 256m
+
+# -------------------------------------
+
+
+end=`date +%s`
+
+echo
+echo -e "${Blue}photometry is ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+#end.
+

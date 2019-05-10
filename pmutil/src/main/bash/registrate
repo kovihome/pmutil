@@ -1,0 +1,117 @@
+#!/bin/bash
+# Registrate light frames
+# Usage:
+# 	registrate <count-combined> [<dir>]
+# Options:
+#	count-combined	count of imaged to combine, if not set, combine all images in the sequence
+#	dir		directory of light frame FITS images
+
+Color_Off="\e[0m"  # Text Reset
+BRed="\e[1;31m"    # Red
+BGreen="\e[1;32m"  # Green
+Blue="\e[0;34m"    # Blue
+
+echo
+echo -e "${BGreen}registrate, version 0.1.0${Color_Off}"
+echo -e "${Blue}registrate and combine calibrated light frames.${Color_Off}"
+echo
+
+DEFAULT_CALIBDIR="Calibrated"
+LIGHT_FILE_PREFIX="Light_"
+
+# Declate count of images to combine
+COUNT_COMBINE=$([ "$1" = "" ] && echo "0" || echo $1)
+
+# Declare source and target directories
+SOURCEDIR=$([ "$2" = "" ] && echo $DEFAULT_CALIBDIR || echo $1)
+SEQDIR="Sequence"
+TEMPDIR="temp"
+
+SEQPREFIX="Seq_"
+
+# Checking if source directory is exists
+if [ ! -d $SOURCEDIR ]; then
+  echo -e "${BRed}Error: Parameter is not a directory!${Color_Off}"
+  exit 1
+fi
+
+# Create the sequence dir, if not exists
+if [ ! -e $SEQDIR ]; then
+  mkdir $SEQDIR
+fi
+
+# Create the temp dir, if not exists
+if [ ! -e $TEMPDIR ]; then
+  mkdir $TEMPDIR
+fi
+
+# Names of the individual files storing the raw bias, dark, flat and object frames:
+COBJLIST=($SOURCEDIR/${LIGHT_FILE_PREFIX}*.fits)
+if [ ! -e ${COBJLIST[0]} ]; then
+  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+  exit 1
+fi
+
+start=`date +%s`
+
+echo "$SOURCEDIR/${LIGHT_FILE_PREFIX}*.fits -> $SOURCEDIR/combined.fits"
+
+# Common arguments (saturation level, image section & trimming, etc.):
+FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
+GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering -4 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 --triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 1 --comment"
+FICOMBINE_ARGS="-m sum -n"
+
+# ------------------------------------
+
+# make reference image from the first one
+echo "set reference image: ${COBJLIST[0]}"
+REF="${TEMPDIR}/ref.stars"
+fistar ${COBJLIST[0]} $FISTAR_ARGS -o $REF
+cp ${COBJLIST[0]} ${TEMPDIR}/`basename ${COBJLIST[0]}`
+
+# Registration of the source images:
+for f in ${COBJLIST[*]:1} ; do
+
+  echo "transform $f -> ${TEMPDIR}/`basename $f`"
+  fstars="${TEMPDIR}/`basename $f`.stars"
+  ftrans="${TEMPDIR}/`basename $f`.trans"
+
+  fistar $f $FISTAR_ARGS -o $fstars
+
+  grmatch $GRMATCH_ARGS --input $fstars --reference $REF --output-transformation $ftrans
+
+  fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/`basename $f`
+
+done
+
+# list of transformed frames
+TROBJLIST=($TEMPDIR/${LIGHT_FILE_PREFIX}*.fits)
+
+# create a sequence of combined frames
+if (( $COUNT_COMBINE != 0 )); then
+  for (( a=0; a<${#TROBJLIST[*]}; a+=$COUNT_COMBINE )) ; do
+    echo "combine ${SEQDIR}/${SEQPREFIX}$((a/COUNT_COMBINE)).fits"
+    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o ${SEQDIR}/${SEQPREFIX}$((a/COUNT_COMBINE)).fits
+  done
+fi
+
+# create a combined frame of all images
+echo "combine $TEMPDIR/${LIGHT_FILE_PREFIX}*.fits -> Combined.fits"
+ficombine ${TROBJLIST[*]} $FICOMBINE_ARGS -o Combined.fits
+
+# -------------------------------------
+
+end=`date +%s`
+
+# remove temp files
+for f in ${TROBJLIST[*]} ; do rm -f $f ; done
+rm -f $REF
+rm -f ${TEMPDIR}/*.stars
+rm -f ${TEMPDIR}/*.trans
+
+echo
+echo -e "${Blue}registration and combination is ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+#end.
+

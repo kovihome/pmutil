@@ -1,0 +1,78 @@
+#!/bin/bash
+# Make photometry on sequence of images
+# Usage:
+# 	phot <dir>
+# Options:
+#	dir	directory of light frame FITS images
+
+Color_Off="\e[0m"  # Text Reset
+BRed="\e[1;31m"    # Red
+BGreen="\e[1;32m"  # Green
+Blue="\e[0;34m"    # Blue
+
+echo
+echo -e "${BGreen}phot2, version 0.1.0${Color_Off}"
+echo -e "${Blue}make photometry against calibrated and stacked frames.${Color_Off}"
+echo
+
+DEFAULT_SEQDIR="Sequence"
+SEQ_FILE_PREFIX=$([ "$1" = "." ] && echo "Combined" || echo "Seq_")
+
+# Declare source and target directories
+# TODO: directory of master bias, dark and flat could be parametrized
+SOURCEDIR=$([ "$1" = "" ] && echo $DEFAULT_SEQDIR || echo $1)
+PHOTDIR="Phot"
+TEMPDIR="temp"
+
+# Checking if source directory is exists
+if [ ! -d $SOURCEDIR ]; then
+  echo -e "${BRed}Error: Parameter is not a directory!${Color_Off}"
+  exit 1
+fi
+
+# Names of the individual files storing the raw bias, dark, flat and object frames:
+SEQLIST=($SOURCEDIR/${SEQ_FILE_PREFIX}*.fits)
+if [ ! -e ${SEQLIST[0]} ]; then
+  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+  exit 1
+fi
+
+start=`date +%s`
+
+# Common arguments (saturation level, image section & trimming, etc.):
+
+AST_CFG="/etc/astrometry.cfg"
+SEX_CFG="/home/kovi/bin/sex.cfg"
+
+SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
+
+# ------------------------------------
+
+# Photometry of the source images:
+for f in ${SEQLIST[*]} ; do
+
+  echo "photometry of $f"
+
+  AST_FILE="`basename -s .fits $f`.ast.fits"
+  PMCAT_FILE="${PHOTDIR}/`basename $f`.cat"
+  echo $AST_FILE
+
+  /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D ${PHOTDIR} -N ${PHOTDIR}/$AST_FILE $f
+
+  sextractor ${PHOTDIR}/$AST_FILE -c $SEX_CFG -CATALOG_NAME $PMCAT_FILE -CATALOG_TYPE ASCII_HEAD
+
+  pmfilter -r ref.cat -o ${PMCAT_FILE}.pm $PMCAT_FILE
+
+done
+
+# -------------------------------------
+
+
+end=`date +%s`
+
+echo
+echo -e "${Blue}photometry is ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+#end.
+

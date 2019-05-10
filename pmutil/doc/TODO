@@ -1,0 +1,23 @@
+TODO
+----
+
+1. hot and dead pixel removing with fiign
+
+2. photometry
+
+	- fiphot
+	+ sextractor ?
+
+3. astrometry
+
+	+ astrometry.net?
+
++4. catalog matching
+
+5. all color chennels
+
+6. standardization (s15n)
+
+7. registrate: the output file index should be formatted for 3 digits
+
+
