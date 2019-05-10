@@ -6,9 +6,8 @@
 
 These scripts run on Linux, and they have some dependecies:
 
-- **python3** for .pz scripts
+- **python3** for .py scripts
 - **numpy** python package
-
 - **FITSH** 0.9.3+ (https://fitsh.net)
 - **RawTran** 1.1+ (http://integral.physics.muni.cz/rawtran/)
 - **ExifTool** 11.38+ (https://sourceforge.net/projects/exiftool/)
