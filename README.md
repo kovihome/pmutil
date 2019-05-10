@@ -1,4 +1,4 @@
-## Welcome to GitHub Pages
+## pmutil
 
 You can use the [editor on GitHub](https://github.com/kovihome/pmutil/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
 
