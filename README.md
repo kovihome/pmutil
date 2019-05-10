@@ -1,37 +1,24 @@
 ## pmutil
 
-You can use the [editor on GitHub](https://github.com/kovihome/pmutil/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
+**pmutil** is several bash and python scripts, which helps perform full fotometry pipeline. It is based on mainly the FITSH, Astrometry.net and SExtractor pakcages.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+# Preconditions
 
-### Markdown
+These scripts run on Linux, and they have some dependecies:
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+- **python3** for .pz scripts
+- **numpy** python package
 
-```markdown
-Syntax highlighted code block
+- **FITSH** 0.9.3+ (https://fitsh.net)
+- **RawTran** 1.1+ (http://integral.physics.muni.cz/rawtran/)
+- **ExifTool** 11.38+ (https://sourceforge.net/projects/exiftool/)
+- **Astrometry.net** 0.77+ (http://astrometry.net)
+- **SExtractor** 2.19.5+ (http://www.astromatic.net/software/sextractor)
 
-# Header 1
-## Header 2
-### Header 3
+# Download and install pmutil
 
-- Bulleted
-- List
+TBD.
 
-1. Numbered
-2. List
+# Usage
 
-**Bold** and _Italic_ and `Code` text
-
-[Link](url) and ![Image](src)
-```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/kovihome/pmutil/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+TBD.
