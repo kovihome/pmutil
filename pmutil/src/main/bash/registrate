@@ -90,8 +90,9 @@ TROBJLIST=($TEMPDIR/${LIGHT_FILE_PREFIX}*.fits)
 # create a sequence of combined frames
 if (( $COUNT_COMBINE != 0 )); then
   for (( a=0; a<${#TROBJLIST[*]}; a+=$COUNT_COMBINE )) ; do
-    echo "combine ${SEQDIR}/${SEQPREFIX}$((a/COUNT_COMBINE)).fits"
-    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o ${SEQDIR}/${SEQPREFIX}$((a/COUNT_COMBINE)).fits
+    printf -v fi "%03g" $((a/COUNT_COMBINE))
+    echo "combine ${SEQDIR}/${SEQPREFIX}${fi}.fits"
+    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o ${SEQDIR}/${SEQPREFIX}${fi}.fits
   done
 fi
 

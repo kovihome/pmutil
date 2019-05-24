@@ -1,0 +1,8 @@
+#!/bin/bash
+# Registrate light frames
+# Usage:
+# 	registrate <count-combined> [<dir>]
+# Options:
+#	count-combined	count of imaged to combine, if not set, combine all images in the sequence
+#	dir		directory of light frame FITS images
+

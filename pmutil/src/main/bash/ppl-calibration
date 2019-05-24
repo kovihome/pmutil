@@ -1,0 +1,572 @@
+#!/bin/bash
+# Calibration pipeline
+# Usage:
+# 	ppl-calibration [options]
+# Options:
+#
+
+usage() {
+	echo "Usage: ppl-calibration [OPTIONS]..."
+	echo "Make calibration process for raw or fits images."
+	echo
+	echo "Mandatory arguments to long options are mandatory for short options too."
+	echo "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below"
+	echo "  -cc, --count-combine n  set number of frames to combine in the sequence, 0 means all frames, default is 0"
+	echo "  -f,  --flat             make master flat frame only"
+	echo "  -h,  --help             print this page"
+	echo "  -w,  --overwrite        force to overwrite existing results"
+	echo
+	echo "Available filter color codes are:"
+	echo "  Gi | G | gi | g         green channel"
+	echo "  Bi | B | bi | b         blue channel"
+	echo "  Ri | R | ri | r         red channel"
+	echo "  all | ALL | All         all channels, results 3 separate frame"
+	echo
+}
+
+Color_Off='\033[0m'       # Text Reset
+BRed="\e[1;31m"           # Red
+BGreen='\033[1;32m'       # Green
+Blue='\033[0;34m'         # Blue
+BCyan='\e[1;36m'	  # Cyan
+
+print_error() {
+	echo -e "${BRed}Error: $1 ${Color_Off}"
+}
+
+print_warning() {
+	echo -e "${BGreen}Warning: $1 ${Color_Off}"
+}
+
+print_info() {
+	echo -e "${BCyan}$1 ${Color_Off}"
+}
+
+echo
+echo -e "${BGreen}ppl-calibration, version 0.1.0${Color_Off}"
+echo -e "${Blue}Calibrate a set of RAW or FITS images.${Color_Off}"
+echo
+
+# default setup
+. "ppl-setup"
+
+TEMPDIR="temp"
+
+# Common arguments (saturation level, image section & trimming, etc.):
+# TODO: image size from FITS header NAXIS1, NAXIS2
+COMMON_ARGS="--saturation 16000 --image 0:0:2144:1427 --trim"
+FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
+GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering -4 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 \
+	--triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 1 --comment"
+FICOMBINE_ARGS="-m sum -n"
+
+# command line options
+COLOR_CHANNEL=("Gi")
+FORCE_OVERWRITE=0
+SHOW_HELP=0
+COUNT_COMBINE=0
+FLAT_ONLY=0
+
+# process command line parameters
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-c|--color)
+			case "$2" in
+				Gi|G|gi|g)
+					COLOR_CHANNEL=("Gi")
+					;;
+				Bi|B|bi|b)
+					COLOR_CHANNEL=("Bi")
+					;;
+				Ri|R|ri|r)
+					COLOR_CHANNEL=("Ri")
+					;;
+				all|ALL|All)
+					COLOR_CHANNEL=("Gi" "Bi" "Ri")
+					;;
+				*)
+					print_error "bad color value: $2, using Gi instead."
+					COLOR_CHANNEL=("Gi")
+					;;
+			esac
+			shift
+			shift
+			;;
+		-w|--overwrite)
+			FORCE_OVERWRITE=1
+			shift
+			;;
+		-f|--flat)
+			FLAT_ONLY=1
+			shift
+			;;
+		-cc|--count-combine)
+			COUNT_COMBINE=$2
+			shift
+			shift
+			;;
+		-h|--help)
+			SHOW_HELP=1
+			shift
+			;;
+		*)
+			print_error "bad command line option: $1"
+			shift
+			;;
+	esac
+done
+
+if [ $SHOW_HELP -eq 1 ]; then
+	usage
+	exit 0
+fi
+
+# TODO: make flat only, process FLAT_ONLY option
+
+
+echo "colors: ${COLOR_CHANNEL[*]}"
+echo "force: $FORCE_OVERWRITE"
+
+######################### discover pipeline elements
+
+# step 1. discover bias directory and frame prefix
+
+if [ ! -d $BIAS_FOLDER ]; then
+	print_error "bias directory $BIAS_FOLDER is not exist ot not a directory."
+	exit 1
+fi	
+echo "bias directory $BIAS_FOLDER is exist"
+
+# step 2. discover dark directory and frame prefix
+
+if [ ! -d $DARK_FOLDER ]; then
+	print_error "dark directory $DARK_FOLDER is not exist ot not a directory."
+	exit 1
+fi	
+echo "dark directory $DARK_FOLDER is exist."
+
+
+# step 3. discover if flat bias directory is differ from bias directory
+
+if [ ! -d $FLAT_BIAS_FOLDER ]; then
+	print_warning "no separate flat bias directory, use $BIAS_FOLDER instead."
+	FLAT_BIAS_FOLDER = $BIAS_FOLDER 
+fi	
+echo "flat bias directory is $FLAT_BIAS_FOLDER"
+
+# step 4. discover if flat dark directory is differ from dark directory
+
+if [ ! -d $FLAT_DARK_FOLDER ]; then
+	print_warning "no separate flat bias directory, use $DARK_FOLDER instead."
+	FLAT_DARK_FOLDER = $DARK_FOLDER 
+fi	
+echo "flat dark directory is $FLAT_DARK_FOLDER"
+
+# step 5. discover flat directory
+
+if [ ! -d $FLAT_FOLDER ]; then
+	print_error "flat directory $FLAT_FOLDER is not exist ot not a directory."
+	exit 1
+fi	
+echo "flat directory $FLAT_FOLDER is exists."
+
+# step 6. discover light directories and directory name convention
+if [ ! -d $LIGHT_FOLDER ]; then
+	print_error "light directory $LIGHT_FOLDER is not exist ot not a directory."
+	exit 1
+fi	
+echo "light directory $LIGHT_FOLDER is exist."
+
+# step 7. create the temp dir, if not exists
+if [ ! -e $TEMPDIR ]; then
+  mkdir $TEMPDIR
+fi
+
+
+
+
+######################### process calibration pipeline
+
+start=`date +%s`
+
+raw2fits_file() {
+#	echo "rawfile: $1, color: $2"
+	local rawfile=$1
+	local FITS_NAME=${rawfile%.*}-$2.fits
+#	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e $FITS_NAME ]; then
+	if [ ! -e $FITS_NAME ]; then
+		echo "$rawfile -> $FITS_NAME"
+		rawtran -c $2 -o $FITS_NAME -B 16 -C '-4 -D' -X '-q 3 -w' $rawfile
+		local IMAGETEMP=`exiftool -s -g $rawfile | grep -i CameraTemperature | sed 's/[^0-9]//g'`
+		fiheader --append "CCD-TEMP=${IMAGETEMP}./CCD Temperature (Celsius)" $FITS_NAME
+	fi
+}
+
+raw2fits() {
+	# list of raw CR2 file in the input directory
+	local RAWFILES=$1/*.cr2
+	
+	# for all raw file do the conversion
+	for rawfile in $1/*.cr2; do
+		for color in "${COLOR_CHANNEL[@]}"; do
+			raw2fits_file $rawfile $color
+		done
+	done
+}
+
+make_master_bias() {
+	local BIASLIST=($1/${BIAS_FILE_PREFIX}*-$2.fits)
+	if [ ! -e ${BIASLIST[0]} ]; then
+		return 1
+#	  echo -e "${BRed}Error: No bias files in the directory.${Color_Off}"
+#	  exit 1
+	fi
+	
+	echo "$1/${BIAS_FILE_PREFIX}*-$2.fits -> $1/${MASTER_BIAS_FILE}-$2.fits"
+	
+	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
+	local R_BIASLIST=($(for f in ${BIASLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
+	
+	# The calibration of the individual bias frames, followed by their combination into a single master image:
+	ficalib -i ${BIASLIST[*]} $COMMON_ARGS -o ${R_BIASLIST[*]}
+	ficombine ${R_BIASLIST[*]} --mode median -o $1/${MASTER_BIAS_FILE}-$2.fits
+
+	# cleanup: remove temp files
+	for f in ${R_BIASLIST[*]} ; do rm -f $f ; done
+
+	return 0
+}
+
+make_master_dark() {
+
+	# Names of the individual files storing the raw bias, dark, flat and object frames:
+	local DARKLIST=($1/${DARK_FILE_PREFIX}*-$2.fits)
+	#echo ${DARKLIST[*]}
+	if [ ! -e ${DARKLIST[0]} ]; then
+		return 1
+#	  echo -e "${BRed}Error: No dark files in the directory.${Color_Off}"
+#	  exit 1
+	fi
+
+	echo "$1/${DARK_FILE_PREFIX}*-$2.fits -> $1/${MASTER_DARK_FILE}-$2.fits"
+
+	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
+	local R_DARKLIST=($(for f in ${DARKLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
+
+	# The calibration of the individual bias frames, followed by their combination into a single master image:
+	ficalib -i ${DARKLIST[*]} $COMMON_ARGS -o ${R_DARKLIST[*]} --input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits
+	ficombine ${R_DARKLIST[*]} --mode median -o $1/${MASTER_DARK_FILE}-$2.fits
+
+	# Calculate average ccd temperature from .cr2 files, and set it into the master dark
+	local sum=0
+	local count=0
+	for f in $1/${DARK_FILE_PREFIX}*.cr2 ; do
+	  IMAGETEMP=`exiftool -s -g $f | grep -i CameraTemperature | sed 's/[^0-9]//g'`
+	  sum=$(( $sum+$IMAGETEMP ))
+	  count=$(( $count+1 ))
+	done
+	local AVGTEMP=$(( ($sum+($count/2))/$count ))
+	echo "average dark temperature: $AVGTEMP C"
+
+	fiheader --append "CCD-TEMP=${AVGTEMP}./CCD Temperature (Celsius)" $1/${MASTER_DARK_FILE}-$2.fits
+
+	# cleanup: remove temp files
+	for f in ${R_DARKLIST[*]} ; do rm -f $f ; done
+
+	return 0
+}
+
+make_master_flat() {
+	# Names of the individual files storing the raw bias, dark, flat and object frames:
+	FLATLIST=($1/${FLAT_FILE_PREFIX}*-$2.fits)
+	if [ ! -e ${FLATLIST[0]} ]; then
+		return 1
+#	  	echo -e "${BRed}Error: No flat files in the directory.${Color_Off}"
+#	  	exit 1
+	fi
+
+	echo "$1/${FLAT_FILE_PREFIX}*-$2.fits -> $1/${MASTER_FLAT_FILE}-$2.fits"
+
+	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
+	R_FLATLIST=($(for f in ${FLATLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
+
+	# The calibration of the individual flat frames, followed by their combination into a single master image:
+	ficalib -i ${FLATLIST[*]} $COMMON_ARGS --post-scale 20000 -o ${R_FLATLIST[*]} \
+		--input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits --input-master-dark $4/${MASTER_DARK_FILE}-$2.fits
+	ficombine ${R_FLATLIST[*]} --mode median -o $1/${MASTER_FLAT_FILE}-$2.fits
+
+	# remove temp files
+	for f in ${R_FLATLIST[*]} ; do rm -f $f ; done
+
+	return 0
+}
+
+calibrate() {
+	# $1 - source directory
+	# $2 - color
+
+	local MB=$BIAS_FOLDER/${MASTER_BIAS_FILE}-$2.fits
+	local MD=$DARK_FOLDER/${MASTER_DARK_FILE}-$2.fits
+	local MF=$FLAT_FOLDER/${MASTER_FLAT_FILE}-$2.fits
+
+	# Names of the individual files storing the raw bias, dark, flat and object frames:
+	IOBJLIST=($1/${LIGHT_FILE_PREFIX}*-$2.fits)
+	if [ ! -e ${IOBJLIST[0]} ]; then
+		return 1
+#	  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+#	  exit 1
+	fi
+
+	echo "$1/${LIGHT_FILE_PREFIX}*-$2.fits -> $CALIB_FOLDER/${LIGHT_FILE_PREFIX}*-$2.fits"
+
+	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
+	R_IOBJLIST=($(for f in ${IOBJLIST[*]} ; do echo ${CALIB_FOLDER}/`basename $f` ; done ))
+
+	# The calibration of the object images:
+	ficalib -i ${IOBJLIST[*]} $COMMON_ARGS -o ${R_IOBJLIST[*]} --input-master-bias $MB \
+		--input-master-dark $MD --input-master-flat $MF
+
+	return 0
+}
+
+registrate() {
+	# $1 - color
+
+	# Names of the individual files storing the raw bias, dark, flat and object frames:
+	COBJLIST=($CALIB_FOLDER/${LIGHT_FILE_PREFIX}*-$1.fits)
+	if [ ! -e ${COBJLIST[0]} ]; then
+		return 1
+#	  echo -e "${BRed}Error: No light frames in the directory.${Color_Off}"
+#	  exit 1
+	fi
+
+	echo "$SOURCEDIR/${LIGHT_FILE_PREFIX}*-$1.fits -> $SOURCEDIR/combined-$1.fits"
+
+	# ------------------------------------
+
+	# make reference image from the first one
+	echo "set reference image: ${COBJLIST[0]}"
+	REF="${TEMPDIR}/ref.stars"
+	fistar ${COBJLIST[0]} $FISTAR_ARGS -o $REF
+	cp ${COBJLIST[0]} ${TEMPDIR}/`basename ${COBJLIST[0]}`
+
+	# Registration of the source images:
+	for f in ${COBJLIST[*]:1} ; do
+
+	  echo "transform $f -> ${TEMPDIR}/`basename $f`"
+	  fstars="${TEMPDIR}/`basename $f`.stars"
+	  ftrans="${TEMPDIR}/`basename $f`.trans"
+
+	  fistar $f $FISTAR_ARGS -o $fstars
+
+	  grmatch $GRMATCH_ARGS --input $fstars --reference $REF --output-transformation $ftrans
+
+	  fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/`basename $f`
+
+	done
+
+	# list of transformed frames
+	TROBJLIST=($TEMPDIR/${LIGHT_FILE_PREFIX}*.fits)
+
+	# create a sequence of combined frames
+	if (( $COUNT_COMBINE != 0 )); then
+	  for (( a=0; a<${#TROBJLIST[*]}; a+=$COUNT_COMBINE )) ; do
+	    printf -v fi "%03g" $((a/COUNT_COMBINE))
+	    echo "combine ${SEQDIR}/${SEQPREFIX}${fi}.fits"
+	    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o ${SEQDIR}/${SEQPREFIX}${fi}-$1.fits
+	  done
+	fi
+
+	# create a combined frame of all images
+	echo "combine $TEMPDIR/${LIGHT_FILE_PREFIX}*.fits -> Combined-$1.fits"
+	ficombine ${TROBJLIST[*]} $FICOMBINE_ARGS -o Combined-$1.fits
+
+	# cleanup - remove temp files
+	for f in ${TROBJLIST[*]} ; do rm -f $f ; done
+	rm -f $REF
+	rm -f ${TEMPDIR}/*.stars
+	rm -f ${TEMPDIR}/*.trans
+}
+
+masters_exist() {
+	local EXISTS=1
+	for color in "${COLOR_CHANNEL[@]}"; do
+		MB=$1/$2-$color.fits
+		if [ ! -e $MB ]; then 
+			EXISTS=0 
+		fi
+	done
+	return $EXISTS
+}
+
+process_bias() {
+	masters_exist $1 $MASTER_BIAS_FILE
+	#if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+	if [ $? -eq 0 ]; then
+		print_info "$2: Convert bias RAW files to FITS."
+		raw2fits $1
+
+		print_info "$2: Create master bias file(s)."
+		for color in "${COLOR_CHANNEL[@]}"; do
+			make_master_bias $1 $color 
+		done
+	else
+		print_info "$2: Master bias file(s) are already created."
+	fi
+	# TODO: create bias FITS files in temp folder
+	# TODO: cleanup - delete bias FITS files
+}
+
+process_dark() {
+	masters_exist $1 $MASTER_DARK_FILE
+	#if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+	if [ $? -eq 0 ]; then
+		print_info "$3: Convert dark RAW files to FITS."
+		raw2fits $1
+
+		print_info "$3: Create master dark file(s)."
+		for color in "${COLOR_CHANNEL[@]}"; do
+			make_master_dark $1 $color $2
+		done
+	else
+		print_info "$3: Master dark file(s) are already created."
+	fi
+	# TODO: create dark FITS files in temp folder
+	# TODO: cleanup - delete dark FITS files
+}
+
+process_flat() {
+	print_info "$4: Convert flat RAW files to FITS."
+	raw2fits $1
+
+	print_info "$4: Create master dark file(s)."
+	for color in "${COLOR_CHANNEL[@]}"; do
+		make_master_flat $1 $color $2 $3
+	done
+}
+
+process_calibration() {
+	# S1 - light folder
+	# $2 - title
+	print_info "$2: Convert light RAW files to FITS."
+	raw2fits $1
+
+	print_info "$2: Create calibrated light file(s)."
+
+	# Create dir for the calibrated images, if not exists
+	if [ ! -e $CALIB_FOLDER ]; then
+	  mkdir $CALIB_FOLDER
+	fi
+
+	for color in "${COLOR_CHANNEL[@]}"; do
+		calibrate $1 $color
+	done
+	# TODO: cleanup - delete light FITS files
+}
+
+process_registration() {
+
+	print_info "$1: Create calibrated light file(s)."
+
+	# Create the sequence dir, if not exists
+	if [ ! -e $SEQ_FOLDER ]; then
+	  mkdir $SEQ_FOLDER
+	fi
+
+	for color in "${COLOR_CHANNEL[@]}"; do
+		registrate $color
+	done
+	# TODO: cleanup - delete light FITS files
+
+
+
+}
+
+####################################
+# step 1. create master bias frame
+####################################
+
+#masters_exist $BIAS_FOLDER $MASTER_BIAS_FILE
+##if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+#if [ $? -eq 0 ]; then
+#	print_info "BIAS: Convert bias RAW files to FITS."
+#	raw2fits $BIAS_FOLDER
+#
+#	print_info "BIAS: Create master bias file(s)."
+#	for color in "${COLOR_CHANNEL[@]}"; do
+#		make_master_bias $BIAS_FOLDER $color 
+#	done
+#else
+#	print_info "BIAS: Master bias file(s) are already created."
+#fi
+## TODO: create bias FITS files in temp folder
+## TODO: cleanup - delete bias FITS files
+process_bias $BIAS_FOLDER "BIAS"
+
+####################################
+# step 2. create master dark frame
+####################################
+
+#masters_exist $DARK_FOLDER $MASTER_DARK_FILE
+##if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+#if [ $? -eq 0 ]; then
+#	print_info "DARK: Convert dark RAW files to FITS."
+#	raw2fits $DARK_FOLDER
+#
+#	print_info "DARK: Create master dark file(s)."
+#	for color in "${COLOR_CHANNEL[@]}"; do
+#		make_master_dark $DARK_FOLDER $color $BIAS_FOLDER
+#	done
+#else
+#	print_info "DARK: Master dark file(s) are already created."
+#fi
+## TODO: create dark FITS files in temp folder
+## TODO: cleanup - delete dark FITS files
+process_dark $DARK_FOLDER $BIAS_FOLDER "DARK"
+
+# process flat bias, flat dark and flat, only if flat master is not exist
+masters_exist $FLAT_FOLDER $MASTER_FLAT_FILE
+#if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+if [ $? -eq 0 ]; then
+
+############################################################################
+# step 3. create master flat bias frame, if it is differs from master bias
+############################################################################
+	if [ $FLAT_BIAS_FOLDER != $BIAS_FOLDER ]; then
+		process_bias $FLAT_BIAS_FOLDER "FLAT BIAS"
+	fi
+
+############################################################################
+# step 4. create master flat dark frame, if it is differs from mastre dark
+############################################################################
+	if [ $FLAT_DARK_FOLDER != $DARK_FOLDER ]; then
+		process_dark $FLAT_DARK_FOLDER $FLAT_BIAS_FOLDER "FLAT DARK"
+	fi
+
+##############################
+# step 5. create master flat
+##############################
+	process_flat $FLAT_FOLDER $FLAT_BIAS_FOLDER $FLAT_DARK_FOLDER "FLAT"
+
+else
+	print_info "FLAT: Master flat file(s) are already created."
+fi
+
+##################################
+# step 6. calibrate light frames
+##################################
+process_calibration $LIGHT_FOLDER "CALIBRATE"
+
+###############################################
+# step 7. registrate and combine light frames
+###############################################
+process_registration "REGISTRATE"
+
+end=`date +%s`
+
+echo
+echo -e "${Blue}Calibration is ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+# end.
+

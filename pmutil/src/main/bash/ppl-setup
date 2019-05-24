@@ -1,0 +1,25 @@
+#!/bin/bash
+# Pipeline setup
+#
+
+# standard Ekos folder names
+BIAS_FOLDER="Bias"
+DARK_FOLDER="Dark"
+FLAT_BIAS_FOLDER="Flat-Bias"
+FLAT_DARK_FOLDER="Flat-Dark"
+FLAT_FOLDER="Flat"
+LIGHT_FOLDER="Light"
+CALIB_FOLDER="Calibrated"
+SEQ_FOLDER="Sequence"
+
+# standard Ekos file prefixes
+BIAS_FILE_PREFIX="Bias_"
+DARK_FILE_PREFIX="Dark_"
+FLAT_FILE_PREFIX="Flat_"
+LIGHT_FILE_PREFIX="Light_"
+SEQ_FILE_PREFIX="Seq_"
+
+MASTER_BIAS_FILE="master-bias"
+MASTER_DARK_FILE="master-dark"
+MASTER_FLAT_FILE="master-flat"
+

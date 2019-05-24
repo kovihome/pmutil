@@ -1,23 +1,31 @@
 TODO
 ----
 
-1. hot and dead pixel removing with fiign
+#449	Hot/dead pixel kezelés
+#454	+ Calibration pipeline vezérlő script
+#456	+ Master framek készítésénél --force opció
+#448	+ 3D fits file kezelés
+#453	FITS headerek
+#457	+ Konfigurációs file
+#459	Dark library kezelés
+#460	Konzerv flat használata
 
-2. photometry
+#450	Standardizálás
+#451	Catalog matching
+#452	Ensemble variációk
+#455	Photometry pipeline vezérlő script
 
+1. photometry
 	- fiphot
-	+ sextractor ?
+	- sextractor fotometria finomitas
 
-3. astrometry
+Cmmand line options:
 
-	+ astrometry.net?
-
-+4. catalog matching
-
-5. all color chennels
-
-6. standardization (s15n)
-
-7. registrate: the output file index should be formatted for 3 digits
-
-
+	-c, --color CCC		color channel (filter), CCC = 
+							Gi | G | gi | g		green channel
+							Bi | B | bi | b		blue channel
+							Ri | R | ri | r		red channel
+							all 				all channels in separate files
+							3d | 3D				all channels in 3D fits format
+							
+	-f, --force			recreate and overwrite master frames
