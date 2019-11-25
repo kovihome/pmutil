@@ -58,7 +58,8 @@ echo "$SOURCEDIR/${LIGHT_FILE_PREFIX}*.fits -> $SOURCEDIR/combined.fits"
 
 # Common arguments (saturation level, image section & trimming, etc.):
 FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
-GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering -4 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 --triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 1 --comment"
+GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 --triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 \
+--order 2 --max-distance 2 --comment"
 FICOMBINE_ARGS="-m sum -n"
 
 # ------------------------------------

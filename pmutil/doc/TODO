@@ -10,6 +10,9 @@ TODO
 #459	Dark library kezelés
 #460	Konzerv flat használata
 
+----	Clean option, ami kitakaritja a legyartott fits file-okat *felt;ve, ha cr2 volt az alap
+		Ezt egybe lehet gyurni az archivalas funkcioval, illetve az archivalas egyben takaritson is
+
 #450	Standardizálás
 #451	Catalog matching
 #452	Ensemble variációk
