@@ -3,14 +3,14 @@
 #
 
 # standard Ekos folder names
-BIAS_FOLDER="Bias"
-DARK_FOLDER="Dark"
-FLAT_BIAS_FOLDER="Flat-Bias"
-FLAT_DARK_FOLDER="Flat-Dark"
-FLAT_FOLDER="Flat"
-LIGHT_FOLDER="Light"
-CALIB_FOLDER="Calibrated"
-SEQ_FOLDER="Sequence"
+BIAS_FOLDER_NAME="Bias"
+DARK_FOLDER_NAME="Dark"
+FLAT_BIAS_FOLDER_NAME="Flat-Bias"
+FLAT_DARK_FOLDER_NAME="Flat-Dark"
+FLAT_FOLDER_NAME="Flat"
+LIGHT_FOLDER_NAME="Light"
+CALIB_FOLDER_NAME="Calibrated"
+SEQ_FOLDER_NAME="Sequence"
 
 # standard Ekos file prefixes
 BIAS_FILE_PREFIX="Bias_"
@@ -23,3 +23,8 @@ MASTER_BIAS_FILE="master-bias"
 MASTER_DARK_FILE="master-dark"
 MASTER_FLAT_FILE="master-flat"
 
+# setup marker: do not modify
+
+PPL_SETUP=OK
+
+# end.

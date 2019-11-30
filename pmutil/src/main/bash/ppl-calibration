@@ -10,12 +10,14 @@ usage() {
 	echo "Make calibration process for raw or fits images."
 	echo
 	echo "Mandatory arguments to long options are mandatory for short options too."
-	echo "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below"
-	echo "  -cc, --count-combine n  set number of frames to combine in the sequence, 0 means all frames, default is 0"
-	echo "  -f,  --flat             make master flat frame only"
-	echo "  -mf, --master-flat folder use the given master-flat folder"
-	echo "  -h,  --help             print this page"
-	echo "  -w,  --overwrite        force to overwrite existing results"
+	echo "  -c,  --color arg                set filter(s), arg is the color code, default color is 'Gi', for available color codes see below"
+	echo "  -cc, --count-combine n          set number of frames to combine in the sequence, 0 means all frames, default is 0"
+	echo "  -f,  --flat                     make master flat frame only"
+	echo "  -mf, --master-flat folder       use the given master-flat folder"
+	echo "  -t,  --image-time LT|UT         specify orignal image time zone, LT=local time, UT=universal time"
+	echo "  -w,  --overwrite                force to overwrite existing results"
+	echo "  -e,  --on-error noop|skip|stop  specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all"
+	echo "  -h,  --help                     print this page"
 	echo
 	echo "Available filter color codes are:"
 	echo "  Gi | G | gi | g         green channel"
@@ -43,17 +45,20 @@ print_info() {
 	echo -e "${BCyan}$1 ${Color_Off}"
 }
 
+exit_on_error() {
+	print_warning "Processing stop on error."
+}
+
 echo
 echo -e "${BGreen}ppl-calibration, version 0.1.0${Color_Off}"
 echo -e "${Blue}Calibrate a set of RAW or FITS images.${Color_Off}"
 echo
 
 # Common arguments (saturation level, image section & trimming, etc.):
-# TODO: image size from FITS header NAXIS1, NAXIS2
-COMMON_ARGS="--saturation 16000 --image 0:0:2144:1427 --trim"
+COMMON_ARGS="--saturation 16000 --trim"
 FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
 GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 \
-	--triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 2 --comment"
+	--triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 3 --comment"
 FICOMBINE_ARGS="-m sum -n"
 
 # command line options
@@ -63,10 +68,14 @@ SHOW_HELP=0
 COUNT_COMBINE=0
 FLAT_ONLY=0
 USE_MASTER_FLAT=0
+# timestamp in the image, values are: LT (for local time) or UT (universal time) 
+IMAGE_TIME="LT"
 MASTER_FLAT=""
 BASE_FOLDER=""
+ON_ERROR="noop"
 
 # process command line parameters
+ARGS_SAVE=$*
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		-c|--color)
@@ -110,6 +119,24 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
+		-t|--image-time)
+			if [ '$2' == 'LT' || '$2' == 'UT' ]; then
+				IMAGE_TIME=$2
+			else
+				print_error "bad image time zone value: $2, using default $IMAGE_TIME instead."
+			fi
+			shift
+			shift
+			;;
+		-e|--on-error)
+			if [ '$2' == 'noop' || '$2' == 'stop' || '$2' == 'skip' ]; then
+				ON_ERROR=$2
+			else
+				print_error "bad on-error instruction; available values are: noop, stop, skip."
+			fi
+			shift
+			shift
+			;;
 		-h|--help)
 			SHOW_HELP=1
 			shift
@@ -136,22 +163,16 @@ if [ ! "$BASE_FOLDER" == "" ] ; then
   fi
 fi
 
-if [ ! "$MASTER_FLAT" == "" ] ; then
-  if [ ! -d $MASTER_FLAT ] ; then
-    print_error "Master-flat folder $MASTER_FLAT not exists."
-    exit 1
-  else
-    if [ ! -e $MASTER_FLAT/${MASTER_FLAT_FILE}-*.fits ] ; then
-      print_error "No master-flat file in the directory $MASTER_FLAT"
-    else
-      echo "master-flat: $MASTER_FLAT"
-    fi
-  fi
-fi
-
 echo "colors: ${COLOR_CHANNEL[*]}"
 echo "force: $FORCE_OVERWRITE"
 echo "count combine: $COUNT_COMBINE"
+
+# save command into file
+if [ "$BASE_FOLDER" != "" ]; then
+	echo "ppl-calibration $ARGS_SAVE" > $BASE_FOLDER/calibration
+else
+	echo "ppl-calibration $ARGS_SAVE" > ./calibration
+fi
 
 ######################### discover pipeline elements
 
@@ -165,60 +186,28 @@ TEMPDIR="temp"
 . "ppl-disco" $FLAT_ONLY $USE_MASTER_FLAT $BASE_FOLDER
 
 if [ ! "$MASTER_FLAT" == "" ] ; then
-  FLAT_FOLDER=$MASTER_FLAT
+  if [ ! -d $MASTER_FLAT ] ; then
+    print_error "Master-flat folder $MASTER_FLAT not exists."
+    exit 1
+  else
+    has_master=1
+    for c in "${COLOR_CHANNEL[@]}" ; do
+      echo "$MASTER_FLAT/${MASTER_FLAT_FILE}-${c}.fits"
+      if [ ! -e $MASTER_FLAT/${MASTER_FLAT_FILE}-${c}.fits ] ; then
+        print_error "No ${c} master-flat file in the directory $MASTER_FLAT"
+        has_master=0
+      fi
+    done
+    if [ ${has_master} = 1 ] ; then
+      FLAT_FOLDER=$MASTER_FLAT
+      echo "master-flat: $MASTER_FLAT"
+    else
+      exit 1
+    fi
+  fi
 fi
 
-#set +x
-
-# step 1. discover bias directory and frame prefix
-
-#if [ ! -d $BIAS_FOLDER ]; then
-#	print_error "bias directory $BIAS_FOLDER is not exist ot not a directory."
-#	exit 1
-#fi	
-#echo "bias directory $BIAS_FOLDER is exist"
-
-# step 2. discover dark directory and frame prefix
-
-#if [ ! -d $DARK_FOLDER ]; then
-#	print_error "dark directory $DARK_FOLDER is not exist ot not a directory."
-#	exit 1
-#fi	
-#echo "dark directory $DARK_FOLDER is exist."
-
-
-# step 3. discover if flat bias directory is differ from bias directory
-
-#if [ ! -d $FLAT_BIAS_FOLDER ]; then
-#	print_warning "no separate flat bias directory, use $BIAS_FOLDER instead."
-#	FLAT_BIAS_FOLDER = $BIAS_FOLDER 
-#fi	
-#echo "flat bias directory is $FLAT_BIAS_FOLDER"
-
-# step 4. discover if flat dark directory is differ from dark directory
-
-#if [ ! -d $FLAT_DARK_FOLDER ]; then
-#	print_warning "no separate flat bias directory, use $DARK_FOLDER instead."
-#	FLAT_DARK_FOLDER = $DARK_FOLDER 
-#fi	
-#echo "flat dark directory is $FLAT_DARK_FOLDER"
-
-# step 5. discover flat directory
-
-#if [ ! -d $FLAT_FOLDER ]; then
-#	print_error "flat directory $FLAT_FOLDER is not exist ot not a directory."
-#	exit 1
-#fi	
-#echo "flat directory $FLAT_FOLDER is exists."
-
-# step 6. discover light directories and directory name convention
-#if [ ! -d $LIGHT_FOLDER ]; then
-#	print_error "light directory $LIGHT_FOLDER is not exist ot not a directory."
-#	exit 1
-#fi	
-#echo "light directory $LIGHT_FOLDER is exist."
-
-# step 7. create the temp dir, if not exists
+# create the temp dir, if not exists
 if [ ! -e $TEMPDIR ]; then
   mkdir $TEMPDIR
 fi
@@ -227,8 +216,15 @@ fi
 
 start=`date +%s`
 
+im_size_arg() {
+#	$1 - FITS file name
+	local NAXIS1=`fiheader --get NAXIS1 $1`
+	local NAXIS2=`fiheader --get NAXIS2 $1`
+	echo "--image 0:0:$((NAXIS1-1)):$((NAXIS2-1))"
+}
+
 raw2fits_file() {
-#	echo "rawfile: $1, color: $2"
+#	rawfile: $1, color: $2
 	local rawfile=$1
 	local FITS_NAME=${rawfile%.*}-$2.fits
 #	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e $FITS_NAME ]; then
@@ -237,6 +233,11 @@ raw2fits_file() {
 		rawtran -c $2 -o $FITS_NAME -B 16 -C '-4 -D' -X '-q 3 -w' $rawfile
 		local IMAGETEMP=`exiftool -s -g $rawfile | grep -i CameraTemperature | sed 's/[^0-9]//g'`
 		fiheader --append "CCD-TEMP=${IMAGETEMP}./CCD Temperature (Celsius)" $FITS_NAME
+		if [ $IMAGE_TIME == "LT" ]; then
+			local IMAGE_DATE=`fiheader --get DATE-OBS $FITS_NAME`
+			local IMAGE_DATE_UTC=`pmlt2ut $IMAGE_DATE`
+			sethead -s _ $FITS_NAME DATE-OBS="$IMAGE_DATE_UTC" DATE-IMG="$IMAGE_DATE" / Original_image_date_(in_local_time)
+		fi
 	fi
 }
 
@@ -266,7 +267,7 @@ make_master_bias() {
 	local R_BIASLIST=($(for f in ${BIASLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
 	
 	# The calibration of the individual bias frames, followed by their combination into a single master image:
-	ficalib -i ${BIASLIST[*]} $COMMON_ARGS -o ${R_BIASLIST[*]}
+	ficalib -i ${BIASLIST[*]} $COMMON_ARGS $(im_size_arg "${BIASLIST[0]}") -o ${R_BIASLIST[*]}
 	ficombine ${R_BIASLIST[*]} --mode median -o $1/${MASTER_BIAS_FILE}-$2.fits
 
 	# cleanup: remove temp files
@@ -292,7 +293,7 @@ make_master_dark() {
 	local R_DARKLIST=($(for f in ${DARKLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
 
 	# The calibration of the individual bias frames, followed by their combination into a single master image:
-	ficalib -i ${DARKLIST[*]} $COMMON_ARGS -o ${R_DARKLIST[*]} --input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits
+	ficalib -i ${DARKLIST[*]} $COMMON_ARGS $(im_size_arg "${DARKLIST[0]}") -o ${R_DARKLIST[*]} --input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits
 	ficombine ${R_DARKLIST[*]} --mode median -o $1/${MASTER_DARK_FILE}-$2.fits
 
 	# Calculate average ccd temperature from .cr2 files, and set it into the master dark
@@ -329,7 +330,7 @@ make_master_flat() {
 	R_FLATLIST=($(for f in ${FLATLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
 
 	# The calibration of the individual flat frames, followed by their combination into a single master image:
-	ficalib -i ${FLATLIST[*]} $COMMON_ARGS --post-scale 20000 -o ${R_FLATLIST[*]} \
+	ficalib -i ${FLATLIST[*]} $COMMON_ARGS $(im_size_arg "${FLATLIST[0]}") --post-scale 20000 -o ${R_FLATLIST[*]} \
 		--input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits --input-master-dark $4/${MASTER_DARK_FILE}-$2.fits
 	ficombine ${R_FLATLIST[*]} --mode median -o $1/${MASTER_FLAT_FILE}-$2.fits
 
@@ -362,7 +363,7 @@ calibrate() {
 	local R_IOBJLIST=($(for f in ${IOBJLIST[*]} ; do echo $2/`basename $f` ; done ))
 
 	# The calibration of the object images:
-	ficalib -i ${IOBJLIST[*]} $COMMON_ARGS -o ${R_IOBJLIST[*]} --input-master-bias $MB \
+	ficalib -i ${IOBJLIST[*]} $COMMON_ARGS $(im_size_arg ${IOBJLIST[0]}) -o ${R_IOBJLIST[*]} --input-master-bias $MB \
 		--input-master-dark $MD --input-master-flat $MF
 
 	return 0
@@ -372,7 +373,7 @@ registrate() {
 	# $1 - calib folder
 	# $2 - seq folder
 	# $3 - color
-#set -x
+
 	# Names of the individual files storing the raw bias, dark, flat and object frames:
 	local COBJLIST=($1/${LIGHT_FILE_PREFIX}*-$3.fits)
 	if [ ! -e ${COBJLIST[0]} ]; then
@@ -404,7 +405,17 @@ registrate() {
 
 	  grmatch $GRMATCH_ARGS --input $fstars --reference $REF --output-transformation $ftrans
 
-	  fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
+	  local match_failed=`grep -c "Match failed" ${ftrans}`
+	  if [ ${match_failed} == 1 ]; then
+	    print_error "Match failed on $f."
+	    if [ $ON_ERROR == "stop" ]; then
+	    	exit_on_error
+	    fi
+	  fi
+
+	  if [ ${match_failed} == 0 ] || [ $ON_ERROR == "skip" ]; then
+	  	fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
+	  fi
 
 	done
 
@@ -417,20 +428,20 @@ registrate() {
 	    printf -v fi "%03g" $((a/COUNT_COMBINE))
 	    echo "combine $2/${SEQPREFIX}${fi}.fits"
 	    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o $2/${SEQPREFIX}${fi}-$3.fits
+	    pmdateobs $2/${SEQPREFIX}${fi}-$3.fits ${TROBJLIST[*]:a:COUNT_COMBINE}
 	  done
 	fi
 
 	# create a combined frame of all images
 	echo "combine $TEMPDIR/${LIGHT_FILE_PREFIX}*-$3.fits -> $2/Combined-$3.fits"
 	ficombine ${TROBJLIST[*]} $FICOMBINE_ARGS -o $2/Combined-$3.fits
+	pmdateobs $2/Combined-$3.fits ${TROBJLIST[*]} 
 
 	# cleanup - remove temp files
 	for f in ${TROBJLIST[*]} ; do rm -f $f ; done
 	rm -f $REF
 	rm -f ${TEMPDIR}/*.stars
 	rm -f ${TEMPDIR}/*.trans
-
-#set +x
 }
 
 masters_exist() {
