@@ -1,34 +1,63 @@
 TODO
 ----
 
-#449	Hot/dead pixel kezelés
-#454	+ Calibration pipeline vezérlő script
-#456	+ Master framek készítésénél --force opció
-#448	+ 3D fits file kezelés
-#453	FITS headerek
-#457	+ Konfigurációs file
-#459	Dark library kezelés
-#460	Konzerv flat használata
+--- calibration --------------------------------------------
 
-----	Clean option, ami kitakaritja a legyartott fits file-okat *felt;ve, ha cr2 volt az alap
-		Ezt egybe lehet gyurni az archivalas funkcioval, illetve az archivalas egyben takaritson is
+- check grmatch result, stop processing, when match failed.
 
-#450	Standardizálás
-#451	Catalog matching
-#452	Ensemble variációk
-#455	Photometry pipeline vezérlő script
+	grep -c "Match failed" Light_006-Bi.fits.trans	-> 0 | 1
 
-1. photometry
-	- fiphot
-	- sextractor fotometria finomitas
+	ilyenkor ki kellene zarni a problemas filet
 
-Cmmand line options:
+- config: tetszoleges parameter megadhato legyen command lineban
 
-	-c, --color CCC		color channel (filter), CCC = 
-							Gi | G | gi | g		green channel
-							Bi | B | bi | b		blue channel
-							Ri | R | ri | r		red channel
-							all 				all channels in separate files
-							3d | 3D				all channels in 3D fits format
-							
-	-f, --force			recreate and overwrite master frames
+	pl: -D max-distance=4
+
+	COMMON_ARGS:
+		saturation nnn
+	FISTAR_ARGS:
+		algorithm [uplink]
+		prominence fff.f
+		model [elliptic]
+	GRMATCH_ARGS:
+		triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002
+		order nnn
+		max-distance nnn
+	FICOMBINE_ARGS:
+		m [sum] (combination algorithm)
+
++(454) calibrate pipeline script
+
++(448) all color channels
+
++(456) --force option for master frames
+
+(462) more light folders, locate all folders, including bias, dark and flat, with given pattern (typically obs date)
+
+	- light folder conventions:
+
+		*obsdate*/Light*
+
+(468) common Bias, Dark and Flat folder for all object
+
+(460) use canned flat, with -f??? option
+
+(449) hot and dead pixel removing with fiign
+
+(465) -c??? clean and -a archivate + clean options
+
+--- photometry ---------------------------------------------
+
++(455) photometry pipeline script
+
+(450) standardization (s15n)
+
+(451) catalog matching
+
+- fiphot
+
+
+
+
+
+

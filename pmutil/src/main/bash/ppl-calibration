@@ -53,7 +53,7 @@ echo
 COMMON_ARGS="--saturation 16000 --image 0:0:2144:1427 --trim"
 FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
 GRMATCH_ARGS="--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 \
-	--triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 2 --comment"
+	--triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 3 --comment"
 FICOMBINE_ARGS="-m sum -n"
 
 # command line options
@@ -403,6 +403,11 @@ registrate() {
 	  fistar $f $FISTAR_ARGS -o $fstars
 
 	  grmatch $GRMATCH_ARGS --input $fstars --reference $REF --output-transformation $ftrans
+
+	  local match_failed=`grep -c "Match failed" ${ftrans}`
+	  if [ ${match_failed} = 1 ]; then
+	    print_error "Match failed on $f."
+	  fi
 
 	  fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
 
