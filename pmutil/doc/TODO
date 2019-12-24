@@ -36,6 +36,20 @@ TODO
 
 (465) -a archivate + clean options
 
+(462) more light folders, locate all folders, including bias, dark and flat, with given pattern (typically obs date)
+
+	- light folder conventions:
+
+		*obsdate*/Light*
+
+(468) common Bias, Dark and Flat folder for all object
+
+(460) use canned flat, with -f??? option
+
+(449) hot and dead pixel removing with fiign
+
+(465) -c??? clean and -a archivate + clean options
+
 --- photometry ---------------------------------------------
 
 +(455) photometry pipeline script
