@@ -11,6 +11,7 @@ FLAT_FOLDER_NAME="Flat"
 LIGHT_FOLDER_NAME="Light"
 CALIB_FOLDER_NAME="Calibrated"
 SEQ_FOLDER_NAME="Sequence"
+PHOT_FOLDER_NAME="Photometry"
 
 # standard Ekos file prefixes
 BIAS_FILE_PREFIX="Bias_"

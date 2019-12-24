@@ -22,8 +22,9 @@ def loadRefCatalog(refFileName):
         refCat['header'] = headerLine.split()
 
         for refLine in ref:
-            refCatLine = refLine.split()
-            refCat['cat'].append(refCatLine)
+            if not refLine.startswith('#') and refLine.strip() != '':
+                refCatLine = refLine.split()
+                refCat['cat'].append(refCatLine)
         ref.close()
 
         print (("Reference catalog: %s") % refFileName)
@@ -107,8 +108,12 @@ def matchCatalogs(refCat, pmCat):
     # print (refCat)
 
 
-refHeaders = ['AUID', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'LABEL', 'MAG_V', 'ERR_V', 'B-V', 'ERR_BV']
+refHeaders = ['AUID', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V', 'MAG_B', 'ERR_B', 'MAG_R', 'ERR_R', 'B-V', 'ERR_BV']
+
 pmHeaders = ['NUMBER', 'MAG_ISOCOR', 'MAGERR_ISOCOR', 'MAG_BEST', 'MAGERR_BEST', 'ALPHA_J2000', 'DELTA_J2000']
+
+refTrailerHeaders = [ 'LABEL']
+
 
 
 def dumpResult(refCat, pmCat, outFileName):
@@ -130,6 +135,9 @@ def dumpResult(refCat, pmCat, outFileName):
         for h in pmHeaders:
             pos = getHeaderPos(pmCat, h)
             outf.write(pm[pos].ljust(15))
+        for h in refTrailerHeaders:
+            pos = getHeaderPos(refCat, h)
+            outf.write(ref[pos].ljust(15))
         outf.write('\n')
 
     outf.close()
@@ -138,13 +146,14 @@ def dumpResult(refCat, pmCat, outFileName):
 
 commandLineOptions = {
     'ref' : None,
-    'out' : None
+    'out' : None,
+    'color': 'Gi'
     }
 
 
 def processCommands():
     try:
-        optlist, args = getopt.getopt (sys.argv[1:], "r:o:", ['--ref', '--out'])
+        optlist, args = getopt.getopt (sys.argv[1:], "r:o:c:", ['--ref', '--out', '--color'])
     except getopt.GetoptError:
         print ('Invalid command line options')
         return
@@ -156,6 +165,8 @@ def processCommands():
             commandLineOptions['ref'] = a
         elif o == '-o':
             commandLineOptions['out'] = a
+        elif o == '-c':
+            commandLineOptions['color'] = a
 
     commandLineOptions['files'] = args
     if not commandLineOptions['out']:
