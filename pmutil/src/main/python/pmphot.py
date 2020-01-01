@@ -78,6 +78,7 @@ fieldMgTrue = 'MAG_V'
 fieldMgErrInstrumental = 'MAGERR_BEST'
 fieldMgErrTrue = 'ERR_V'
 fieldAuid = 'AUID'
+fieldRole = 'ROLE'
 
 
 def calculateMgsRobustAveraging(refCat, color):
@@ -97,12 +98,13 @@ def calculateMgsRobustAveraging(refCat, color):
     miPos = getHeaderPos(refCat, fieldMgInstrumental)
     evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
     eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+    rolePos = getHeaderPos(refCat, fieldRole)
 
     y = []
     e2 = []
     w = []
     for pm in refCat['cat']:
-        if pm[mvPos] != '-':
+        if pm[rolePos] == 'C' and pm[mvPos] != '-':
             mi = float(pm[miPos])
             mv = float(pm[mvPos])
             ei = float(pm[eiPos])
@@ -164,7 +166,7 @@ def calculateMgsRobustAveraging(refCat, color):
 
     result = []
     for pm in refCat['cat']:
-        if pm[mvPos] == '-':
+        if pm[rolePos] == 'V':
             mv = float(pm[miPos]) + z
             pm[mvPos] = mv
             pm[evPos] = sqrt(ez_2)
@@ -186,13 +188,14 @@ def calculateMgsLinearFit(refCat, color):
     miPos = getHeaderPos(refCat, fieldMgInstrumental)
     evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
     eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+    rolePos = getHeaderPos(refCat, fieldRole)
 
     mi = []
     mv = []
     er = []
 #    p = [1.0, 0.0]
     for pm in refCat['cat']:
-        if pm[mvPos] != '-':
+        if pm[rolePos] == 'C' and pm[mvPos] != '-':
             mi.append(float(pm[miPos]))
             mv.append(float(pm[mvPos]))
             ei = float(pm[eiPos])
@@ -204,7 +207,7 @@ def calculateMgsLinearFit(refCat, color):
 
     result = []
     for pm in refCat['cat']:
-        if pm[mvPos] == '-':
+        if pm[rolePos] == 'V':
             mv = p[0] * float(pm[miPos]) + p[1]
             pm[mvPos] = mv
             result.append(pm)
@@ -222,18 +225,19 @@ def calculateMgsComparision(refCat, color, comp):
     miPos = getHeaderPos(refCat, fieldMgInstrumental)
     evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
     eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+    rolePos = getHeaderPos(refCat, fieldRole)
 
     p = 0.0
     ep = 0.0
     for pm in refCat['cat']:
-        if pm[mvPos] != '-':
+        if pm[rolePos] == 'C' and pm[mvPos] != '-':
             if comp != None and pm[idPos] == comp:
                 p = float(pm[mvPos]) - float(pm[miPos])
                 ep = max(float(pm[evPos]), float(pm[eiPos]))
 
     result = []
     for pm in refCat['cat']:
-        if pm[mvPos] == '-':
+        if pm[rolePos] == 'V':
             mv = float(pm[miPos]) + p
             pm[mvPos] = mv
             pm[evPos] = max(float(pm[eiPos]), ep)

@@ -108,7 +108,7 @@ def matchCatalogs(refCat, pmCat):
     # print (refCat)
 
 
-refHeaders = ['AUID', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V', 'MAG_B', 'ERR_B', 'MAG_R', 'ERR_R', 'B-V', 'ERR_BV']
+refHeaders = ['AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V', 'MAG_B', 'ERR_B', 'MAG_R', 'ERR_R', 'B-V', 'ERR_BV']
 
 pmHeaders = ['NUMBER', 'MAG_ISOCOR', 'MAGERR_ISOCOR', 'MAG_BEST', 'MAGERR_BEST', 'ALPHA_J2000', 'DELTA_J2000']
 

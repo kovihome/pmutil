@@ -23,9 +23,6 @@ TODO
 
 - cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
-(478) pmfilter: if a comparator star has no mg value in a band, it will be present in the report
-
-	- somehow can distinct comp and var stars, i.e. the reference catalog can contain a column when assign V or C to the objects (and F for another field stars in whole image photometry)
 
 === V 1.1 ==================================================
 
