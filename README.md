@@ -6,7 +6,7 @@
 
 These scripts run on Linux, and they have some dependecies:
 
-- **python3** for .py scripts
+- **python3** 3.6+ for .py scripts
 - **numpy** python package
 - **FITSH** 0.9.3+ (https://fitsh.net)
 - **RawTran** 1.1+ (http://integral.physics.muni.cz/rawtran/)
