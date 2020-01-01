@@ -58,7 +58,7 @@ aavso_colors = {
     'B' : 'B'
 }
 
-def reportForAAVSO(allResults, header, outFolder):
+def reportForAAVSO(allResults, header, outFolder, obsName):
     '''
     header:
     #TYPE=Extended
@@ -109,13 +109,14 @@ def reportForAAVSO(allResults, header, outFolder):
     colorPos = getHeaderPos(header, 'COL')
     errPos = getHeaderPos(header, 'ERR')
     jdPos = getHeaderPos(header, 'JD')
+    flagPos = getHeaderPos(header, 'FLAG')
 
     outFileName = outFolder + '/result.extended.aavso'
     print("Print AAVSO extended report to the file", outFileName)
     r = open(outFileName, 'w')
 
     r.write('#TYPE=Extended\n')
-    r.write('#OBSCODE=?\n')
+    r.write('#OBSCODE=%s\n' % (obsName))
     r.write('#SOFTWARE=pmutil v1.0\n')
     r.write('#DELIM=,\n')
     r.write('#DATE=JD\n')
@@ -129,6 +130,7 @@ def reportForAAVSO(allResults, header, outFolder):
         date = res[jdPos]
         magnitude = res[mvPos]
         magerr = res[errPos]
+        fainter = "<" if res[flagPos] == "F" else ""
         flt = color
         trans = 'NO'
         mtype = 'STD'
@@ -140,21 +142,22 @@ def reportForAAVSO(allResults, header, outFolder):
         group = 'na'
         chart = 'na'
         notes = 'na'
-        r.write(('%s,%s,%4.3f,%4.3f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n') % (starid, date, float(magnitude), float(magerr), flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes))
+        r.write(('%s,%s,%s%4.3f,%4.3f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n') % (starid.upper(), date, fainter, float(magnitude), float(magerr), flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes))
 
     r.close()
 
 # process command line
 
 commandLineOptions = {
-    'out' : None,   # output folder
-    'rpt' : 'aavso' # report format, default: aavso extended
+    'out' : None,    # output folder
+    'rpt' : 'aavso', # report format, default: aavso extended
+    'name': '?'      # observer name code
     }
 
 
 def processCommands():
     try:
-        optlist, args = getopt.getopt (sys.argv[1:], "o:r:", ['--out', '--report'])
+        optlist, args = getopt.getopt (sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
     except getopt.GetoptError:
         print ('Invalid command line options')
         return
@@ -169,6 +172,8 @@ def processCommands():
                 commandLineOptions['rpt'] = a
             else:
                 print("Invalid report type: " + a + ". Create default aavso extended report instead")
+        elif o == '-n':
+            commandLineOptions['name'] = a
 
     commandLineOptions['files'] = args
 #    if not commandLineOptions['out']:
@@ -198,7 +203,7 @@ if __name__ == '__main__':
         allResults.extend(pmResult['cat'])
 
     if commandLineOptions['rpt'] == 'aavso':
-        reportForAAVSO(allResults, headers, commandLineOptions['out'])
+        reportForAAVSO(allResults, headers, commandLineOptions['out'], commandLineOptions['name'])
 
 # end main.
 

@@ -11,21 +11,17 @@ TODO
 
 --- photometry ---------------------------------------------
 
-- pmphot: calculate mg with some different method, and put in the result catalog file
++(475) BUG: pmfilter - match objects more correctly, assign it, if no appropriate match
 
-	- auto comp star selection, by the least instrumental error value
-
-(475) BUG: pmfilter - match objects more correctly, assign it, if no appropriate match
-
-	try to use grmatch
+	+ try to use grmatch
 
 (477) calculate magnitude limit, and use it if the object is under detectable limit
 
+	- HMG szamolas nem tunik teljesen jonak
+
 - cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
-(478) pmfilter: if a comparator star has no mg value in a band, it will be present in the report
 
-	- somehow can distinct comp and var stars, i.e. the reference catalog can contain a column when assign V or C to the objects (and F for another field stars in whole image photometry)
 
 === V 1.1 ==================================================
 
@@ -61,6 +57,10 @@ TODO
 - fiphot
 
 - SCAMP
+
+(452) pmphot: calculate mg with some different method, and put in the result catalog file
+
+	- auto comp star selection, by the least instrumental error value
 
 === V 2.0 ==================================================
 

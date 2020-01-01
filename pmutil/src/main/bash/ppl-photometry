@@ -11,6 +11,7 @@ usage() {
 	echo
 	echo "Mandatory arguments to long options are mandatory for short options too."
 	echo "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below"
+        echo "  -n,  --name nameCode    set observer code for the AAVSO report"
 	echo "  -h,  --help             print this page"
 	echo "  -w,  --overwrite        force to overwrite existing results"
 	echo
@@ -47,6 +48,7 @@ echo
 
 # command line options
 COLOR_CHANNEL=("Gi")
+NAME_CODE="XXX"
 FORCE_OVERWRITE=0
 SHOW_HELP=0
 BASE_FOLDER=""
@@ -73,6 +75,11 @@ while [[ $# -gt 0 ]]; do
 					COLOR_CHANNEL=("Gi")
 					;;
 			esac
+			shift
+			shift
+			;;
+		-n|--name)
+			NAME_CODE=$2
 			shift
 			shift
 			;;
@@ -228,7 +235,7 @@ fi
 
 print_info "Create report into $REPORT_FOLDER folder."
 
-pmresult -o $REPORT_FOLDER ${PM_FILES[@]}
+pmresult -o $REPORT_FOLDER -n $NAME_CODE ${PM_FILES[@]}
 
 
 #set +x
