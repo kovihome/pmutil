@@ -123,6 +123,8 @@ def dumpResult(refCat, pmCat, outFileName):
         outf.write(h.ljust(15))
     for h in pmHeaders:
         outf.write(h.ljust(15))
+    for h in refTrailerHeaders:
+        outf.write(h.ljust(30))
     outf.write('\n')
 
     rlen = len(refCat['header'])
@@ -137,7 +139,7 @@ def dumpResult(refCat, pmCat, outFileName):
             outf.write(pm[pos].ljust(15))
         for h in refTrailerHeaders:
             pos = getHeaderPos(refCat, h)
-            outf.write(ref[pos].ljust(15))
+            outf.write(ref[pos].ljust(30))
         outf.write('\n')
 
     outf.close()

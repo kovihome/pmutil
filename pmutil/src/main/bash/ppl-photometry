@@ -160,11 +160,17 @@ photometry() {
     AST_FILE="$2/`basename -s .fits $f`.ast.fits"
     PMCAT_FILE="$2/`basename $f`.cat"
 
+    print_info "Make astrometry for $f"
     /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
+    print_info "Make photometry for $f"
     sextractor $AST_FILE -c $SEX_CFG -CATALOG_NAME $PMCAT_FILE -CATALOG_TYPE ASCII_HEAD
 
-    pmfilter -c $4 -r $3 -o ${PMCAT_FILE}.pm $PMCAT_FILE
+    print_info "Filtering result catalog to ${PMCAT_FILE}.cat"
+    pmfilter -c $4 -r $3 -o ${PMCAT_FILE}.cat $PMCAT_FILE
+
+    print_info "Calculate real magnitudes to ${PMCAT_FILE}.pm"
+    pmphot -c $4 -o ${PMCAT_FILE}.pm ${PMCAT_FILE}.cat
 
   done
 }
@@ -206,8 +212,35 @@ for sf in ${SEQ_FOLDERS[@]} ; do
   process_photometry $sf $pf "PHOTOMETRY"
   
 done
-  
+
+########################################
+# step 2. create report from all results
+########################################
+
+if [ ! "$BASE_FOLDER" == "" ] ; then
+  PM_FILES=(*$BASE_FOLDER*/$PHOT_FOLDER_NAME/*.pm)
+  BASE_FOLDERS=(*$BASE_FOLDER*)
+  REPORT_FOLDER=${BASE_FOLDERS[0]}
+else
+  PM_FILES=($PHOT_FOLDER_NAME/*.pm)
+  REPORT_FOLDER=`pwd`
+fi
+
+print_info "Create report into $REPORT_FOLDER folder."
+
+pmresult -o $REPORT_FOLDER ${PM_FILES[@]}
+
+
 #set +x
+
+end=`date +%s`
+
+echo
+echo -e "${Blue}Photometry is ready."
+echo -e "execution time was $((end-start)) seconds.${Color_Off}"
+
+# end.
+
 
 
 

@@ -1,15 +1,35 @@
 TODO
 ----
 
+=== V 1.0 ==================================================
+
 --- calibration --------------------------------------------
 
-+(470) check grmatch result, stop processing, when match failed.
++(456) --force option for master frames
 
-	grep -c "Match failed" Light_006-Bi.fits.trans	-> 0 | 1
+(449) hot and dead pixel removing with fiign
 
-	ilyenkor ki kellene zarni a problemas filet
+--- photometry ---------------------------------------------
 
--(469) config: tetszoleges parameter megadhato legyen command lineban
+- pmphot: calculate mg with some different method, and put in the result catalog file
+
+	- auto comp star selection, by the least instrumental error value
+
+(475) BUG: pmfilter - match objects more correctly, assign it, if no appropriate match
+
+	try to use grmatch
+
+(477) calculate magnitude limit, and use it if the object is under detectable limit
+
+- cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
+
+(478) pmfilter: if a comparator star has no mg value in a band, it will be present in the report
+
+	- somehow can distinct comp and var stars, i.e. the reference catalog can contain a column when assign V or C to the objects (and F for another field stars in whole image photometry)
+
+=== V 1.1 ==================================================
+
+(469) config: tetszoleges parameter megadhato legyen command lineban
 
 	pl: -D max-distance=4
 
@@ -26,39 +46,40 @@ TODO
 	FICOMBINE_ARGS:
 		m [sum] (combination algorithm)
 
-+(454) calibrate pipeline script
+--- calibration --------------------------------------------
 
-+(448) all color channels
-
-+(456) --force option for master frames
-
-(449) hot and dead pixel removing with fiign
-
-(465) -a archivate + clean options
-
-(462) more light folders, locate all folders, including bias, dark and flat, with given pattern (typically obs date)
-
-	- light folder conventions:
-
-		*obsdate*/Light*
-
-(468) common Bias, Dark and Flat folder for all object
-
-(460) use canned flat, with -f??? option
-
-(449) hot and dead pixel removing with fiign
-
-(465) -c??? clean and -a archivate + clean options
+(448) create/use 3D/4D FITS
 
 --- photometry ---------------------------------------------
 
-+(455) photometry pipeline script
-
 (450) standardization (s15n)
 
-(451) catalog matching
+(451) whole frame photometry
+
+(479) create reference catalog: from AAVSO VSP photometry table, from AAVSO VSX list, from various stellar catalogs (UCAC, NOMAD, etc.)
 
 - fiphot
+
+- SCAMP
+
+=== V 2.0 ==================================================
+
+--- calibration --------------------------------------------
+
+--- photometry ---------------------------------------------
+
+
+=== NOT VERSIONED  ==================================================
+
+(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
+
++(465) -c??? clean and -a archivate + clean options
+
+	ppl_clean
+
+--- calibration --------------------------------------------
+
+--- photometry ---------------------------------------------
 
 
 
