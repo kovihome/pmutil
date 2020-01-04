@@ -10,9 +10,9 @@ Created on Apr 28, 2019
 import getopt
 import sys
 import glob
-import datetime
 
 # manage catalog file
+
 
 def loadCatalog(refFileName):
 
@@ -49,6 +49,7 @@ def getHeaderPos(hdr, headerName):
 
 # create report
 
+
 aavso_colors = {
     'Gi': 'TG',
     'Ri': 'TR',
@@ -57,6 +58,7 @@ aavso_colors = {
     'R' : 'R',
     'B' : 'B'
 }
+
 
 def reportForAAVSO(allResults, header, outFolder, obsName):
     '''
@@ -148,10 +150,11 @@ def reportForAAVSO(allResults, header, outFolder, obsName):
 
 # process command line
 
+
 commandLineOptions = {
-    'out' : None,    # output folder
-    'rpt' : 'aavso', # report format, default: aavso extended
-    'name': '?'      # observer name code
+    'out' : None,  # output folder
+    'rpt' : 'aavso',  # report format, default: aavso extended
+    'name': '?'  # observer name code
     }
 
 
@@ -180,6 +183,7 @@ def processCommands():
 #        commandLineOptions['out'] = args[0] + '.refout'
 
 # main program
+
 
 if __name__ == '__main__':
 
