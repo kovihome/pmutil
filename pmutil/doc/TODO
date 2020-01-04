@@ -11,16 +11,13 @@ TODO
 
 --- photometry ---------------------------------------------
 
-+(475) BUG: pmfilter - match objects more correctly, assign it, if no appropriate match
-
-	+ try to use grmatch
-
 (477) calculate magnitude limit, and use it if the object is under detectable limit
 
 	- HMG szamolas nem tunik teljesen jonak
 
 - cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
++(479) create reference catalog: from AAVSO VSP photometry table, from AAVSO VSX list, from various stellar catalogs (UCAC, NOMAD, etc.)
 
 
 === V 1.1 ==================================================
@@ -51,8 +48,6 @@ TODO
 (450) standardization (s15n)
 
 (451) whole frame photometry
-
-(479) create reference catalog: from AAVSO VSP photometry table, from AAVSO VSX list, from various stellar catalogs (UCAC, NOMAD, etc.)
 
 - fiphot
 

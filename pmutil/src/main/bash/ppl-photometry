@@ -54,6 +54,7 @@ SHOW_HELP=0
 BASE_FOLDER=""
 
 # process command line parameters
+ARGS_SAVE=$*
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		-c|--color)
@@ -115,6 +116,13 @@ fi
 
 echo "colors: ${COLOR_CHANNEL[*]}"
 echo "force: $FORCE_OVERWRITE"
+
+# save command into file
+if [ "$BASE_FOLDER" != "" ]; then
+	echo "ppl-photometry $ARGS_SAVE" > $BASE_FOLDER/photometry
+else
+	echo "ppl-photometr $ARGS_SAVE" > ./photometry
+fi
 
 ######################### discover pipeline elements
 
