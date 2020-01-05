@@ -406,7 +406,6 @@ registrate() {
 	  grmatch $GRMATCH_ARGS --input $fstars --reference $REF --output-transformation $ftrans
 
 	  local match_failed=`grep -c "Match failed" ${ftrans}`
-<<<<<<< HEAD
 	  if [ ${match_failed} == 1 ]; then
 	    print_error "Match failed on $f."
 	    if [ $ON_ERROR == "stop" ]; then
@@ -417,13 +416,6 @@ registrate() {
 	  if [ ${match_failed} == 0 ] || [ $ON_ERROR == "skip" ]; then
 	  	fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
 	  fi
-=======
-	  if [ ${match_failed} = 1 ]; then
-	    print_error "Match failed on $f."
-	  fi
-
-	  fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
->>>>>>> branch 'master' of https://github.com/kovihome/pmutil.git
 
 	done
 

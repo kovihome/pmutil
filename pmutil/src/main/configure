@@ -1,0 +1,207 @@
+#!/bin/bash
+# Calibration pipeline
+# Usage:
+# 	ppl-calibration [options]
+# Options:
+#
+
+usage() {
+	echo "Usage: configure [OPTIONS] [DESTINATION_FOLDER]"
+	echo "Configure pmutil package."
+	echo
+	echo "Mandatory arguments to long options are mandatory for short options too."
+	echo "  -h,  --help                     print this page"
+	echo
+}
+
+Color_Off='\033[0m'       # Text Reset
+BRed="\e[1;31m"           # Red
+BGreen='\033[1;32m'       # Green
+Blue='\033[0;34m'         # Blue
+BCyan='\e[1;36m'	  # Cyan
+
+print_error() {
+	echo -e "${BRed}Error: $1 ${Color_Off}"
+}
+
+print_warning() {
+	echo -e "${BGreen}Warning: $1 ${Color_Off}"
+}
+
+print_info() {
+	echo -e "${BCyan}$1 ${Color_Off}"
+}
+
+exit_on_error() {
+	print_warning "Processing stop on error."
+}
+
+echo
+echo -e "${BGreen}configure, version 0.1.0${Color_Off}"
+echo -e "${Blue}Configure pmutil package.${Color_Off}"
+echo
+
+a="$(pwd)/$0"
+BASE_FOLDER=${a%/configure}
+DEST_FOLDER="$HOME/bin"
+
+# process command line parameters
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		*)
+			#print_error "bad command line option: $1"
+			DEST_FOLDER=$1
+			shift
+			;;
+	esac
+done
+
+echo "Script folder: $BASE_FOLDER"
+echo "Destination folder: $DEST_FOLDER"
+echo
+
+##############################
+# Check external dependencies
+##############################
+
+warn_version() {
+	readarray -td. actver <<<"$1" 
+	readarray -td. minver <<<"$2" 
+
+	local num=${#actver[@]}
+	if [ ${#minver[@]} -lt "$num" ]; then
+		num=${#minver[@]}
+	fi
+	
+	for (( j = 0; j < $num; j += 1 )) ; do
+		local a=${actver[$j]}
+		local m=${minver[$j]}
+		if [ ${actver[$j]} -lt ${minver[$j]} ]; then
+			print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
+			return
+		fi
+	done 
+	
+	echo "$3 version '$1' OK."
+}
+
+print_info "Checking external dependecies."
+
+# python3
+
+PYTHON3_VERSION=$(python3 --version | head -n1 | cut -d" " -f2)
+PYTHON3_MINVERSION=3.6.0
+warn_version "$PYTHON3_VERSION" "$PYTHON3_MINVERSION" "python3"
+
+# python3 numpy
+
+NUMPY_VERSION=$(pip3 list 2> /dev/null | grep "numpy" | sed 's/[^0-9\.]//g')
+NUMPY_MINVERSION=1.16
+warn_version "$NUMPY_VERSION" "$NUMPY_MINVERSION" "python3/numpy"
+
+# python3 xmltodict
+
+XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "xmltodict" | sed 's/[^0-9\.]//g')
+XMLTODICT_MINVERSION=0.12.0
+warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/xmltodict"
+
+# FITSH
+
+FITSH_VERSION=$(ficalib --version | head -n1 | cut -d"(" -f2 | cut -d"@" -f1)
+FITSH_MINVERSION=0.9.3
+warn_version "$FITSH_VERSION" "$FITSH_MINVERSION" "FITSH"
+
+# RawTran
+
+RAWTRAN_VERSION=$(rawtran --version | head -n1 | cut -d"," -f2)
+RAWTRAN_MINVERSION=0.3.8
+warn_version "$RAWTRAN_VERSION" "$RAWTRAN_MINVERSION" "rawtran"
+
+# ExifTool
+
+EXIFTOOL_VERSION=$(exiftool -ver | head -n1)
+EXIFTOOL_MINVERSION=10.80
+warn_version "$EXIFTOOL_VERSION" "$EXIFTOOL_MINVERSION" "exiftool"
+
+# Astrometry.net solve_field
+
+ASTROMETRY_VERSION=$(solve-field --help | grep "Revision" | cut -d" " -f2 | cut -d"," -f1)
+ASTROMETRY_MINVERSION=0.77
+warn_version "$ASTROMETRY_VERSION" "$ASTROMETRY_MINVERSION" "Astrometry.net"
+
+# SExtractor
+
+SEXTRACTOR_VERSION=$(sextractor --version | head -n1 | cut -d" " -f3)
+SEXTRACTOR_MINVERSION=2.19.5
+warn_version "$SEXTRACTOR_VERSION" "$SEXTRACTOR_MINVERSION" "SExtractor"
+
+# wcstools
+
+WCSFTOOL_VERSION=$(sethead 2> shtmp; grep "WCSTools" shtmp | cut -d" " -f3 | cut -d"," -f1; rm shtmp)
+WCSTOOL_MINVERSION=3.9.5
+warn_version "$WCSFTOOL_VERSION" "$WCSTOOL_MINVERSION" "wcstool"
+
+####################################
+# Copy sources to user's bin folder
+####################################
+
+SOURCES=( "bash/ppl-setup" "bash/ppl-disco" "bash/ppl-calibration" "bash/ppl-photometry" "bash/ppl-clean" "python/pmfilter.py" "python/pmphot.py" \
+	"python/pmresult.py" "python/pmlt2ut.py" "python/pmdateobs.py" "python/pmrefcat.py" )
+
+assert_source_exist() {
+	if [ ! -e "${BASE_FOLDER}"/"$1" ]; then
+		print_error "Source script $1 is missing."
+		exit 0
+	fi
+}
+
+copy_source() {
+	if [[ $1 =~ .*\.py$ ]]; then
+		local dn=$(basename -s .py "$1")
+		if [ "$dn" == "pmrefcat" ]; then
+			dn="ppl-refcat"
+		fi 
+		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/${dn}
+	else
+		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"
+	fi
+}
+
+
+
+if [ ! -e "$DEST_FOLDER" ]; then
+	mkdir "$DEST_FOLDER"
+	echo "Create destination folder $DEST_FOLDER."
+fi
+
+print_info "Copy scripts to $DEST_FOLDER."
+for src in ${SOURCES[*]}; do
+	assert_source_exist "$src"
+done
+
+for src in ${SOURCES[*]}; do
+	copy_source "$src"
+done
+
+chmod 0755 "$DEST_FOLDER"/*
+
+#############################
+# copy external config files
+#############################
+
+print_info "Copy config files to $DEST_FOLDER."
+
+CONFIG_BASE=${BASE_FOLDER%/src/main}
+CONFIG_BASE="$CONFIG_BASE/etc"
+
+# sextractor files: sex.cfg, sex.param
+cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"
+cp "$CONFIG_BASE/sex.param" "$DEST_FOLDER"
+
+# TODO: astrometry.net files: ???
+
+print_info "Configure pmutil successfully ended."
