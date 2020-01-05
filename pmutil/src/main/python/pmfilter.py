@@ -70,6 +70,7 @@ def loadPmCatalog(pmFileName):
         print (("Reference catalog %s not found") % pmFileName)
         return None
 
+
 def loadIdCatalog(idFileName):
 
     idCat = []
@@ -91,8 +92,6 @@ def loadIdCatalog(idFileName):
         return None
 
 
-
-
 def getHeaderPos(cat, headerName):
     index = 0
     for header in cat['header']:
@@ -101,17 +100,20 @@ def getHeaderPos(cat, headerName):
         index = index + 1
     return None
 
+
 def findId(idCat, refId):
     for idr in idCat:
         if refId == idr[0]:
             return idr[1]
     return None
 
+
 def findPmRec(pmCat, pmId, pmcIdPos):
     for pmr in pmCat:
         if pmId == pmr[pmcIdPos]:
             return pmr
     return None
+
 
 def hmg(pmCat):
     mg1Pos = getHeaderPos(pmCat, 'MAG_ISOCOR')
@@ -134,6 +136,7 @@ def hmg(pmCat):
 
     return [hmg1, hmg2]
 
+
 def matchCatalogsByGrmatch(refCatFile, pmCatFile, outFile):
 
     idFile = pmCatFile + ".idmatch"
@@ -142,7 +145,7 @@ def matchCatalogsByGrmatch(refCatFile, pmCatFile, outFile):
     (output, errno) = p.communicate()
     p.wait()
 
-    #output.decode('ascii').strip()
+    # output.decode('ascii').strip()
 
     refCat = loadRefCatalog(commandLineOptions['ref'])
     pmCat = loadPmCatalog(commandLineOptions['files'][0])
@@ -168,15 +171,15 @@ def matchCatalogsByGrmatch(refCatFile, pmCatFile, outFile):
             if ref[rolePos] == 'V' and float(pm[mg2Pos]) > hmgs[1]:
                 ref[rlen + 1] = pmlen
                 ref[rolePos] = 'VF'
-            else:             
-               ref[rlen + 1] = int(pmId) - 1
+            else:
+                ref[rlen + 1] = int(pmId) - 1
         else:
             if ref[rolePos] == 'V':
                 ref[rlen + 1] = pmlen
                 ref[rolePos] = 'VF'
             print("Ref object not matched:", refId, ref[labelPos])
 
-#   1 NUMBER                 Running object number                                     
+#   1 NUMBER                 Running object number
 #   2 FLUX_ISOCOR            Corrected isophotal flux                                   [count]
 #   3 FLUXERR_ISOCOR         RMS error for corrected isophotal flux                     [count]
 #   4 MAG_ISOCOR             Corrected isophotal magnitude                              [mag]
@@ -229,7 +232,7 @@ def matchCatalogsNaiveApproach(refCatFile, pmCatFile, outFile):
             dRA = refRA - pmRA
             dDEC = refDEC - pmDEC
             dist2 = dRA * dRA + dDEC * dDEC
-            if dist2 < ref[len]:
+            if dist2 < ref[rlen]:
                 ref[rlen] = dist2
                 ref[rlen + 1] = pmi
         pmi = pmi + 1
@@ -242,7 +245,6 @@ refHeaders = ['AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V'
 pmHeaders = ['NUMBER', 'MAG_ISOCOR', 'MAGERR_ISOCOR', 'MAG_BEST', 'MAGERR_BEST', 'ALPHA_J2000', 'DELTA_J2000']
 
 refTrailerHeaders = [ 'LABEL']
-
 
 
 def dumpResult(refCat, pmCat, outFileName):
