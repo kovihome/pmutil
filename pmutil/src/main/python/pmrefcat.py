@@ -23,10 +23,10 @@ defFov = 60
 auidOnly = True
 
 Color_Off = '\033[0m'  # Text Reset
-BRed = "\e[1;31m"  # Red
+BRed = "\033[1;31m"  # Red
 BGreen = '\033[1;32m'  # Green
 Blue = '\033[0;34m'  # Blue
-BCyan = '\e[1;36m'  # Cyan
+BCyan = '\033[1;36m'  # Cyan
 
 
 def printError(s):
@@ -42,6 +42,7 @@ def printInfo(s):
 
 
 def printTitle():
+    print()
     print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
     print(Blue + "Create reference catalog for photometry." + Color_Off)
 
@@ -121,9 +122,9 @@ def loadVspPhotometryData(outFile, objectName, ra = None, dec = None, fov = defF
         else:
             mgR = "-"
             mgerrR = "-"
-        label = pm['label']
+        label = str(pm['label']).replace(' ', '_')
 
-        s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + mgB.ljust(7) + mgerrB.ljust(8) + mgV.ljust(7) + mgerrV.ljust(8) + mgR.ljust(7) + mgerrR.ljust(8) + str(label)
+        s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + mgB.ljust(7) + mgerrB.ljust(8) + mgV.ljust(7) + mgerrV.ljust(8) + mgR.ljust(7) + mgerrR.ljust(8) + label
         if outFile != None:
             outFile.write(s + "\n")
         else:
@@ -188,7 +189,7 @@ def loadVsxCatalogData(outFile, objectName, ra = None, dec = None, fov = defFov)
         if not dec.startswith('-'):
             dec = "+" + dec
             decDeg = "+" + decDeg
-        label = tr['TD'][1]
+        label = tr['TD'][1].replace(' ', '_')
 
         s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + label
         if outFile != None:
@@ -224,8 +225,8 @@ def loadVsxCatalogData(outFile, objectName, ra = None, dec = None, fov = defFov)
         else:
             print(s)
 
-
 def usage():
+    print()
     print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
     print()
     print("Usage: ppl-refcat [OPTIONS]... CATALOG_FILE_NAME")
@@ -265,7 +266,7 @@ def processCommands():
         elif o == '-o':
             commandLineOptions['object'] = a.replace('_', ' ')
         elif o == '-f':
-            if a.isDigit():
+            if a.isdigit():
                 commandLineOptions['field'] = int(a)
             else:
                 print("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
@@ -302,11 +303,14 @@ def processCommands():
         commandLineOptions['dec'] = c[1]
 
 
-catalogHeader = "AUID          ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
+catalogHeader = "AUID         ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
 
 if __name__ == '__main__':
 
     processCommands()
+
+    printTitle()
+    print()
 
     outFile = None
     if commandLineOptions['file'] != None:
@@ -329,5 +333,7 @@ if __name__ == '__main__':
 
     if outFile != None:
         outFile.close()
+
+    printInfo("Reference catalog file %s created." % (commandLineOptions['file']))
 
 # end main.

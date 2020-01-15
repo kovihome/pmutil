@@ -236,7 +236,7 @@ raw2fits_file() {
 		if [ $IMAGE_TIME == "LT" ]; then
 			local IMAGE_DATE=`fiheader --get DATE-OBS $FITS_NAME`
 			local IMAGE_DATE_UTC=`pmlt2ut $IMAGE_DATE`
-			sethead -s _ $FITS_NAME DATE-OBS="$IMAGE_DATE_UTC" DATE-IMG="$IMAGE_DATE" / Original_image_date_(in_local_time)
+			sethead -s _ $FITS_NAME DATE-OBS="$IMAGE_DATE_UTC" DATE-IMG="$IMAGE_DATE" / "Original_image_date_(in_local_time)"
 		fi
 	fi
 }

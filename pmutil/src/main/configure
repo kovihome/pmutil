@@ -201,7 +201,6 @@ CONFIG_BASE="$CONFIG_BASE/etc"
 # sextractor files: sex.cfg, sex.param
 cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"
 cp "$CONFIG_BASE/sex.param" "$DEST_FOLDER"
-
-# TODO: astrometry.net files: ???
+cp "$CONFIG_BASE/astrometry.cfg" "$DEST_FOLDER"
 
 print_info "Configure pmutil successfully ended."

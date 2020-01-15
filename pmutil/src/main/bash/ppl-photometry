@@ -147,8 +147,8 @@ start=`date +%s`
 #set -x
 
 # Common arguments (saturation level, image section & trimming, etc.):
-AST_CFG="/etc/astrometry.cfg"
-SEX_CFG="/home/kovi/bin/sex.cfg"
+AST_CFG="$CONFIG_FOLDER/astrometry.cfg"
+SEX_CFG="$CONFIG_FOLDER/sex.cfg"
 #SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
 SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -r -y -p"
 

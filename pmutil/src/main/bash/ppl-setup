@@ -2,6 +2,9 @@
 # Pipeline setup
 #
 
+# folder of the config files (ast, sex)
+CONFIG_FOLDER="/home/kovi/bin"
+
 # standard Ekos folder names
 BIAS_FOLDER_NAME="Bias"
 DARK_FOLDER_NAME="Dark"

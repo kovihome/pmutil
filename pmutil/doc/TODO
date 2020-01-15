@@ -3,21 +3,21 @@ TODO
 
 === V 1.0 ==================================================
 
+(481) ha a base folder vegen / van, azt le kell szedni
+
 --- calibration --------------------------------------------
 
 +(456) --force option for master frames
 
-(449) hot and dead pixel removing with fiign
++(470) image not matched remove from further processing
+
+	+ tesztelni kell
 
 --- photometry ---------------------------------------------
 
-(477) calculate magnitude limit, and use it if the object is under detectable limit
-
-	- HMG szamolas nem tunik teljesen jonak
-
 - cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
-+(479) create reference catalog: from AAVSO VSP photometry table, from AAVSO VSX list, from various stellar catalogs (UCAC, NOMAD, etc.)
+(480) legyen az aavso riport file neve a folder (20190614-AY_Lyr.extended.aavso)
 
 
 === V 1.1 ==================================================
@@ -45,6 +45,8 @@ TODO
 
 --- photometry ---------------------------------------------
 
+(449) hot and dead pixel removing with fiign
+
 (450) standardization (s15n)
 
 (451) whole frame photometry
@@ -71,6 +73,8 @@ TODO
 +(465) -c??? clean and -a archivate + clean options
 
 	ppl_clean
+	
+(482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
 
