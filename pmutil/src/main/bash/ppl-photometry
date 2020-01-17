@@ -94,7 +94,7 @@ while [[ $# -gt 0 ]]; do
 			;;
 		*)
 			#print_error "bad command line option: $1"
-			BASE_FOLDER=$1
+			BASE_FOLDER=`echo "$1" | sed 's/\/$//'`
 			shift
 			;;
 	esac
