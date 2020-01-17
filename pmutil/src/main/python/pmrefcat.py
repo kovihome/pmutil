@@ -1,339 +1,216 @@
 #!/usr/bin/env python3
 #
-# PmUtils/pmrefcat
+# PmUtils/pmresult
 #
 '''
-Created on Jan 1, 2020
+Created on Apr 28, 2019
 
 @author: kovi
-
-1. load photometry for comp stars from AAVSO VSP fotometry table. 
 '''
+import getopt
+import sys
+import glob
 
-from sys import argv
-from getopt import getopt, GetoptError
-from urllib import request
-import json
-import xmltodict
-import re
-
-defMgLimit = 18.0
-defFov = 60
-
-auidOnly = True
-
-Color_Off = '\033[0m'  # Text Reset
-BRed = "\033[1;31m"  # Red
-BGreen = '\033[1;32m'  # Green
-Blue = '\033[0;34m'  # Blue
-BCyan = '\033[1;36m'  # Cyan
+# manage catalog file
 
 
-def printError(s):
-    print(BRed + "Error: " + s + Color_Off)
+def loadCatalog(refFileName):
+
+    refCat = { 'header': [], 'cat': [] }
+
+    ref = open(refFileName, 'r')
+    if ref:
+        headerLine = ref.readline()
+        refCat['header'] = headerLine.split()
+
+        for refLine in ref:
+            refCatLine = refLine.split()
+            refCat['cat'].append(refCatLine)
+        ref.close()
+
+        print (("Photometric result catalog: %s") % refFileName)
+        # print (("%d reference object loaded." % len(refCat['cat'])))
+        # print (refCat)
+        return refCat
+
+    else:
+
+        print (("Reference catalog %s not found") % refFileName)
+        return None
 
 
-def printWarning(s):
-    print(BGreen + "Warning: " + s + Color_Off)
+def getHeaderPos(hdr, headerName):
+    index = 0
+    for header in hdr:
+        if header == headerName:
+            return index
+        index = index + 1
+    return None
+
+# create report
 
 
-def printInfo(s):
-    print(BCyan + s + Color_Off)
+aavso_colors = {
+    'Gi': 'TG',
+    'Ri': 'TR',
+    'Bi': 'TB',
+    'V' : 'V',
+    'R' : 'R',
+    'B' : 'B'
+}
 
 
-def printTitle():
-    print()
-    print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
-    print(Blue + "Create reference catalog for photometry." + Color_Off)
-
-
-def hexa2deg(s):
-    r = s.split(':')
-    d = float(r[0])
-    m = float(r[1])
-    s = float(r[2])
-    return d + m / 60.0 + s / 3600.0
-
-
-def deg2hexa(d):
-    dd = int(d)
-    r = (d - float(dd)) * 60.0
-    mm = int(r)
-    ss = (r - float(mm)) * 60.0
-    return "%02d:%02d:%04.1f" % (dd, mm, ss)
-
-
-def loadVspPhotometryData(outFile, objectName, ra = None, dec = None, fov = defFov):
+def reportForAAVSO(allResults, header, outFolder, obsName):
     '''
-    star*: name of the star to plot. You must provide EITHER the star parameter OR ra and dec parameters (see below)
-    ra*: right ascension
-    dec*: declination
-    fov*: field of view, in arcminutes.
-    maglimit*: magnitude limit for the chart; stars fainter than the maglimit will not be plotted.
-    other: other variable stars to mark on the chart. Omit or leave blank for none, "gcvs" for GCVS variables, "all" for all variables
+    header:
+    #TYPE=Extended
+    #OBSCODE=?
+    #SOFTWARE=
+    #DELIM=,
+    #DATE=JD
+    #OBSTYPE=DSLR
+    
+    data:
+    STARID: The star's identifier. It can be the AAVSO Designation, the AAVSO Name, or the AAVSO Unique Identifier, but NOT more than one of these. Limit: 30 characters.
+    DATE: The date of the observation, in the format specified in the DATE parameter. Limit: 16 characters.
+    MAGNITUDE: The magnitude of the observation. Prepend with < if a fainter-than.  A dot is required (e.g. "9.0" rather than "9"). Limit: 8 characters.
+    MAGERR: Photometric uncertainty associated with the variable star magnitude. If not available put "na". Limit: 6 characters.
+    FILTER: The filter used for the observation. This can be one of the following letters (in bold):
+        B: Johnson B
+        V: Johnson V
+        R: Cousins R
+        TG: Green Filter (or Tri-color green). This is commonly the "green-channel" in a DSLR or color CCD camera. These observations use V-band comp star magnitudes.
+        TB: Blue Filter (or Tri-color blue). This is commonly the "blue-channel" in a DSLR or color CCD camera. These observations use B-band comp star magnitudes.
+        TR: Red Filter (or Tri-color red). This is commonly the "red-channel" in a DSLR or color CCD camera. These observations use R-band comp star magnitudes.
+    TRANS: YES if transformed using the Landolt Standards or those fields that contain secondary standards, or NO if not. Document the method used to transform in the "NOTES" section.
+    MTYPE: Magnitude type. STD if standardized (Click here for definition of standardized) or DIF if differential (very rare). If you are currently using ABS for 'absolute' we will still accept it.
+        Differential requires the use of CNAME.
+    CNAME: Comparison star name or label such as the AUID (much preferred) or the chart label for the comparison star used. If not present, use "na". Limit: 20 characters.
+    CMAG: Instrumental magnitude of the comparison star. If "ensemble" see example below. If not present, use "na". Limit: 8 characters.
+    KNAME: Check star name or label such as the AUID (much preferred) or the chart label for the check star. If not present, use "na". Limit: 20 characters.
+    KMAG: Instrumental magnitude of the check star. If "ensemble" see example below. If not present, use "na".Limit: 8 characters.
+    AIRMASS: Airmass of observation Limit 7 characters - entry will be truncated if longer than that. If not present, use "na".
+    GROUP: Grouping identifier (maximum 5 characters). It is used for grouping multiple observations together, usually an observation set that was taken through multiple filters. 
+        It makes it easier to retrieve all magnitudes from a given set in the database, say, if someone wanted to form color indices such as (B-V) with them. If you are just doing time series, 
+        or using the same filter for multiple stars, etc., just set GROUP to "na." For cases where you want to group observations, GROUP should be an integer, identical for all observations in a group,
+        and unique for a given observer for a given star on a given Julian Date. Limit: 5 characters.
+    CHART: Please use the sequence ID you will find written in Bold print near the top of the photometry table in a sentence that reads "Report this sequence as [ID] in the chart field 
+        of your observation report." If a non–AAVSO sequence was used, please describe it as clearly as possible. Limit: 20 characters.
+    NOTES: Comments or notes about the observation. If no comments, use "na". This field has a maximum length of several thousand characters, so you can be as descriptive as necessary. 
+        One convention for including a lot of information as concisely as possible is to use subfields in the format |A=B; the '|' character is the separator, A is a keyvalue name and B is its value. 
+        If you need an alternative delimiter from '|', use it but preceed the first instance with "DELIM=". Using this mechanismnyou can document your transform process in more detail. 
+        Here is an example as used by TransformApplier:
+        5 records aggregated|VMAGINS=-7.244|VERR=0.006|CREFMAG=13.793|CREFERR=0.026|
+        KREFMAG=14.448|KREFERR=0.021|VX=1.1501|CX=1.1505|KX=1.1500|Tv_bv=0.0090|Tv_bvErr=0.0100|
+        TAver=2.47
     '''
-    vspUrl = "https://www.aavso.org/apps/vsp/api/chart/?format=json&star=%s&fov=%d&maglimit=%4.1f&other=all" % (objectName.replace(' ', '+'), fov, defMgLimit)
-    f = request.urlopen(vspUrl)
-    respJson = f.read().decode('UTF-8')
 
-    resp = json.loads(respJson)
+    # idPos = getHeaderPos(header, 'AUID')
+    labelPos = getHeaderPos(header, 'LABEL')
+    mvPos = getHeaderPos(header, 'MAG')
+    colorPos = getHeaderPos(header, 'COL')
+    errPos = getHeaderPos(header, 'ERR')
+    jdPos = getHeaderPos(header, 'JD')
+    flagPos = getHeaderPos(header, 'FLAG')
 
-    # print("Star:", resp['star'])
-    # print("AUID:", resp['auid'])
-    # print("Coord:", resp['ra'], resp['dec'])
-    # print("ChartID:", resp['chartid'])
-    # print("Photometry table:")
-    for pm in resp['photometry']:
+    r = outFolder.split('/')
+    fileName = r[-1]
 
-        # 'V', 'B', 'Rc', 'Ic', 'J', 'H', 'K'
-        bands = {}
-        for b in pm['bands']:
-            bands[b['band']] = b
+    outFileName = outFolder + '/' + fileName + '.extended.aavso'
+    print("Print AAVSO extended report to the file", outFileName)
+    r = open(outFileName, 'w')
 
-        auid = pm['auid']
-        role = "C"
-        ra = pm['ra']
-        dec = pm['dec']
-        raDeg = "%10.8f" % (hexa2deg(ra) * 15.0)
-        if not dec.startswith('-'):
-            dec = "+" + dec
-        decDeg = "%+10.8f" % (hexa2deg(dec))
-        if 'B' in bands:
-            mgB = str(bands['B']['mag'])
-            mgerrB = str(bands['B']['error'])
-            if mgerrB == 'None':
-                mgerrB = "-"
-        else:
-            mgB = "-"
-            mgerrB = "-"
-        if 'V' in bands:
-            mgV = str(bands['V']['mag'])
-            mgerrV = str(bands['V']['error'])
-            if mgerrV == 'None':
-                mgerrV = "-"
-        else:
-            mgV = "-"
-            mgerrV = "-"
-        if 'Rc' in bands:
-            mgR = str(bands['Rc']['mag'])
-            mgerrR = str(bands['Rc']['error'])
-            if mgerrR == 'None':
-                mgerrR = "-"
-        else:
-            mgR = "-"
-            mgerrR = "-"
-        label = str(pm['label']).replace(' ', '_')
+    r.write('#TYPE=Extended\n')
+    r.write('#OBSCODE=%s\n' % (obsName))
+    r.write('#SOFTWARE=pmutil v1.0\n')
+    r.write('#DELIM=,\n')
+    r.write('#DATE=JD\n')
+    r.write('#OBSTYPE=DSLR\n')
 
-        s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + mgB.ljust(7) + mgerrB.ljust(8) + mgV.ljust(7) + mgerrV.ljust(8) + mgR.ljust(7) + mgerrR.ljust(8) + label
-        if outFile != None:
-            outFile.write(s + "\n")
-        else:
-            print(s)
+    for res in allResults:
 
+        color = aavso_colors[res[colorPos]]
 
-def loadVsxCatalogData(outFile, objectName, ra = None, dec = None, fov = defFov):
-    '''
-    &coords   The central J2000 RA/DEC coordinates for a radius search, expressed sexagesimally (by default), or in decimal degrees if format is set to d. Northern hemisphere coordinates must have the plus () sign URL-encoded as %2B. Space characters between all other figures must be replaced with the URL whitespace character (). The order argument (which see) must also be included in the query string with its value set to 9 in order to prompt VSX to display distances from the central coordinates in the results listing. Default is empty string (no radius search).
-    &ident    Object identification for name searches. Space characters must be replaced with the URL whitespace character (+). Other special characters may also need to be URL-encoded. Default is empty string (no name search).
-    &format   Explicit specification for format of coords. For sexagesimal, this value should be s. For decimal degrees, this value should be d. Default is s (sexagesimal).
-    &geom     The geometry for central coordinate-based searches. For radius searches, this value should be r. For box searches, this value should be b. Default is r (radius search).
-    &size     For box searches (geom=b), the width of the box. For radius searches (geom=r), the radius of the circle. Expressed in the units specified by unit (see next). Default is 10.0.
-    &unit     The unit of measurement used for the value given in size (see above). For arc degrees, this value should be 1. For arc minutes, this value should be 2. For arc seconds, this value should be 3. Default is 2 (arc minutes).
-    '''
-    # https://www.aavso.org/vsx/index.php?view=results.csv&ident=R+Car
-    vsxUrl = "https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident=%s" % (objectName.replace(' ', '+'))
-    # print(vsxUrl)
-    f = request.urlopen(vsxUrl)
-    respJson = f.read().decode('UTF-8')
-    resp = json.loads(respJson)
-    # print(resp)
-    # print("Object:", resp['VSXObject']['Name'], "RA:", resp['VSXObject']['RA2000'], "Dec:", resp['VSXObject']['Declination2000'])
+        starid = res[labelPos].replace('_', ' ')
+        date = res[jdPos]
+        magnitude = res[mvPos]
+        magerr = res[errPos]
+        fainter = "<" if res[flagPos] == "F" else ""
+        flt = color
+        trans = 'NO'
+        mtype = 'STD'
+        cname = 'ENSEMBLE'
+        cmag = 'na'  # TODO: set comp star mg if not ensemble
+        kname = 'na'  # TODO: specify ensemble reference comp star when ensemble, or set a check star
+        kmag = 'na'  # TODO: set measured mg of check star
+        airmass = 'na'  # TODO: calculate airmass
+        group = 'na'
+        chart = 'na'
+        notes = 'na'
+        r.write(('%s,%s,%s%4.3f,%4.3f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n') % (starid.upper(), date, fainter, float(magnitude), float(magerr), flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes))
 
-    ra = deg2hexa(float(resp['VSXObject']['RA2000']) / 15.0)
-    dec = deg2hexa(float(resp['VSXObject']['Declination2000']))
-    coords = ra + "+" + dec
-    vsxUrl = "https://www.aavso.org/vsx/index.php?view=query.votable&format=d&coords=%s&size=%d&unit=2&geom=b" % (coords, fov)
-    # https://www.aavso.org/vsx/index.php?view=query.votable&coords=19:54:17+32:13:08&format=d&size=60&unit=2
-    # print(vsxUrl)
-    f = request.urlopen(vsxUrl)
-    respVOTable = f.read().decode('UTF-8')
-    # resp = json.loads(respJson)
-    # print(respVOTable)
-    votable = xmltodict.parse(respVOTable)
-    # print(votable)
-    # print(votable['VOTABLE']['RESOURCE']['TABLE'].keys())
-    # print(votable['VOTABLE']['RESOURCE']['TABLE']['FIELD'])
-    # print(votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA'])
-    trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
-    nrUnknown = 1
-    for tr in trs:
-        # print(tr['TD'])
-        # [None, 'PS1-3PI J185203.12+325154.5', 'Lyr', '283.01304000,32.86516000', 'RRAB', '16.810', 'r', '0.400', 'r', '57000.85600', None, '0.839122', None, None, None]
-        # print("AUID:", tr['TD'][0], "Coord:", tr['TD'][3], "LABEL", tr['TD'][1])
+    r.close()
 
-        # #0.00    Variable    AY Lyr                000-BCD-108    18 44 26.69 +37 59 51.9    Lyr    UGSU    0.0733    12.5 - 18.4 B
-        # distance, varstate, label(1), auid(0), coords(3), constell(2), type(4), period(11), max(5,6) - min(7,8)
-        # print("   Constell:", tr['TD'][2], "Type:", tr['TD'][4], "Period:", tr['TD'][11], "Mg:", tr['TD'][5] + tr['TD'][6], "-", tr['TD'][7] + tr['TD'][8])
-
-        auid = tr['TD'][0]
-        if auid == None:
-            if auidOnly:
-                continue
-            auid = '999-VAR-%03d' % (nrUnknown)
-            nrUnknown = nrUnknown + 1
-            tr['TD'][0] = auid
-        role = 'V'
-        raDeg, decDeg = tr['TD'][3].split(',')
-        ra = deg2hexa(float(raDeg) / 15.0)
-        dec = deg2hexa(float(decDeg))
-        if not dec.startswith('-'):
-            dec = "+" + dec
-            decDeg = "+" + decDeg
-        label = tr['TD'][1].replace(' ', '_')
-
-        s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + label
-        if outFile != None:
-            outFile.write(s + "\n")
-        else:
-            print(s)
-
-    nrUnknown = 1
-    for tr in trs:
-
-        auid = tr['TD'][0]
-        if auid == None:
-            if auidOnly:
-                continue
-            auid = '999-VAR-%03d' % (nrUnknown)
-            nrUnknown = nrUnknown + 1
-        role = 'V'
-        raDeg, decDeg = tr['TD'][3].split(',')
-        ra = deg2hexa(float(raDeg) / 15.0)
-        dec = deg2hexa(float(decDeg))
-        label = tr['TD'][1]
-        constell = tr['TD'][2]
-        vartype = tr['TD'][4]
-        if vartype == None:
-            vartype = "-"
-        period = tr['TD'][11]
-        maxmg = tr['TD'][5] + tr['TD'][6]
-        minmg = tr['TD'][7] + tr['TD'][8]
-
-        s = "#" + label.ljust(29) + auid.ljust(14) + ra.ljust(15) + dec.ljust(14) + constell.ljust(4) + vartype.ljust(11) + period.ljust(11) + maxmg + " - " + minmg
-        if outFile != None:
-            outFile.write(s + "\n")
-        else:
-            print(s)
-
-def usage():
-    print()
-    print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
-    print()
-    print("Usage: ppl-refcat [OPTIONS]... CATALOG_FILE_NAME")
-    print("Create reference catalog for photometry.")
-    print()
-    print("Mandatory arguments to long options are mandatory for short options too.")
-    print("  -c,  --coords ra,decl       coordinates of the center of reference frame. Valid format is 12:34:56.7,-12:34:56.7")
-    print("  -s,  --source catalog       source catalog for field stars")
-    print("  -o,  --object object_name   object (variable star) name")
-    print("  -f,  --field size           field size in arcmin")
-    print("  -h,  --help                 print this page")
+# process command line
 
 
 commandLineOptions = {
-    'coords' : None,  # coordinates of reference field
-    'source': None,  # source catalog of field stars
-    'object': None,  # object (variable star) name
-    'field' : defFov,  # reference field size in arcmins
-    'file'  : None  # reference catalog file name
+    'out' : None,  # output folder
+    'rpt' : 'aavso',  # report format, default: aavso extended
+    'name': '?'  # observer name code
     }
 
 
 def processCommands():
     try:
-        optlist, args = getopt (argv[1:], "c:s:o:f:h", ['--coord', '--source', '--object', '--field', '--help'])
-    except GetoptError:
+        optlist, args = getopt.getopt (sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
+    except getopt.GetoptError:
         print ('Invalid command line options')
-        exit(1)
+        return
 
     for o, a in optlist:
         if a[:1] == ':':
             a = a[1:]
-        elif o == '-c':
-            commandLineOptions['coords'] = a
-        elif o == '-s':
-            commandLineOptions['source'] = a
         elif o == '-o':
-            commandLineOptions['object'] = a.replace('_', ' ')
-        elif o == '-f':
-            if a.isdigit():
-                commandLineOptions['field'] = int(a)
+            commandLineOptions['out'] = a
+        elif o == '-r':
+            if a == 'aavso':
+                commandLineOptions['rpt'] = a
             else:
-                print("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
-        elif o == '-h':
-            usage()
-            exit(0)
+                print("Invalid report type: " + a + ". Create default aavso extended report instead")
+        elif o == '-n':
+            commandLineOptions['name'] = a
 
-    if len(args) > 0:
-        commandLineOptions['file'] = args[0]
+    commandLineOptions['files'] = args
+#    if not commandLineOptions['out']:
+#        commandLineOptions['out'] = args[0] + '.refout'
 
-#     if commandLineOptions['file'] == None:
-#         printError("Catalog file name is mandatory.")
-#         exit(1)
+# main program
 
-    if commandLineOptions['object'] == None and commandLineOptions['coords'] == None:
-        printError("Either object name (-o) or coordinates (-c) must be given.")
-        exit(1)
-
-    if commandLineOptions['coords'] != None:
-        c = commandLineOptions['coords'].split(',', maxsplit = 2)
-        ok = True
-        if len(c) != 2:
-            ok = False
-        else:
-            if re.fullmatch("(\d){2}:(\d){2}:(\d){2}(\.\d)*", c[0]) == None:
-                ok = False
-            if re.fullmatch("[+-]*(\d){2}:(\d){2}:(\d){2}(\.\d)*", c[1]) == None:
-                ok = False
-        if not ok:
-            printError("Invalid coordinate format")
-            exit(1)
-
-        commandLineOptions['ra'] = c[0]
-        commandLineOptions['dec'] = c[1]
-
-
-catalogHeader = "AUID         ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
 
 if __name__ == '__main__':
 
     processCommands()
 
-    printTitle()
-    print()
+    if not commandLineOptions['files']:
+        f = glob.glob('Phot/Seq_*.fits.cat.pm')
+        f.sort()
+        commandLineOptions['files'] = f
 
-    outFile = None
-    if commandLineOptions['file'] != None:
-        outFile = open(commandLineOptions['file'], 'w')
-        outFile.write(catalogHeader + "\n")
-    else:
-        print(catalogHeader)
+    allResults = []
 
-    if commandLineOptions['object'] != None:
+    headers = []
 
-        loadVspPhotometryData(outFile, commandLineOptions['object'], fov = commandLineOptions['field'])
+    for fileName in commandLineOptions['files']:
 
-        loadVsxCatalogData(outFile, commandLineOptions['object'], fov = commandLineOptions['field'])
+        pmResult = loadCatalog(fileName)
 
-    else:
+        headers = pmResult['header']
 
-        loadVspPhotometryData(outFile, ra = commandLineOptions['ra'], dec = commandLineOptions['dec'], fov = commandLineOptions['field'])
+        allResults.extend(pmResult['cat'])
 
-        loadVsxCatalogData(outFile, ra = commandLineOptions['ra'], dec = commandLineOptions['dec'], fov = commandLineOptions['field'])
-
-    if outFile != None:
-        outFile.close()
-
-    printInfo("Reference catalog file %s created." % (commandLineOptions['file']))
+    if commandLineOptions['rpt'] == 'aavso':
+        reportForAAVSO(allResults, headers, commandLineOptions['out'], commandLineOptions['name'])
 
 # end main.
+

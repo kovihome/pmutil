@@ -155,7 +155,7 @@ SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -
 photometry() {
   # $1 - seq folder
   # $2 - phot folder
-  # $2 - reference catalog file name
+  # $3 - reference catalog file name
   # $4 - color
 #set -x
   # Names of the sequence/combined files:
@@ -192,6 +192,7 @@ photometry() {
 
 process_photometry() {
   print_info "$3: Make photometry on sequence file(s)."
+  echo "folder: $1"
 
   # Create the photometry dir, if not exists
   if [ ! -e $2 ]; then
@@ -200,8 +201,10 @@ process_photometry() {
 
   # Photometry reference file:
   local sf=$1
-  local basedir=${sf//${SEQ_FOLDER_NAME}/}
+  local basedir=${sf//${SEQ_FOLDER_NAME}*/}
+  echo "basedir: $basedir"
   local PMREFS=($basedir/*.cat)
+  echo "refcat: ${PMREFS[*]}"
   if [ ${#PMREFS[@]} > 1 ] && [ -e ${PMREFS[0]} ]; then
     local PMREF=${PMREFS[0]}
   else
