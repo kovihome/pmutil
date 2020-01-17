@@ -113,7 +113,10 @@ def reportForAAVSO(allResults, header, outFolder, obsName):
     jdPos = getHeaderPos(header, 'JD')
     flagPos = getHeaderPos(header, 'FLAG')
 
-    outFileName = outFolder + '/result.extended.aavso'
+    r = outFolder.split('/')
+    fileName = r[-1]
+
+    outFileName = outFolder + '/' + fileName + '.extended.aavso'
     print("Print AAVSO extended report to the file", outFileName)
     r = open(outFileName, 'w')
 

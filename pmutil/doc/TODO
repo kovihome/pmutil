@@ -15,8 +15,6 @@ TODO
 
 - cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
-(480) legyen az aavso riport file neve a folder (20190614-AY_Lyr.extended.aavso)
-
 
 === V 1.1 ==================================================
 
@@ -56,6 +54,14 @@ TODO
 (452) pmphot: calculate mg with some different method, and put in the result catalog file
 
 	- auto comp star selection, by the least instrumental error value
+	
+(483) az aavso riport file-ban vannak kitoltetlen mezok: 
+	cmag = 'na'  # TODO: set comp star mg if not ensemble
+    kname = 'na'  # TODO: specify ensemble reference comp star when ensemble, or set a check star
+    kmag = 'na'  # TODO: set measured mg of check star
+    airmass = 'na'  # TODO: calculate airmass
+
+	
 
 === V 2.0 ==================================================
 
@@ -77,9 +83,4 @@ TODO
 --- calibration --------------------------------------------
 
 --- photometry ---------------------------------------------
-
-
-
-
-
 
