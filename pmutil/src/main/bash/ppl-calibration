@@ -227,8 +227,7 @@ raw2fits_file() {
 #	rawfile: $1, color: $2
 	local rawfile=$1
 	local FITS_NAME=${rawfile%.*}-$2.fits
-#	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e $FITS_NAME ]; then
-	if [ ! -e $FITS_NAME ]; then
+	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e $FITS_NAME ]; then
 		echo "$rawfile -> $FITS_NAME"
 		rawtran -c $2 -o $FITS_NAME -B 16 -C '-4 -D' -X '-q 3 -w' $rawfile
 		local IMAGETEMP=`exiftool -s -g $rawfile | grep -i CameraTemperature | sed 's/[^0-9]//g'`
@@ -457,8 +456,7 @@ masters_exist() {
 
 process_bias() {
 	masters_exist $1 $MASTER_BIAS_FILE
-	#if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
-	if [ $? -eq 0 ]; then
+	if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
 		print_info "$2: Convert bias RAW files to FITS."
 		raw2fits $1
 
@@ -475,8 +473,7 @@ process_bias() {
 
 process_dark() {
 	masters_exist $1 $MASTER_DARK_FILE
-	#if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
-	if [ $? -eq 0 ]; then
+	if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
 		print_info "$3: Convert dark RAW files to FITS."
 		raw2fits $1
 
@@ -561,8 +558,7 @@ if [ "$USE_MASTER_FLAT" == "0" ] ; then
 
   # process flat bias, flat dark and flat, only if flat master is not exist
   masters_exist $FLAT_FOLDER $MASTER_FLAT_FILE
-  #if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
-  if [ $? -eq 0 ]; then
+  if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
 
 ############################################################################
 # step 3. create master flat bias frame, if it is differs from master bias

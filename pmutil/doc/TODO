@@ -5,8 +5,6 @@ TODO
 
 --- calibration --------------------------------------------
 
-+(456) --force option for master frames
-
 +(470) image not matched remove from further processing
 
 	+ tesztelni kell
@@ -19,7 +17,7 @@ TODO
 
 === V 1.1 ==================================================
 
-(469) config: tetszoleges parameter megadhato legyen command lineban
+(469) config: tetszoleges parameter megadhato legyen command line-ban
 
 	pl: -D max-distance=4
 
@@ -39,6 +37,8 @@ TODO
 --- calibration --------------------------------------------
 
 (448) create/use 3D/4D FITS
+
+(487) a rosszul match-elodo, de hibat nem ado kepeket is ki kell szurni valahogy a grmatch eredmeny file alapjan 
 
 --- photometry ---------------------------------------------
 
