@@ -176,7 +176,7 @@ photometry() {
     PMCAT_FILE="$2/`basename $f`.cat"
 
     print_info "Make astrometry for $f"
-    /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
+    ${AST_BIN_FOLDER}/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
     print_info "Make photometry for $f"
     sextractor $AST_FILE -c $SEX_CFG -CATALOG_NAME $PMCAT_FILE -CATALOG_TYPE ASCII_HEAD

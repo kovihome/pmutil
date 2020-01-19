@@ -5,13 +5,7 @@ TODO
 
 --- calibration --------------------------------------------
 
-+(470) image not matched remove from further processing
-
-	+ tesztelni kell
-
 --- photometry ---------------------------------------------
-
-- cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
 --- refcat -------------------------------------------------
 
@@ -46,8 +40,6 @@ TODO
 
 (450) standardization (s15n)
 
-(451) whole frame photometry
-
 - fiphot
 
 - SCAMP
@@ -62,23 +54,30 @@ TODO
     kmag = 'na'  # TODO: set measured mg of check star
     airmass = 'na'  # TODO: calculate airmass
 
-	
+- cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
 
-=== V 2.0 ==================================================
+
+=== V 1.2 ==================================================
+
+(465) RAW képek és eredmény archiválása
 
 --- calibration --------------------------------------------
 
+(463) Az összegképet mentse el jpg-ben is
+
 --- photometry ---------------------------------------------
+
+(451) whole frame photometry
+
+(488) Tranziens detektálás
+
+(489) Referencia katalógus tartalmazzon mezőcsillagokat is
 
 
 === NOT VERSIONED  ==================================================
 
 (476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
 
-+(465) -c??? clean and -a archivate + clean options
-
-	ppl_clean
-	
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------

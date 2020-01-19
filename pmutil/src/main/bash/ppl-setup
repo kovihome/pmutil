@@ -2,6 +2,9 @@
 # Pipeline setup
 #
 
+# astronomy.net bin folder location
+AST_BIN_FOLDER="/usr/local/astrometry/bin"
+
 # folder of the config files (ast, sex)
 CONFIG_FOLDER="/home/kovi/bin"
 

@@ -120,7 +120,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		-t|--image-time)
-			if [ '$2' == 'LT' || '$2' == 'UT' ]; then
+			if [ "$2" == "LT" ] || [ "$2" == "UT" ]; then
 				IMAGE_TIME=$2
 			else
 				print_error "bad image time zone value: $2, using default $IMAGE_TIME instead."
@@ -129,7 +129,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		-e|--on-error)
-			if [ '$2' == 'noop' || '$2' == 'stop' || '$2' == 'skip' ]; then
+			if [ "$2" == "noop" ] || [ "$2" == "stop" ] || [ "$2" == "skip" ]; then
 				ON_ERROR=$2
 			else
 				print_error "bad on-error instruction; available values are: noop, stop, skip."
@@ -143,7 +143,7 @@ while [[ $# -gt 0 ]]; do
 			;;
 		*)
 			#print_error "bad command line option: $1"
-			BASE_FOLDER=`echo "$1" | sed 's/\/$//'`
+			BASE_FOLDER=$(echo "$1" | sed 's/\/$//')
 			shift
 			;;
 	esac
@@ -155,7 +155,7 @@ if [ $SHOW_HELP -eq 1 ]; then
 fi
 
 if [ ! "$BASE_FOLDER" == "" ] ; then
-  if [ ! -d $BASE_FOLDER ] ; then
+  if [ ! -d "$BASE_FOLDER" ] ; then
     print_error "Base folder $BASE_FOLDER not exists or not a directory."
     exit 1
   else
@@ -169,7 +169,7 @@ echo "count combine: $COUNT_COMBINE"
 
 # save command into file
 if [ "$BASE_FOLDER" != "" ]; then
-	echo "ppl-calibration $ARGS_SAVE" > $BASE_FOLDER/calibration
+	echo "ppl-calibration $ARGS_SAVE" > "$BASE_FOLDER"/calibration
 else
 	echo "ppl-calibration $ARGS_SAVE" > ./calibration
 fi
@@ -186,14 +186,14 @@ TEMPDIR="temp"
 . "ppl-disco" $FLAT_ONLY $USE_MASTER_FLAT $BASE_FOLDER
 
 if [ ! "$MASTER_FLAT" == "" ] ; then
-  if [ ! -d $MASTER_FLAT ] ; then
+  if [ ! -d "$MASTER_FLAT" ] ; then
     print_error "Master-flat folder $MASTER_FLAT not exists."
     exit 1
   else
     has_master=1
     for c in "${COLOR_CHANNEL[@]}" ; do
       echo "$MASTER_FLAT/${MASTER_FLAT_FILE}-${c}.fits"
-      if [ ! -e $MASTER_FLAT/${MASTER_FLAT_FILE}-${c}.fits ] ; then
+      if [ ! -e "$MASTER_FLAT/${MASTER_FLAT_FILE}-${c}.fits" ] ; then
         print_error "No ${c} master-flat file in the directory $MASTER_FLAT"
         has_master=0
       fi
@@ -214,12 +214,12 @@ fi
 
 ######################### process calibration pipeline
 
-start=`date +%s`
+start=$(date +%s)
 
 im_size_arg() {
 #	$1 - FITS file name
-	local NAXIS1=`fiheader --get NAXIS1 $1`
-	local NAXIS2=`fiheader --get NAXIS2 $1`
+	local NAXIS1=$(fiheader --get NAXIS1 $1)
+	local NAXIS2=$(fiheader --get NAXIS2 $1)
 	echo "--image 0:0:$((NAXIS1-1)):$((NAXIS2-1))"
 }
 
@@ -227,15 +227,15 @@ raw2fits_file() {
 #	rawfile: $1, color: $2
 	local rawfile=$1
 	local FITS_NAME=${rawfile%.*}-$2.fits
-	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e $FITS_NAME ]; then
+	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e "$FITS_NAME" ]; then
 		echo "$rawfile -> $FITS_NAME"
-		rawtran -c $2 -o $FITS_NAME -B 16 -C '-4 -D' -X '-q 3 -w' $rawfile
-		local IMAGETEMP=`exiftool -s -g $rawfile | grep -i CameraTemperature | sed 's/[^0-9]//g'`
-		fiheader --append "CCD-TEMP=${IMAGETEMP}./CCD Temperature (Celsius)" $FITS_NAME
-		if [ $IMAGE_TIME == "LT" ]; then
-			local IMAGE_DATE=`fiheader --get DATE-OBS $FITS_NAME`
-			local IMAGE_DATE_UTC=`pmlt2ut $IMAGE_DATE`
-			sethead -s _ $FITS_NAME DATE-OBS="$IMAGE_DATE_UTC" DATE-IMG="$IMAGE_DATE" / "Original_image_date_(in_local_time)"
+		rawtran -c "$2" -o "$FITS_NAME" -B 16 -C '-4 -D' -X '-q 3 -w' "$rawfile"
+		local IMAGETEMP=$(exiftool -s -g "$rawfile" | grep -i CameraTemperature | sed 's/[^0-9]//g')
+		fiheader --append "CCD-TEMP=${IMAGETEMP}./CCD Temperature (Celsius)" "$FITS_NAME"
+		if [ "$IMAGE_TIME" == "LT" ]; then
+			local IMAGE_DATE=$(fiheader --get DATE-OBS "$FITS_NAME")
+			local IMAGE_DATE_UTC=$(pmlt2ut "$IMAGE_DATE")
+			sethead -s _ "$FITS_NAME" DATE-OBS="$IMAGE_DATE_UTC" DATE-IMG="$IMAGE_DATE" / "Original_image_date_(in_local_time)"
 		fi
 	fi
 }
@@ -247,14 +247,14 @@ raw2fits() {
 	# for all raw file do the conversion
 	for rawfile in $1/*.cr2; do
 		for color in "${COLOR_CHANNEL[@]}"; do
-			raw2fits_file $rawfile $color
+			raw2fits_file "$rawfile" "$color"
 		done
 	done
 }
 
 make_master_bias() {
 	local BIASLIST=($1/${BIAS_FILE_PREFIX}*-$2.fits)
-	if [ ! -e ${BIASLIST[0]} ]; then
+	if [ ! -e "${BIASLIST[0]}" ]; then
 		return 1
 #	  echo -e "${BRed}Error: No bias files in the directory.${Color_Off}"
 #	  exit 1
@@ -263,14 +263,14 @@ make_master_bias() {
 	echo "$1/${BIAS_FILE_PREFIX}*-$2.fits -> $1/${MASTER_BIAS_FILE}-$2.fits"
 	
 	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-	local R_BIASLIST=($(for f in ${BIASLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
+	local R_BIASLIST=($(for f in ${BIASLIST[*]} ; do echo ${TEMPDIR}/$(basename "$f") ; done ))
 	
 	# The calibration of the individual bias frames, followed by their combination into a single master image:
-	ficalib -i ${BIASLIST[*]} $COMMON_ARGS $(im_size_arg "${BIASLIST[0]}") -o ${R_BIASLIST[*]}
-	ficombine ${R_BIASLIST[*]} --mode median -o $1/${MASTER_BIAS_FILE}-$2.fits
+	ficalib -i "${BIASLIST[*]}" "$COMMON_ARGS" $(im_size_arg "${BIASLIST[0]}") -o "${R_BIASLIST[*]}"
+	ficombine "${R_BIASLIST[*]}" --mode median -o "$1/${MASTER_BIAS_FILE}-$2.fits"
 
 	# cleanup: remove temp files
-	for f in ${R_BIASLIST[*]} ; do rm -f $f ; done
+	for f in "${R_BIASLIST[*]}" ; do rm -f $f ; done
 
 	return 0
 }
@@ -289,7 +289,7 @@ make_master_dark() {
 	echo "$1/${DARK_FILE_PREFIX}*-$2.fits -> $1/${MASTER_DARK_FILE}-$2.fits"
 
 	# Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-	local R_DARKLIST=($(for f in ${DARKLIST[*]} ; do echo ${TEMPDIR}/`basename $f` ; done ))
+	local R_DARKLIST=($(for f in ${DARKLIST[*]} ; do echo ${TEMPDIR}/$(basename $f) ; done ))
 
 	# The calibration of the individual bias frames, followed by their combination into a single master image:
 	ficalib -i ${DARKLIST[*]} $COMMON_ARGS $(im_size_arg "${DARKLIST[0]}") -o ${R_DARKLIST[*]} --input-master-bias $3/${MASTER_BIAS_FILE}-$2.fits
@@ -299,7 +299,7 @@ make_master_dark() {
 	local sum=0
 	local count=0
 	for f in $1/${DARK_FILE_PREFIX}*.cr2 ; do
-	  IMAGETEMP=`exiftool -s -g $f | grep -i CameraTemperature | sed 's/[^0-9]//g'`
+	  IMAGETEMP=$(exiftool -s -g $f | grep -i CameraTemperature | sed 's/[^0-9]//g')
 	  sum=$(( $sum+$IMAGETEMP ))
 	  count=$(( $count+1 ))
 	done
@@ -412,7 +412,7 @@ registrate() {
 	    fi
 	  fi
 
-	  if [ ${match_failed} == 0 ] || [ $ON_ERROR == "skip" ]; then
+	  if [ ${match_failed} == 0 ] || [ $ON_ERROR == "noop" ]; then
 	  	fitrans $f --input-transformation $ftrans --reverse -k -o ${TEMPDIR}/${bn}
 	  fi
 
@@ -425,9 +425,9 @@ registrate() {
 	if (( $COUNT_COMBINE != 0 )); then
 	  for (( a=0; a<${#TROBJLIST[*]}; a+=$COUNT_COMBINE )) ; do
 	    printf -v fi "%03g" $((a/COUNT_COMBINE))
-	    echo "combine $2/${SEQPREFIX}${fi}.fits"
-	    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o $2/${SEQPREFIX}${fi}-$3.fits
-	    pmdateobs $2/${SEQPREFIX}${fi}-$3.fits ${TROBJLIST[*]:a:COUNT_COMBINE}
+	    echo "combine $2/${SEQ_FILE_PREFIX}${fi}.fits"
+	    ficombine ${TROBJLIST[*]:a:COUNT_COMBINE} $FICOMBINE_ARGS -o $2/${SEQ_FILE_PREFIX}${fi}-$3.fits
+	    pmdateobs $2/${SEQ_FILE_PREFIX}${fi}-$3.fits ${TROBJLIST[*]:a:COUNT_COMBINE}
 	  done
 	fi
 
