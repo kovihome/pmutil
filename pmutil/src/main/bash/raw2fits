@@ -11,7 +11,7 @@ BGreen='\033[1;32m'       # Green
 Blue='\033[0;34m'         # Blue
 
 echo
-echo -e "${BGreen}raw2fits, version 0.1.0${Color_Off}"
+echo -e "${BGreen}raw2fits, version 1.0.0${Color_Off}"
 echo -e "${Blue}convert cr2 files to fits.${Color_Off}"
 echo
 

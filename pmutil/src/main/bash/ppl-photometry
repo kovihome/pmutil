@@ -42,7 +42,7 @@ print_info() {
 }
 
 echo
-echo -e "${BGreen}ppl-photometry, version 0.1.0${Color_Off}"
+echo -e "${BGreen}ppl-photometry, version 1.0.0${Color_Off}"
 echo -e "${Blue}Make photometry on calibrated FITS images.${Color_Off}"
 echo
 

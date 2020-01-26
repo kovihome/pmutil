@@ -14,7 +14,7 @@ DEFAULT_BIASDIR="Bias"
 BIAS_FILE_PREFIX="Bias_"
 
 echo
-echo -e "${BGreen}master-bias, version 0.1.0${Color_Off}"
+echo -e "${BGreen}master-bias, version 1.0.0${Color_Off}"
 echo -e "${Blue}create master bias frame.${Color_Off}"
 echo
 

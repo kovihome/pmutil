@@ -14,7 +14,7 @@ DEFAULT_DARKDIR="Dark"
 DARK_FILE_PREFIX="Dark_"
 
 echo
-echo -e "${BGreen}master-dark, version 0.1.0${Color_Off}"
+echo -e "${BGreen}master-dark, version 1.0.0${Color_Off}"
 echo -e "${Blue}create master dark frame.${Color_Off}"
 echo
 

@@ -19,7 +19,7 @@ if [ ! "$PPL_SETUP" == "OK" ] ; then
   SILENT_MODE=1
 
   echo
-  echo -e "${BGreen}ppl-disco, version 0.1.0${Color_Off}"
+  echo -e "${BGreen}ppl-disco, version 1.0.0${Color_Off}"
   echo -e "${Blue}discovery folders.${Color_Off}"
   echo
 

@@ -50,7 +50,7 @@ exit_on_error() {
 }
 
 echo
-echo -e "${BGreen}ppl-calibration, version 0.1.0${Color_Off}"
+echo -e "${BGreen}ppl-calibration, version 1.0.0${Color_Off}"
 echo -e "${Blue}Calibrate a set of RAW or FITS images.${Color_Off}"
 echo
 

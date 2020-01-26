@@ -11,7 +11,7 @@ BGreen="\e[1;32m"  # Green
 Blue="\e[0;34m"    # Blue
 
 echo
-echo -e "${BGreen}phot2, version 0.1.0${Color_Off}"
+echo -e "${BGreen}phot2, version 1.0.0${Color_Off}"
 echo -e "${Blue}make photometry against calibrated and stacked frames.${Color_Off}"
 echo
 

@@ -37,7 +37,7 @@ exit_on_error() {
 }
 
 echo
-echo -e "${BGreen}configure, version 0.1.0${Color_Off}"
+echo -e "${BGreen}configure, version 1.0.0${Color_Off}"
 echo -e "${Blue}Configure pmutil package.${Color_Off}"
 echo
 

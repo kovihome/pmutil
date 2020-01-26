@@ -38,7 +38,7 @@ exit_on_error() {
 }
 
 echo
-echo -e "${BGreen}ppl-clean, version 0.1.0${Color_Off}"
+echo -e "${BGreen}ppl-clean, version 1.0.0${Color_Off}"
 echo -e "${Blue}Clean all generated FITS and other files.${Color_Off}"
 echo
 

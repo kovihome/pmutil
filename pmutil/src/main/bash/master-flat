@@ -14,7 +14,7 @@ DEFAULT_FLATDIR="Flat"
 FLAT_FILE_PREFIX="Flat_"
 
 echo
-echo -e "${BGreen}master-flat, version 0.1.0${Color_Off}"
+echo -e "${BGreen}master-flat, version 1.0.0${Color_Off}"
 echo -e "${Blue}create master flat frame.${Color_Off}"
 echo
 

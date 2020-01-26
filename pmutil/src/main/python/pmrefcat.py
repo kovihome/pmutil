@@ -47,7 +47,7 @@ def printInfo(s):
 
 def printTitle():
     print()
-    print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
+    print(BGreen + "ppl-refcat, version 1.0.0 " + Color_Off)
     print(Blue + "Create reference catalog for photometry." + Color_Off)
 
 def loadPplSetup():
@@ -301,7 +301,7 @@ def determineCoordsFromImage(imageFileName):
 
 def usage():
     print()
-    print(BGreen + "ppl-refcat, version 0.1.0 " + Color_Off)
+    print(BGreen + "ppl-refcat, version 1.0.0 " + Color_Off)
     print()
     print("Usage: ppl-refcat [OPTIONS]... CATALOG_FILE_NAME")
     print("Create reference catalog for photometry.")
