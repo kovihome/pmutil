@@ -42,7 +42,7 @@ print_info() {
 }
 
 echo
-echo -e "${BGreen}ppl-photometry, version 1.0.0${Color_Off}"
+echo -e "${BGreen}ppl-photometry, version 1.1.0${Color_Off}"
 echo -e "${Blue}Make photometry on calibrated FITS images.${Color_Off}"
 echo
 
@@ -129,6 +129,13 @@ fi
 # default setup
 . "ppl-setup"
 
+if [ ! -d "$PMLIB" ]; then
+	mkdir "$PMLIB"
+	mv "$HOME/bin/astrometry.cfg" "$PMLIB"
+	mv "$HOME/bin/sex.cfg" "$PMLIB"
+	mv "$HOME/bin/sex.param" "$PMLIB"
+fi
+
 TEMPDIR="temp"
 
 
@@ -209,6 +216,7 @@ process_photometry() {
     local PMREF=${PMREFS[0]}
   else
     print_error "No reference catalog file (.cat) in folder $basedir"
+    print_info "Use ppl-refcat command to create reference catalog for the object."
     return 1
   fi
 
@@ -223,11 +231,16 @@ process_photometry() {
 # step 1. do photometry for all file
 ####################################
 
+PMERROR=0
 for sf in ${SEQ_FOLDERS[@]} ; do
 
-  pf=${sf//${SEQ_FOLDER_NAME}/${PHOT_FOLDER_NAME}}
+	pf=${sf//${SEQ_FOLDER_NAME}/${PHOT_FOLDER_NAME}}
 
-  process_photometry $sf $pf "PHOTOMETRY"
+	process_photometry $sf $pf "PHOTOMETRY"
+	if [ $? == 1 ]; then
+		PMERROR=1
+		break	
+	fi
   
 done
 
@@ -235,18 +248,21 @@ done
 # step 2. create report from all results
 ########################################
 
-if [ ! "$BASE_FOLDER" == "" ] ; then
-  PM_FILES=(*$BASE_FOLDER*/$PHOT_FOLDER_NAME/*.pm)
-  BASE_FOLDERS=(*$BASE_FOLDER*)
-  REPORT_FOLDER=${BASE_FOLDERS[0]}
-else
-  PM_FILES=($PHOT_FOLDER_NAME/*.pm)
-  REPORT_FOLDER=`pwd`
+if [ $PMERROR  == 0 ]; then
+	if [ ! "$BASE_FOLDER" == "" ] ; then
+		PM_FILES=(*$BASE_FOLDER*/$PHOT_FOLDER_NAME/*.pm)
+		BASE_FOLDERS=(*$BASE_FOLDER*)
+		REPORT_FOLDER=${BASE_FOLDERS[0]}
+	else
+		PM_FILES=($PHOT_FOLDER_NAME/*.pm)
+		REPORT_FOLDER=`pwd`
+	fi
+
+	print_info "Create report into $REPORT_FOLDER folder."
+
+	pmresult -o $REPORT_FOLDER -n $NAME_CODE ${PM_FILES[@]}
+
 fi
-
-print_info "Create report into $REPORT_FOLDER folder."
-
-pmresult -o $REPORT_FOLDER -n $NAME_CODE ${PM_FILES[@]}
 
 
 #set +x

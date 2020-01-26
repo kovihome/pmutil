@@ -6,8 +6,6 @@
 Created on Jan 1, 2020
 
 @author: kovi
-
-1. load photometry for comp stars from AAVSO VSP fotometry table. 
 '''
 
 from sys import argv
@@ -50,6 +48,7 @@ def printTitle():
     print(BGreen + "ppl-refcat, version 1.0.0 " + Color_Off)
     print(Blue + "Create reference catalog for photometry." + Color_Off)
 
+
 def loadPplSetup():
     global pplSetup
     userhome = os.getenv("HOME")
@@ -59,10 +58,12 @@ def loadPplSetup():
             r = line.split('=')
             pplSetup[r[0].strip()] = r[1].rstrip()[1:-1]
 
+
 def invoke(cmd):
     r = cmd.split()
     a = subprocess.check_output(r)
     return a.decode('ascii')[:-1]
+
 
 def hexa2deg(s):
     r = s.split(':')
@@ -263,16 +264,21 @@ def loadVsxCatalogData(outFile, objectName, ra = None, dec = None, fov = defFov)
         else:
             print(s)
 
+
 def getPair(s, delim = ','):
     ss = s.split(delim)
     return [ss[0].strip(), ss[1].strip()]
 
+
 def determineCoordsFromImage(imageFileName):
-    SOLVE_ARGS = "-O --config /home/kovi/bin/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
+    configFolder = pplSetup["PMLIB"]
+    if configFolder == None:
+        configFolder = "$HOME/.pmlib"
+    SOLVE_ARGS = "-O --config " + configFolder + "/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
 
     # /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
-    os.makedirs("temp", exist_ok=True)
+    os.makedirs("temp", exist_ok = True)
 
     invoke("cp " + imageFileName + " temp/src.fits")
 
@@ -316,13 +322,14 @@ def usage():
 
 
 commandLineOptions = {
-    'coords' : None,   # coordinates of reference field
-    'source': None,    # source catalog of field stars
-    'object': None,    # object (variable star) name
-    'image' : None,    # image file
+    'coords' : None,  # coordinates of reference field
+    'source': None,  # source catalog of field stars
+    'object': None,  # object (variable star) name
+    'image' : None,  # image file
     'field' : defFov,  # reference field size in arcmins
-    'file'  : None     # reference catalog file name
+    'file'  : None  # reference catalog file name
     }
+
 
 def processCommands():
 

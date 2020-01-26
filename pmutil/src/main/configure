@@ -193,10 +193,16 @@ chmod 0755 "$DEST_FOLDER"/*
 # copy external config files
 #############################
 
-print_info "Copy config files to $DEST_FOLDER."
+CONFIG_FOLDER="$HOME/.pmlib"
+
+print_info "Copy config files to $CONFIG_FOLDER."
 
 CONFIG_BASE=${BASE_FOLDER%/src/main}
 CONFIG_BASE="$CONFIG_BASE/etc"
+
+if [ ! -d "$CONFIG_FOLDER" ]; then
+	mkdir "$CONFIG_FOLDER"
+fi
 
 # sextractor files: sex.cfg, sex.param
 cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"

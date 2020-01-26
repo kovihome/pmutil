@@ -181,6 +181,13 @@ fi
 # default setup
 . "ppl-setup"
 
+if [ ! -d "$PMLIB" ]; then
+	mkdir "$PMLIB"
+	mv "$HOME/bin/astrometry.cfg" "$PMLIB"
+	mv "$HOME/bin/sex.cfg" "$PMLIB"
+	mv "$HOME/bin/sex.param" "$PMLIB"
+fi
+
 TEMPDIR="temp"
 
 . "ppl-disco" $FLAT_ONLY $USE_MASTER_FLAT $BASE_FOLDER

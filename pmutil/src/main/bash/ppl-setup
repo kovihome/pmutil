@@ -1,12 +1,17 @@
 #!/bin/bash
 # Pipeline setup
 #
+PMLIB="$HOME/.pmlib"
+DARKLIB="$PMLIB/dark"
+FLATLIB="$PMLIB/flat"
+COEFFLIB="$PMLIB/coeff"
+ARCHLIB="$PMLIB/archive"
 
 # astronomy.net bin folder location
 AST_BIN_FOLDER="/usr/local/astrometry/bin"
 
 # folder of the config files (ast, sex)
-CONFIG_FOLDER="/home/kovi/bin"
+CONFIG_FOLDER="$PMLIB"
 
 # standard Ekos folder names
 BIAS_FOLDER_NAME="Bias"
