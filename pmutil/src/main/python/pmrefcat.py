@@ -387,6 +387,23 @@ def processCommands():
         commandLineOptions['ra'] = c[0]
         commandLineOptions['dec'] = c[1]
 
+def saveCommand():
+    for j in range(len(argv)):
+        if " " in argv[j]:
+            argv[j] = "\"" + argv[j] + "\""
+    cmd = " ".join(argv)
+    cmd = cmd[cmd.find("ppl-"):]
+
+    path = ""
+    j = commandLineOptions['file'].rfind("/")
+    if j != -1:
+        path = commandLineOptions['file'][:j+1]
+	
+    f = open(path + "refcat", "w+")
+    f.write(cmd + "\n")
+    f.close()
+
+
 
 catalogHeader = "AUID         ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
 
@@ -431,6 +448,7 @@ if __name__ == '__main__':
     if outFile != None:
         outFile.close()
 
+    saveCommand()
     printInfo("Reference catalog file %s created." % (commandLineOptions['file']))
 
 # end main.

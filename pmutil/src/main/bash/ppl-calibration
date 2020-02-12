@@ -234,7 +234,7 @@ raw2fits_file() {
 #	rawfile: $1, color: $2
 	local rawfile=$1
 	local FITS_NAME=${rawfile%.*}-$2.fits
-	if [ $FORCE_OVERWRITE == 1 ] || [ ! -e "$FITS_NAME" ]; then
+	if [ $FORCE_OVERWRITE -eq 1 ] || [ ! -e "$FITS_NAME" ]; then
 		echo "$rawfile -> $FITS_NAME"
 		rawtran -c "$2" -o "$FITS_NAME" -B 16 -C '-4 -D' -X '-q 3 -w' "$rawfile"
 		local IMAGETEMP=$(exiftool -s -g "$rawfile" | grep -i CameraTemperature | sed 's/[^0-9]//g')
@@ -273,11 +273,11 @@ make_master_bias() {
 	local R_BIASLIST=($(for f in ${BIASLIST[*]} ; do echo ${TEMPDIR}/$(basename "$f") ; done ))
 	
 	# The calibration of the individual bias frames, followed by their combination into a single master image:
-	ficalib -i "${BIASLIST[*]}" "$COMMON_ARGS" $(im_size_arg "${BIASLIST[0]}") -o "${R_BIASLIST[*]}"
-	ficombine "${R_BIASLIST[*]}" --mode median -o "$1/${MASTER_BIAS_FILE}-$2.fits"
+	ficalib -i ${BIASLIST[*]} $COMMON_ARGS $(im_size_arg ${BIASLIST[0]}) -o ${R_BIASLIST[*]}
+	ficombine ${R_BIASLIST[*]} --mode median -o $1/${MASTER_BIAS_FILE}-$2.fits
 
 	# cleanup: remove temp files
-	for f in "${R_BIASLIST[*]}" ; do rm -f $f ; done
+	for f in ${R_BIASLIST[*]} ; do rm -f $f ; done
 
 	return 0
 }
@@ -454,7 +454,7 @@ masters_exist() {
 	local EXISTS=1
 	for color in "${COLOR_CHANNEL[@]}"; do
 		MB=$1/$2-$color.fits
-		if [ ! -e $MB ]; then 
+		if [ ! -f $MB ]; then 
 			EXISTS=0 
 		fi
 	done
@@ -463,7 +463,8 @@ masters_exist() {
 
 process_bias() {
 	masters_exist $1 $MASTER_BIAS_FILE
-	if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+	local exists=$?
+	if [ $FORCE_OVERWRITE -eq 1 ] || [ $exists -eq 0 ]; then
 		print_info "$2: Convert bias RAW files to FITS."
 		raw2fits $1
 
@@ -480,7 +481,8 @@ process_bias() {
 
 process_dark() {
 	masters_exist $1 $MASTER_DARK_FILE
-	if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+	local exists=$?
+	if [ $FORCE_OVERWRITE -eq 1 ] || [ $exists -eq 0 ]; then
 		print_info "$3: Convert dark RAW files to FITS."
 		raw2fits $1
 
@@ -563,9 +565,10 @@ fi
 
 if [ "$USE_MASTER_FLAT" == "0" ] ; then
 
-  # process flat bias, flat dark and flat, only if flat master is not exist
-  masters_exist $FLAT_FOLDER $MASTER_FLAT_FILE
-  if [ $FORCE_OVERWRITE == 1 ] || [ $? -eq 0 ]; then
+	# process flat bias, flat dark and flat, only if flat master is not exist
+	masters_exist $FLAT_FOLDER $MASTER_FLAT_FILE
+	exists=$?
+	if [ $FORCE_OVERWRITE -eq 1 ] || [ $exists -eq 0 ]; then
 
 ############################################################################
 # step 3. create master flat bias frame, if it is differs from master bias
@@ -584,11 +587,11 @@ if [ "$USE_MASTER_FLAT" == "0" ] ; then
 ##############################
 # step 5. create master flat
 ##############################
-	process_flat $FLAT_FOLDER $FLAT_BIAS_FOLDER $FLAT_DARK_FOLDER "FLAT"
+		process_flat $FLAT_FOLDER $FLAT_BIAS_FOLDER $FLAT_DARK_FOLDER "FLAT"
 
-  else
-	print_info "FLAT: Master flat file(s) are already created."
-  fi
+	else
+		print_info "FLAT: Master flat file(s) are already created."
+	fi
 
 fi
 
