@@ -10,7 +10,7 @@ These scripts run on Linux, and they have some dependecies:
 - python packages: **numpy**, **xmltodict**
 - **FITSH** 0.9.3+ (https://fitsh.net)
 - **RawTran** 0.3.8+ (http://integral.physics.muni.cz/rawtran/)
-- **ExifTool** 10.80+ (https://sourceforge.net/projects/exiftool/)
+- **ExifTool** 10.80+ (https://sourceforge.net/projects/exiftool/) - libimage-exiftool-perl package in Debian/Ubuntu systems
 - **Astrometry.net** 0.77+ (http://astrometry.net)
 - **SExtractor** 2.19.5+ (http://www.astromatic.net/software/sextractor)
 - **wcstools** 3.9.5+ (http://tdc-www.harvard.edu/software/wcstools/)
