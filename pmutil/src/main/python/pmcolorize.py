@@ -23,7 +23,8 @@ class Colorize:
 
     scaleMethods = ['linear', 'sqrt', 'log', 'asinh']
 
-    wb = [1.15, 1.0, 0.79]   # for Canon EOS 1100D
+#    wb = [1.15, 1.0, 0.79]   # for Canon EOS 1100D
+    wb = [1.25, 1.0, 0.96]   # for Canon EOS 1100D sRGB
 #   wb = [1.12, 1.0, 0.77]   # for Canon EOS 350D
 #   wb = [1.04, 1.0, 0.72]   # for Canon EOS 450D
 #   wb = [0.98, 1.0, 0.82]   # for Canon EOS 1300D
@@ -58,7 +59,8 @@ class Colorize:
         img = zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
         for j in range(3):
             smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
-            smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
+#            smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
+            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
             if self.SCALE_METHOD == self.scaleMethods[0]:
                 img[:,:,j] = img_scale.linear(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[1]:

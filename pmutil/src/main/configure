@@ -109,6 +109,18 @@ XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "xmltodict" | sed 's/[^0-9\.]/
 XMLTODICT_MINVERSION=0.12.0
 warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/xmltodict"
 
+# python3 astropy
+
+XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "astropy" | sed 's/[^0-9\.]//g')
+XMLTODICT_MINVERSION=4.0
+warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/astropy"
+
+# python3 matplotlib
+
+XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "matplotlib" | sed 's/[^0-9\.]//g')
+XMLTODICT_MINVERSION=3.1
+warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/matplotlib"
+
 # FITSH
 
 FITSH_VERSION=$(ficalib --version | head -n1 | cut -d"(" -f2 | cut -d"@" -f1)
@@ -149,8 +161,8 @@ warn_version "$WCSFTOOL_VERSION" "$WCSTOOL_MINVERSION" "wcstool"
 # Copy sources to user's bin folder
 ####################################
 
-SOURCES=( "bash/ppl-setup" "bash/ppl-disco" "bash/ppl-calibration" "bash/ppl-photometry" "bash/ppl-clean" "python/pmfilter.py" "python/pmphot.py" \
-	"python/pmresult.py" "python/pmlt2ut.py" "python/pmdateobs.py" "python/pmrefcat.py" )
+#SOURCES=( "bash/ppl-setup" "bash/ppl-disco" "bash/ppl-calibration" "bash/ppl-clean" "python/pmfilter.py" "python/pmphot.py" \
+#	"python/pmresult.py" "python/pmlt2ut.py" "python/pmdateobs.py" "python/pmrefcat.py" "pyton/pplphotometry.py" )
 
 assert_source_exist() {
 	if [ ! -e "${BASE_FOLDER}"/"$1" ]; then
@@ -160,15 +172,17 @@ assert_source_exist() {
 }
 
 copy_source() {
-	if [[ $1 =~ .*\.py$ ]]; then
-		local dn=$(basename -s .py "$1")
-		if [ "$dn" == "pmrefcat" ]; then
-			dn="ppl-refcat"
-		fi 
-		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/${dn}
-	else
-		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"
-	fi
+	assert_source_exist "$1"
+	cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/$2
+#	if [[ $1 =~ .*\.py$ ]]; then
+#		local dn=$(basename -s .py "$1")
+#		if [ "$dn" == "pmrefcat" ]; then
+#			dn="ppl-refcat"
+#		fi 
+#		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/${dn}
+#	else
+#		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"
+#	fi
 }
 
 
@@ -179,13 +193,28 @@ if [ ! -e "$DEST_FOLDER" ]; then
 fi
 
 print_info "Copy scripts to $DEST_FOLDER."
-for src in ${SOURCES[*]}; do
-	assert_source_exist "$src"
-done
+#for src in ${SOURCES[*]}; do
+#	assert_source_exist "$src"
+#done
 
-for src in ${SOURCES[*]}; do
-	copy_source "$src"
-done
+#for src in ${SOURCES[*]}; do
+#	copy_source "$src"
+#done
+
+copy_source "bash/ppl-setup" "ppl-setup"
+copy_source "bash/ppl-disco" "ppl-disco"
+copy_source "bash/ppl-calibration" "ppl-calibration"
+copy_source "bash/ppl-clean" "ppl-clean"
+copy_source "python/pmfilter.py" "pmfilter"
+copy_source "python/pmphot.py" "pmphot.py"
+copy_source "python/pmresult.py" "pmresult" 
+copy_source "python/pmlt2ut.py" "pmlt2ut" 
+copy_source "python/pmdateobs.py" "pmdateobs" 
+copy_source "python/pmrefcat.py" "ppl-refcat" 
+copy_source "python/pplphotometry.py" "ppl-photometry"
+copy_source "python/pmbase.py" "pmbase.py"
+copy_source "python/img_scale.py" "img_scale.py"
+copy_source "python/pmcolorize.py" "pmcolorize"
 
 chmod 0755 "$DEST_FOLDER"/*
 
@@ -194,7 +223,6 @@ chmod 0755 "$DEST_FOLDER"/*
 #############################
 
 CONFIG_FOLDER="$HOME/.pmlib"
-
 print_info "Copy config files to $CONFIG_FOLDER."
 
 CONFIG_BASE=${BASE_FOLDER%/src/main}

@@ -59,7 +59,7 @@ class Pipeline:
             # TODO: call directly
             invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
 
-            self.calculateMags(color, PMCAT_FILE_FLT)
+            #self.calculateMags(color, PMCAT_FILE_FLT)
 
             #PM_FILE = PMCAT_FILE_FLT + '.pm'
             #printInfo("Calculate real magnitudes to %s" % (PM_FILE))
@@ -74,9 +74,10 @@ class Pipeline:
         PHOTLIST = glob(photFolder + '/' + self.pplSetup['SEQ_FILE_PREFIX'] + '*-' + color + '.cat.cat')
         if len(PHOTLIST) == 0:
             PHOTLIST = glob(photFolder + '/Combined-' + color + '.cat.cat')
+            print(PHOTLIST)
             if len(PHOTLIST) == 0:
-              printWarning("No files for calculate magnitudes in folder %s" % (photFolder))
-              return False
+                printWarning("No files for calculate magnitudes in folder %s" % (photFolder))
+                return False
 
         for f in PHOTLIST:
             inputFiles = []
