@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# PmUtils/pmrefcat
+# PmUtils/pmbase
 #
 '''
 Created on Jan 1, 2020
@@ -9,14 +9,11 @@ Created on Jan 1, 2020
 '''
 
 from sys import argv
-from getopt import getopt, GetoptError
-from urllib import request
+from os import getenv, makedirs
+from datetime import datetime
 from glob import glob
-import json
-import xmltodict
-import re
+from astropy.io import fits
 import subprocess
-import os
 
 Color_Off = '\033[0m'  # Text Reset
 BRed = "\033[1;31m"  # Red
@@ -39,7 +36,7 @@ def printInfo(s):
 
 def loadPplSetup():
     pplSetup = {}
-    userhome = os.getenv("HOME")
+    userhome = getenv("HOME")
     f = open(userhome + "/bin/ppl-setup")
     pplSetup['HOME'] = userhome
     for line in f:
@@ -120,7 +117,7 @@ def determineCoordsFromImage(imageFileName):
 
     # /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
-    os.makedirs("temp", exist_ok = True)
+    makedirs("temp", exist_ok = True)
 
     invoke("cp " + imageFileName + " temp/src.fits")
 
@@ -147,7 +144,7 @@ def determineCoordsFromImage(imageFileName):
     return sCoords
 
 
-def saveCommand(basePath, cmdName):
+def saveCommand(basePath, argv, cmdName):
     for j in range(len(argv)):
         if " " in argv[j]:
             argv[j] = "\"" + argv[j] + "\""
@@ -171,6 +168,30 @@ def discoverFolders(baseFolder, seqFolderName):
     else:
         seqFolders = glob(seqFolderName + '*')
     return seqFolders
+
+
+def getFitsHeaders(fitsFileName, headers):
+    try:
+        hdul = fits.open(fitsFileName)
+    except Exception as e:
+        print('Exception:',e)
+        return None
+
+    fitsHeaders = {}
+    for h in headers:
+        fitsHeaders[h] = hdul[0].header[h]
+
+    hdul.close()
+    return fitsHeaders
+
+def getFitsHeader(fitsFileName, header):
+    hdrs = getFitsHeaders(fitsFileName, [header])
+    if hdrs:
+        return hdrs[header]
+    else:
+        return {}
+
+
 
 
 # end pmbase.

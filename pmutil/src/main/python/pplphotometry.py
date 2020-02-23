@@ -15,6 +15,7 @@ from os import getcwd, mkdir
 from os.path import isdir, exists, basename
 
 from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, discoverFolders
+from pmphot import Photometry
 
 
 
@@ -58,12 +59,42 @@ class Pipeline:
             # TODO: call directly
             invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
 
-            PM_FILE = PMCAT_FILE_FLT + '.pm'
-            printInfo("Calculate real magnitudes to %s" % (PM_FILE))
-            # TODO: call directly
-            invoke("pmphot -c %s -o %s %s" % (color, PM_FILE, PMCAT_FILE_FLT))    
+            self.calculateMags(color, PMCAT_FILE_FLT)
+
+            #PM_FILE = PMCAT_FILE_FLT + '.pm'
+            #printInfo("Calculate real magnitudes to %s" % (PM_FILE))
+            #invoke("pmphot -c %s -o %s %s" % (color, PM_FILE, PMCAT_FILE_FLT))    
 
         return True
+
+    def calculateMags(self, photFolder, colors):
+
+        # Names of the sequence/combined files:
+        color = colors[0]
+        PHOTLIST = glob(photFolder + '/' + self.pplSetup['SEQ_FILE_PREFIX'] + '*-' + color + '.cat.cat')
+        if len(PHOTLIST) == 0:
+            PHOTLIST = glob(photFolder + '/Combined-' + color + '.cat.cat')
+            if len(PHOTLIST) == 0:
+              printWarning("No files for calculate magnitudes in folder %s" % (photFolder))
+              return False
+
+        for f in PHOTLIST:
+            inputFiles = []
+            for c in colors:
+                inputFiles.append(f.replace('-' + color, '-' + c))
+
+            #PM_FILE = PMCAT_FILE_FLT + '.pm'
+            printInfo("Calculate real magnitudes to %s" % (f.replace('-' + color, '-*') + '.pm'))
+            opt = {
+                'out' : None,
+                'comp': None,
+                'color' : colors,
+                'std': False,
+                'makestd': False,
+                'files': inputFiles,
+            }
+            phot = Photometry(opt)
+            phot.process()
 
 
     def process_photometry(self, seqFolder, photFolder, title):
@@ -87,6 +118,8 @@ class Pipeline:
 
         for color in self.opt['color']:
             self.photometry(seqFolder, photFolder, PMREF, color)
+
+        self.calculateMags(photFolder, self.opt['color'])
 
         # TODO: cleanup - delete light FITS files
 
@@ -231,7 +264,7 @@ class MainApp:
     def run(self):
         self.printTitle()
         self.processCommands()
-        saveCommand(self.opt['baseFolder'], 'photometry')
+        saveCommand(self.opt['baseFolder'], self.argv, 'photometry')
 
         start = datetime.now()
 

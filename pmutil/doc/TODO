@@ -24,8 +24,6 @@ TODO
 
 (448) create/use 3D/4D FITS
 
-(487) a rosszul match-elodo, de hibat nem ado kepeket is ki kell szurni valahogy a grmatch eredmeny file alapjan 
-
 --- photometry ---------------------------------------------
 
 (449) hot and dead pixel removing with fiign
@@ -54,8 +52,6 @@ TODO
 (465) RAW képek és eredmény archiválása
 
 --- calibration --------------------------------------------
-
-(463) Az összegképet mentse el jpg-ben is
 
 --- photometry ---------------------------------------------
 
