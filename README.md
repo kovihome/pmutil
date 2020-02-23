@@ -7,7 +7,7 @@
 These scripts run on Linux, and they have some dependecies:
 
 - **python3** 3.6+ for .py scripts
-- python packages: **numpy**, **xmltodict**
+- python packages: **astropy**, **matplotlib**, **numpy**, **xmltodict**
 - **FITSH** 0.9.3+ (https://fitsh.net)
 - **RawTran** 0.3.8+ (http://integral.physics.muni.cz/rawtran/)
 - **ExifTool** 10.80+ (https://sourceforge.net/projects/exiftool/)
