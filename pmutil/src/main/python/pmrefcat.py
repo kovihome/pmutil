@@ -12,7 +12,9 @@ from sys import argv
 from getopt import getopt, GetoptError
 from urllib import request
 from datetime import datetime
-from os import makedirs
+from os import makedirs, symlink, remove
+from os.path import isdir, exists
+from glob import glob
 import json
 import xmltodict
 import re
@@ -26,6 +28,8 @@ class RefCat:
 
     defMgLimit = 18.0
     defFov = 60
+
+    chartId = None
 
     catalogHeader = "AUID         ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
 
@@ -56,6 +60,9 @@ class RefCat:
         # print("Coord:", resp['ra'], resp['dec'])
         # print("ChartID:", resp['chartid'])
         # print("Photometry table:")
+
+        self.chartId = resp['chartid']
+
         for pm in resp['photometry']:
 
             # 'V', 'B', 'Rc', 'Ic', 'J', 'H', 'K'
@@ -249,13 +256,6 @@ class RefCat:
     def execute(self):
         self.pplSetup = loadPplSetup()
 
-        outFile = None
-        if self.opt['file'] != None:
-            outFile = open(self.opt['file'], 'w')
-            outFile.write(self.catalogHeader + "\n")
-        else:
-            print(self.catalogHeader)
-
         if self.opt['image'] != None:
 
             coords = self.determineCoordsFromImage (self.opt['image'])
@@ -264,25 +264,60 @@ class RefCat:
 
 #        print("coords:", coords)
 
+        outFileName = self.pplSetup['CONFIG_FOLDER']
+        if not outFileName.endswith('/'):
+            outFileName += '/'
+        outFileName += 'cat/'
+        if not exists(outFileName):
+            makedirs(outFileName)
+
         if self.opt['object'] != None:
+            outFileName += self.opt['object'].lower().replace(' ', '_') + '.cat'
+        else:
+            if not self.opt['dec'].startswith('+') and not self.opt['dec'].startswith('-'):
+                self.opt['dec'] = '+' + self.opt['dec']
+            outFileName += self.opt['ra'].replace(':', '')[:4] + self.opt['dec'].replace(':', '')[:5] + '.cat'
 
-            self.loadVspPhotometryData(outFile, self.opt['object'], fov = self.opt['field'])
+        if not exists(outFileName) or self.opt['overwrite']:
 
-            self.loadVsxCatalogData(outFile, self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+            outFile = open(outFileName, 'w')
+            outFile.write(self.catalogHeader + "\n")
+
+            if self.opt['object'] != None:
+
+                self.loadVspPhotometryData(outFile, self.opt['object'], fov = self.opt['field'])
+
+                self.loadVsxCatalogData(outFile, self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+
+            else:
+
+                self.loadVspPhotometryData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'])
+
+                self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+
+            outFile.write('### chartid: ' + self.chartId + '\n')
+            outFile.write('### fov: ' + self.opt['field'] + ' arcmin\n')
+
+            outFile.close()
+
+            printInfo("Reference catalog file %s created." % (outFileName))
 
         else:
 
-            self.loadVspPhotometryData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'])
+            printInfo("Reference catalog file %s is exists." % (outFileName))
 
-            self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
-
-        if outFile != None:
-            outFile.close()
-
-        printInfo("Reference catalog file %s created." % (self.opt['file']))
+        if self.opt['folder']:
+        
+            for f in glob(self.opt['folder'] + '*.cat'):
+                remove(f)
+            symlink(outFileName, self.opt['folder'] + 'ref.cat')
 
 
 class MainApp:
+
+    appName        = 'ppl-refcat'
+    appVersion     = '1.1.0'
+    appDescription = 'Create reference catalog for photometry.'
 
     opt = {
         'coords'   : None,   # coordinates of reference field
@@ -290,24 +325,28 @@ class MainApp:
         'object'   : None,   # object (variable star) name
         'image'    : None,   # image file
         'field'    : RefCat.defFov, # reference field size in arcmins
-        'file'     : None,   # reference catalog file name
         'auidOnly' : True,   # variables having auid only
+        'overwrite': False,  # overwrite catalog
+        'folder'   : None,   # reference catalog file name
         }
 
     def __init__(self, argv):
         self.argv = argv
 
+    def printVersion(self):
+        print(BGreen + self.appName + ", version " + self.appVersion + Color_Off)
+
     def printTitle(self):
         print()
-        print(BGreen + "ppl-refcat, version 1.0.0 " + Color_Off)
-        print(Blue + "Create reference catalog for photometry." + Color_Off)
+        self.printVersion()
+        print(Blue + self.appDescription + Color_Off)
 
     def usage(self):
         print()
-        print(BGreen + "ppl-refcat, version 1.1.0 " + Color_Off)
+        self.printVersion()
         print()
-        print("Usage: ppl-refcat [OPTIONS]... CATALOG_FILE_NAME")
-        print("Create reference catalog for photometry.")
+        print("Usage: " + self.appName + " [OPTIONS]... FOLDER_NAME")
+        print(self.appDescription)
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
         print("  -o,  --object object_name   object (variable star) name")
@@ -316,12 +355,13 @@ class MainApp:
         print("  -s,  --source catalog       source catalog for field stars")
         print("  -f,  --field size           field size in arcmin, default is 60 arcmin")
         print("  -a,  --all                  collect all variables ; if not set, collect variables having AUID only")
+        print("  -w,  --overwrite            overwrite catalog file, if exists")
         print("  -h,  --help                 print this page")
 
     def processCommands(self):
 
         try:
-            optlist, args = getopt (argv[1:], "ac:s:o:i:f:h", ['--all', '--coord', '--source', '--object', '--image', '--field', '--help'])
+            optlist, args = getopt (argv[1:], "ac:s:o:i:f:wh", ['--all', '--coord', '--source', '--object', '--image', '--field', '--overwrite', '--help'])
         except GetoptError:
             print ('Invalid command line options')
             exit(1)
@@ -344,12 +384,19 @@ class MainApp:
                     print("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
             elif o == '-a':
                 self.opt['auidOnly'] = False
+            elif o == '-w':
+                self.opt['overwrite'] = True
             elif o == '-h':
-                usage()
+                self.usage()
                 exit(0)
 
         if len(args) > 0:
-            self.opt['file'] = args[0]
+            if not isdir(args[0]):
+                printError('%s is not a folder.' % (args[0]))
+                exit(1)
+            self.opt['folder'] = args[0]
+            if not self.opt['folder'].endswith('/'):
+                self.opt['folder'] += '/'
 
         if self.opt['object'] == None and self.opt['coords'] == None and self.opt['image'] == None:
             printError("Either object name (-o), coordinates (-c) or image file (-i) must be given.")
@@ -375,7 +422,7 @@ class MainApp:
     def run(self):
         self.printTitle()
         self.processCommands()
-        saveCommand(self.opt['file'], self.argv, 'refcat')
+        saveCommand(self.opt['folder'], self.argv, 'refcat')
 
         start = datetime.now()
 
