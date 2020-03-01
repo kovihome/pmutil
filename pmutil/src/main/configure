@@ -1,7 +1,7 @@
 #!/bin/bash
-# Calibration pipeline
+# Configuration script for pmutil package
 # Usage:
-# 	ppl-calibration [options]
+# 	configure [options] [destination_folder]
 # Options:
 #
 
@@ -37,7 +37,7 @@ exit_on_error() {
 }
 
 echo
-echo -e "${BGreen}configure, version 1.0.0${Color_Off}"
+echo -e "${BGreen}configure, version 1.1.0${Color_Off}"
 echo -e "${Blue}Configure pmutil package.${Color_Off}"
 echo
 
@@ -161,9 +161,6 @@ warn_version "$WCSFTOOL_VERSION" "$WCSTOOL_MINVERSION" "wcstool"
 # Copy sources to user's bin folder
 ####################################
 
-#SOURCES=( "bash/ppl-setup" "bash/ppl-disco" "bash/ppl-calibration" "bash/ppl-clean" "python/pmfilter.py" "python/pmphot.py" \
-#	"python/pmresult.py" "python/pmlt2ut.py" "python/pmdateobs.py" "python/pmrefcat.py" "pyton/pplphotometry.py" )
-
 assert_source_exist() {
 	if [ ! -e "${BASE_FOLDER}"/"$1" ]; then
 		print_error "Source script $1 is missing."
@@ -174,18 +171,13 @@ assert_source_exist() {
 copy_source() {
 	assert_source_exist "$1"
 	cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/$2
-#	if [[ $1 =~ .*\.py$ ]]; then
-#		local dn=$(basename -s .py "$1")
-#		if [ "$dn" == "pmrefcat" ]; then
-#			dn="ppl-refcat"
-#		fi 
-#		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/${dn}
-#	else
-#		cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"
-#	fi
 }
 
-
+create_link() {
+	# $1 - src
+	# $2 - dest
+	ln -s "${DEST_FOLDER}"/S1 "${DEST_FOLDER}"/S2
+}
 
 if [ ! -e "$DEST_FOLDER" ]; then
 	mkdir "$DEST_FOLDER"
@@ -193,30 +185,29 @@ if [ ! -e "$DEST_FOLDER" ]; then
 fi
 
 print_info "Copy scripts to $DEST_FOLDER."
-#for src in ${SOURCES[*]}; do
-#	assert_source_exist "$src"
-#done
-
-#for src in ${SOURCES[*]}; do
-#	copy_source "$src"
-#done
 
 copy_source "bash/ppl-setup" "ppl-setup"
 copy_source "bash/ppl-disco" "ppl-disco"
 copy_source "bash/ppl-calibration" "ppl-calibration"
 copy_source "bash/ppl-clean" "ppl-clean"
-copy_source "python/pmfilter.py" "pmfilter"
+copy_source "python/pmfilter.py" "pmfilter.py"
 copy_source "python/pmphot.py" "pmphot.py"
-copy_source "python/pmresult.py" "pmresult" 
+copy_source "python/pmresult.py" "pmresult.py" 
 copy_source "python/pmlt2ut.py" "pmlt2ut" 
 copy_source "python/pmdateobs.py" "pmdateobs" 
-copy_source "python/pmrefcat.py" "ppl-refcat" 
-copy_source "python/pplphotometry.py" "ppl-photometry"
+copy_source "python/pmrefcat.py" "pmrefcat.py" 
+copy_source "python/pplphotometry.py" "pplphotometry.py"
 copy_source "python/pmbase.py" "pmbase.py"
 copy_source "python/img_scale.py" "img_scale.py"
 copy_source "python/pmcolorize.py" "pmcolorize"
 
-chmod 0755 "$DEST_FOLDER"/*
+create_link "pmrefcat.py" "ppl-refcat"
+create_link "pplphotometry.py" "ppl-photometry"
+#create_link "pplcalibration.py.py" "ppl-calibration"
+#create_link "pmclean.py" "ppl-clean"
+#create_link "pmcolorize.py" "ppl-colorize"
+
+chmod 0755 "${DEST_FOLDER}/*"
 
 #############################
 # copy external config files

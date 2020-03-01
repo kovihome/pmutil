@@ -16,7 +16,8 @@ from os.path import isdir, exists, basename
 
 from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, discoverFolders
 from pmphot import Photometry
-
+from pmresult import ReportProcessor
+from pmfilter import CatalogMatcher
 
 
 class Pipeline:
@@ -49,21 +50,33 @@ class Pipeline:
             PMCAT_FILE = photFolder + '/' + basename(f).replace('.fits', '.cat')
 
             printInfo("Make astrometry for %s" % (f))
-            invoke("%s/solve-field %s -D %s -N %s %s" % (self.pplSetup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
+            if not exists(AST_FILE) or self.opt['overwrite']:
+                invoke("%s/solve-field %s -D %s -N %s %s" % (self.pplSetup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
+            else:
+                print("astrometry file %s already exists." % (AST_FILE))
 
             printInfo("Make photometry for %s" % (f))
-            invoke("sextractor %s -c %s -CATALOG_NAME %s -CATALOG_TYPE ASCII_HEAD" % (AST_FILE, self.SEX_CFG, PMCAT_FILE))
+            if not exists(PMCAT_FILE) or self.opt['overwrite']:
+                invoke("sextractor %s -c %s -CATALOG_NAME %s -CATALOG_TYPE ASCII_HEAD" % (AST_FILE, self.SEX_CFG, PMCAT_FILE))
+            else:
+                print("photometry file %s already exists." % (PMCAT_FILE))
 
             PMCAT_FILE_FLT = PMCAT_FILE + ".cat"
             printInfo("Filtering result catalog to %s" % (PMCAT_FILE_FLT))
-            # TODO: call directly
-            invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
+            if not exists(PMCAT_FILE) or self.opt['overwrite']:
+                # TODO: call directly
+                # invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
+                opt = {
+                    'ref' : refcatFileName,
+                    'out' : PMCAT_FILE_FLT,
+                    'color': color,
+                    'files': [ PMCAT_FILE ],
+                    }
+                matcher = CatalogMatcher(opt)
+                matcher.process()
 
-            #self.calculateMags(color, PMCAT_FILE_FLT)
-
-            #PM_FILE = PMCAT_FILE_FLT + '.pm'
-            #printInfo("Calculate real magnitudes to %s" % (PM_FILE))
-            #invoke("pmphot -c %s -o %s %s" % (color, PM_FILE, PMCAT_FILE_FLT))    
+            else:
+                print("filtered photometry file %s already exists." % (PMCAT_FILE))
 
         return True
 
@@ -84,17 +97,19 @@ class Pipeline:
             for c in colors:
                 inputFiles.append(f.replace('-' + color, '-' + c))
 
-            #PM_FILE = PMCAT_FILE_FLT + '.pm'
             printInfo("Calculate real magnitudes to %s" % (f.replace('-' + color, '-*') + '.pm'))
-            opt = {
+            pmopt = {
                 'out' : None,
                 'comp': None,
                 'color' : colors,
-                'std': False,
-                'makestd': False,
+                'method' : self.opt['method'],
+                'loadCoeffs' : self.opt['useStd'],
+                'useCoeffs': self.opt['useStd'] or self.opt['adhocStd'],
+                'makeCoeffs': self.opt['makeStd'] or self.opt['adhocStd'],
+                'saveCoeffs': self.opt['makeStd'],
                 'files': inputFiles,
             }
-            phot = Photometry(opt)
+            phot = Photometry(pmopt)
             phot.process()
 
 
@@ -176,8 +191,14 @@ class Pipeline:
                 REPORT_FOLDER = getcwd()
 
             printInfo("Create report into %s folder." % (REPORT_FOLDER))
-            # TODO: call directly
-            invoke("pmresult -o %s -n %s %s" % (REPORT_FOLDER, self.opt['nameCode'], ' '.join(PM_FILES)))
+            opt = {
+                'out' : REPORT_FOLDER,  # output folder
+                'rpt' : 'aavso',  # report format, default: aavso extended
+                'name': self.opt['nameCode'],  # observer name code
+                'files': PM_FILES,
+                }
+            proc = ReportProcessor(opt)
+            proc.process()
 
         print()
         print(Blue + "Photometry is ready." + Color_Off)
@@ -188,12 +209,22 @@ class MainApp:
     opt = {
         'color' : ['Gi'],    # photometry band, mandatory
         'nameCode' : None,   # observer code for the AAVSO report, mandatory
+        'makeStd'  : False,  # make std coeffs
+        'useStd'   : False,  # use std coeffs
+        'adhocStd' : False,  # make and use std coeffs for this image only
+        'method'   : 'gcx',   # mg calculation method: comp, gcx, lfit
         'overwrite': False,  # force to overwrite existing results, optional
         'files': None,       
         'baseFolder': None,  # base folder, optional
         }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
+
+    mgCalcMethods = {
+        'comp': 'Best comparision star',
+        'gcx' : 'GCX''s robust averaging ensemble',
+        'lfit': 'Linear fit ensemble',
+        }
 
 
     def __init__(self, argv):
@@ -202,18 +233,22 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(BGreen + "pplphotometry, version 1.1.0 " + Color_Off)
+        print(BGreen + "ppl-photometry, version 1.1.0 " + Color_Off)
         print(Blue + "Make photometry on calibrated FITS images." + Color_Off)
         print()
 
 
     def usage(self):
-        print("Usage: pplphotometry [OPTIONS]... [BASE_FOLDER]")
+        print("Usage: ppl-photometry [OPTIONS]... [BASE_FOLDER]")
         print("Make photometry on calibrated FITS images.")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
         print("  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
         print("  -n,  --name nameCode    set observer code for the AAVSO report")
+        print("  -t,  --method method    magnitude calculation method ; values are: comp, gcx, lfit")
+        print("  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
+        print("  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
+        print("  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
         print("  -h,  --help             print this page")
         print("  -w,  --overwrite        force to overwrite existing results")
         print()
@@ -227,7 +262,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:wh", ['--color', '--name', '--help', '--overwrite'])
+            optlist, args = getopt (self.argv[1:], "c:n:msat:wh", ['--color', '--name', '--make-std', '--use-std', '--adhoc-std', '--method', '--overwrite', '--help'])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -246,11 +281,27 @@ class MainApp:
                     self.opt['color'] = [a]
             elif o == '-n':
                 self.opt['nameCode'] = a.upper()
+            elif o == '-m':
+                self.opt['makeStd'] = True
+            elif o == '-s':
+                self.opt['useStd'] = True
+            elif o == '-a':
+                self.opt['adhocStd'] = True
+            elif o == '-t':
+                if not a in self.mgCalcMethods.keys():
+                    printWarning('Invalid mg calculation method %s ; use gcx instead.')
+                else:
+                    self.opt['method'] = a
+                    
             elif o == '-w':
-                self.opt['makestd'] = True
+                self.opt['overwrite'] = True
             elif o == '-h':
                 self.usage()
                 exit(0)
+
+        if self.opt['adhocStd'] and ( self.opt['makeStd'] or self.opt['useStd']):
+           printWarning('Both -a and either -m or -s option cannot be used at once.')
+           exit(0)
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]
@@ -260,6 +311,8 @@ class MainApp:
         if self.opt['nameCode'] == None:
             printWarning('No observer code was given. Use \'XYZ\' instead.')
             self.opt['nameCode'] = 'XYZ'
+
+        print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
     
 
     def run(self):

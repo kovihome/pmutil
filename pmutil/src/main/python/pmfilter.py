@@ -13,6 +13,8 @@ from getopt import getopt, GetoptError
 from sys import argv
 from subprocess import Popen, PIPE
 
+from pmbase import invoke
+
 
 def loadRefCatalog(refFileName):
 
@@ -113,72 +115,92 @@ def findPmRec(pmCat, pmId, pmcIdPos):
             return pmr
     return None
 
-def hmg(pmCat):
-    mg1Pos = getHeaderPos(pmCat, 'MAG_ISOCOR')
-    mg1ErrPos = getHeaderPos(pmCat, 'MAGERR_ISOCOR')
-    mg2Pos = getHeaderPos(pmCat, 'MAG_BEST')
-    mg2ErrPos = getHeaderPos(pmCat, 'MAGERR_BEST')
+class CatalogMatcher:
 
-    hmg1 = -99.99
-    hmg2 = -99.99
-    hmg1Err = 99.99
-    hmg2Err = 99.99
-    sigma = 3.0
-    for pm in pmCat['cat']:
-        mg1 = float(pm[mg1Pos])
-        mg1Err = float(pm[mg1ErrPos])
-        mg2 = float(pm[mg2Pos])
-        mg2Err = float(pm[mg2ErrPos])
-        if mg1 - sigma * mg1Err > hmg1:
-            hmg1 = mg1 - sigma * mg1Err
-            hmg1Err = mg1Err
-        if mg2 - sigma * mg2Err > hmg2:
-            hmg2 = mg2 - sigma * mg2Err
-            hmg2Err = mg2Err
+    opt = {}                 # command line options
+#    pplSetup = {}            # PPL setup from ppl-setup config file
+    pos = None               # catalog header positions
 
-    return [hmg1 + sigma * hmg1Err, hmg2 + sigma * hmg2Err]
+    refHeaders = ['AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V', 'MAG_B', 'ERR_B', 'MAG_R', 'ERR_R']
 
-def matchCatalogsByGrmatch(refCatFile, pmCatFile, outFile):
+    pmHeaders = ['NUMBER', 'MAG_ISOCOR', 'MAGERR_ISOCOR', 'MAG_BEST', 'MAGERR_BEST', 'ALPHA_J2000', 'DELTA_J2000']
 
-    idFile = pmCatFile + ".idmatch"
-    cmd = ("grmatch -r %s -i %s --match-coord --col-ref 4,6 --col-inp 14,15 --output-id %s --col-ref-id 1 --col-inp-id 1") % (refCatFile, pmCatFile, idFile)
-    p = Popen(cmd, stdout = PIPE, shell = True)
-    (output, errno) = p.communicate()
-    p.wait()
+    refTrailerHeaders = [ 'LABEL']
 
-    #output.decode('ascii').strip()
+    HMG_MAX_ERR = 0.4
+    HMG_SIGMA = 3.0
 
-    refCat = loadRefCatalog(commandLineOptions['ref'])
-    pmCat = loadPmCatalog(commandLineOptions['files'][0])
-    idCat = loadIdCatalog(idFile)
+    def __init__(self, opt):
+        self.opt = opt
 
-    refIdPos = getHeaderPos(refCat, 'AUID')
-    labelPos = getHeaderPos(refCat, 'LABEL')
-    pmcIdPos = getHeaderPos(pmCat, 'NUMBER')
-    rolePos = getHeaderPos(refCat, 'ROLE')
-    mg1Pos = getHeaderPos(pmCat, 'MAG_ISOCOR')
-    mg2Pos = getHeaderPos(pmCat, 'MAG_BEST')
+    def hmg(self, pmCat):
+        mg1Pos = getHeaderPos(pmCat, 'MAG_ISOCOR')
+        mg1ErrPos = getHeaderPos(pmCat, 'MAGERR_ISOCOR')
+        mg2Pos = getHeaderPos(pmCat, 'MAG_BEST')
+        mg2ErrPos = getHeaderPos(pmCat, 'MAGERR_BEST')
 
-    rlen = len(refCat['header'])
-    pmlen = len(pmCat['cat'])
-    hmgs = hmg(pmCat)
-    for ref in refCat['cat']:
-        refId = ref[refIdPos]
-        pmId = findId(idCat, refId)
-        pm = findPmRec(pmCat['cat'], pmId, pmcIdPos)
-        ref.append(99.99)
-        ref.append(-1)
-        if pmId != None:
-            if ref[rolePos] == 'V' and float(pm[mg2Pos]) > hmgs[1]:
-                ref[rlen + 1] = pmlen
-                ref[rolePos] = 'VF'
-            else:             
-               ref[rlen + 1] = int(pmId) - 1
-        else:
-            if ref[rolePos] == 'V':
-                ref[rlen + 1] = pmlen
-                ref[rolePos] = 'VF'
-            print("Ref object not matched:", refId, ref[labelPos])
+        hmg1 = -99.99
+        hmg2 = -99.99
+        hmg1Err = 99.99
+        hmg2Err = 99.99
+        for pm in pmCat['cat']:
+            mg1 = float(pm[mg1Pos])
+            mg1Err = float(pm[mg1ErrPos])
+            mg2 = float(pm[mg2Pos])
+            mg2Err = float(pm[mg2ErrPos])
+            if mg1Err < self.HMG_MAX_ERR and mg2 < self.HMG_MAX_ERR:
+                if mg1 - self.HMG_SIGMA * mg1Err > hmg1:
+                    hmg1 = mg1 - self.HMG_SIGMA * mg1Err
+                    hmg1Err = mg1Err
+                if mg2 - self.HMG_SIGMA * mg2Err > hmg2:
+                    hmg2 = mg2 - self.HMG_SIGMA * mg2Err
+                    hmg2Err = mg2Err
+
+#        return [hmg1 - self.HMG_SIGMA * hmg1Err, hmg2 - self.HMG_SIGMA * hmg2Err]
+        return [hmg1, hmg2]
+
+    def matchCatalogsByGrmatch(self, refCatFile, pmCatFile, outFile):
+
+        idFile = pmCatFile + ".idmatch"
+        cmd = "grmatch -r %s -i %s --match-coord --col-ref 4,6 --col-inp 14,15 --output-id %s --col-ref-id 1 --col-inp-id 1" % (refCatFile, pmCatFile, idFile)
+        result = invoke(cmd)
+#        p = Popen(cmd, stdout = PIPE, shell = True)
+#        (output, errno) = p.communicate()
+#        p.wait()
+
+        #output.decode('ascii').strip()
+
+        refCat = loadRefCatalog(self.opt['ref'])
+        pmCat = loadPmCatalog(self.opt['files'][0])
+        idCat = loadIdCatalog(idFile)
+
+        refIdPos = getHeaderPos(refCat, 'AUID')
+        labelPos = getHeaderPos(refCat, 'LABEL')
+        pmcIdPos = getHeaderPos(pmCat, 'NUMBER')
+        rolePos = getHeaderPos(refCat, 'ROLE')
+        mg1Pos = getHeaderPos(pmCat, 'MAG_ISOCOR')
+        mg2Pos = getHeaderPos(pmCat, 'MAG_BEST')
+
+        rlen = len(refCat['header'])
+        pmlen = len(pmCat['cat'])
+        hmgs = self.hmg(pmCat)
+        for ref in refCat['cat']:
+            refId = ref[refIdPos]
+            pmId = findId(idCat, refId)
+            pm = findPmRec(pmCat['cat'], pmId, pmcIdPos)
+            ref.append(99.99)
+            ref.append(-1)
+            if pmId != None:
+                if ref[rolePos] == 'V' and float(pm[mg2Pos]) > hmgs[1]:
+                    ref[rlen + 1] = pmlen
+                    ref[rolePos] = 'VF'
+                else:             
+                   ref[rlen + 1] = int(pmId) - 1
+            else:
+                if ref[rolePos] == 'V':
+                    ref[rlen + 1] = pmlen
+                    ref[rolePos] = 'VF'
+                print("Ref object not matched:", refId, ref[labelPos])
 
 #   1 NUMBER                 Running object number                                     
 #   2 FLUX_ISOCOR            Corrected isophotal flux                                   [count]
@@ -202,121 +224,130 @@ def matchCatalogsByGrmatch(refCatFile, pmCatFile, outFile):
 #  20 ERRTHETAWIN_IMAGE      Windowed error ellipse pos angle (CCW/x)                   [deg]
 #  21 FWHM_IMAGE             FWHM assuming a gaussian core                              [pixel]
 #  22 FWHM_WORLD             FWHM assuming a gaussian core                              [deg]
-    pmCat['cat'].append([str(pmlen), "0.0", "0.0", "%7.4f" % (hmgs[0]), "0.0", "0.0", "0.0", "0.0", "0.0", "%7.4f" % (hmgs[1]), "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0"])
-    print("Instumental HMG: HMG_ISOCORR = %8.4f, HMG_BEST = %8.4f" % (hmgs[0], hmgs[1]))
+        pmCat['cat'].append([str(pmlen), "0.0", "0.0", "%7.4f" % (hmgs[0]), "0.0", "0.0", "0.0", "0.0", "0.0", "%7.4f" % (hmgs[1]), "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0", "0.0"])
+        print("Instumental HMG: HMG_ISOCORR = %8.4f, HMG_BEST = %8.4f" % (hmgs[0], hmgs[1]))
 
-    dumpResult(refCat, pmCat, outFile)
+        self.dumpResult(refCat, pmCat, outFile)
 
 
-def matchCatalogsNaiveApproach(refCatFile, pmCatFile, outFile):
+    def matchCatalogsNaiveApproach(self, refCatFile, pmCatFile, outFile):
 
-    refCat = loadRefCatalog(commandLineOptions['ref'])
-    pmCat = loadPmCatalog(commandLineOptions['files'][0])
+        refCat = loadRefCatalog(self.opt['ref'])
+        pmCat = loadPmCatalog(self.opt['files'][0])
 
-    refcRAFieldPos = getHeaderPos(refCat, 'RA_DEG')
-    refcDECFieldPos = getHeaderPos(refCat, 'DEC_DEG')
-    pmcRAFieldPos = getHeaderPos(pmCat, 'ALPHA_J2000')
-    pmcDECFieldPos = getHeaderPos(pmCat, 'DELTA_J2000')
+        refcRAFieldPos = getHeaderPos(refCat, 'RA_DEG')
+        refcDECFieldPos = getHeaderPos(refCat, 'DEC_DEG')
+        pmcRAFieldPos = getHeaderPos(pmCat, 'ALPHA_J2000')
+        pmcDECFieldPos = getHeaderPos(pmCat, 'DELTA_J2000')
 
-    rlen = len(refCat['header'])
-    for ref in refCat['cat']:
-        ref.append(99.99)
-        ref.append(-1)
-
-    pmi = 0
-    for pm in pmCat['cat']:
-        pmRA = float(pm[pmcRAFieldPos])
-        pmDEC = float(pm[pmcDECFieldPos])
+        rlen = len(refCat['header'])
         for ref in refCat['cat']:
-            refRA = float(ref[refcRAFieldPos])
-            refDEC = float(ref[refcDECFieldPos])
-            dRA = refRA - pmRA
-            dDEC = refDEC - pmDEC
-            dist2 = dRA * dRA + dDEC * dDEC
-            if dist2 < ref[len]:
-                ref[rlen] = dist2
-                ref[rlen + 1] = pmi
-        pmi = pmi + 1
+            ref.append(99.99)
+            ref.append(-1)
 
-    dumpResult(refCat, pmCat, outFile)
+        pmi = 0
+        for pm in pmCat['cat']:
+            pmRA = float(pm[pmcRAFieldPos])
+            pmDEC = float(pm[pmcDECFieldPos])
+            for ref in refCat['cat']:
+                refRA = float(ref[refcRAFieldPos])
+                refDEC = float(ref[refcDECFieldPos])
+                dRA = refRA - pmRA
+                dDEC = refDEC - pmDEC
+                dist2 = dRA * dRA + dDEC * dDEC
+                if dist2 < ref[len]:
+                    ref[rlen] = dist2
+                    ref[rlen + 1] = pmi
+            pmi = pmi + 1
 
-
-refHeaders = ['AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_V', 'ERR_V', 'MAG_B', 'ERR_B', 'MAG_R', 'ERR_R']
-
-pmHeaders = ['NUMBER', 'MAG_ISOCOR', 'MAGERR_ISOCOR', 'MAG_BEST', 'MAGERR_BEST', 'ALPHA_J2000', 'DELTA_J2000']
-
-refTrailerHeaders = [ 'LABEL']
-
-
-
-def dumpResult(refCat, pmCat, outFileName):
-
-    outf = open(outFileName, 'w')
-    for h in refHeaders:
-        outf.write(h.ljust(15))
-    for h in pmHeaders:
-        outf.write(h.ljust(15))
-    for h in refTrailerHeaders:
-        outf.write(h.ljust(30))
-    outf.write('\n')
-
-    rlen = len(refCat['header'])
-    for ref in refCat['cat']:
-        if ref[rlen + 1] != -1:
-            pm = pmCat['cat'][ref[rlen + 1]]
-
-            for h in refHeaders:
-                pos = getHeaderPos(refCat, h)
-                outf.write(ref[pos].ljust(15))
-            for h in pmHeaders:
-                pos = getHeaderPos(pmCat, h)
-                outf.write(pm[pos].ljust(15))
-            for h in refTrailerHeaders:
-                pos = getHeaderPos(refCat, h)
-                outf.write(ref[pos].ljust(30))
-            outf.write('\n')
-
-    outf.close()
-    print ('outpuf file: ', outFileName)
+        self.dumpResult(refCat, pmCat, outFile)
 
 
-commandLineOptions = {
-    'ref' : None,
-    'out' : None,
-    'color': 'Gi'
-    }
+    def dumpResult(self, refCat, pmCat, outFileName):
+
+        outf = open(outFileName, 'w')
+        for h in self.refHeaders:
+            outf.write(h.ljust(15))
+        for h in self.pmHeaders:
+            outf.write(h.ljust(15))
+        for h in self.refTrailerHeaders:
+            outf.write(h.ljust(30))
+        outf.write('\n')
+
+        rlen = len(refCat['header'])
+        for ref in refCat['cat']:
+            if ref[rlen + 1] != -1:
+                pm = pmCat['cat'][ref[rlen + 1]]
+    
+                for h in self.refHeaders:
+                    pos = getHeaderPos(refCat, h)
+                    outf.write(ref[pos].ljust(15))
+                for h in self.pmHeaders:
+                    pos = getHeaderPos(pmCat, h)
+                    outf.write(pm[pos].ljust(15))
+                for h in self.refTrailerHeaders:
+                    pos = getHeaderPos(refCat, h)
+                    outf.write(ref[pos].ljust(30))
+                outf.write('\n')
+
+        outf.close()
+        print ('outpuf file: ', outFileName)
+
+    def process(self):
+        # if self.opt['ref']:
+
+        self.matchCatalogsByGrmatch(self.opt['ref'], self.opt['files'][0], self.opt['out'])
+
+        # self.matchCatalogsNaiveApproach(self.opt['ref'], self.opt['files'][0], self.opt['out'])
 
 
-def processCommands():
-    try:
-        optlist, args = getopt (argv[1:], "r:o:c:", ['--ref', '--out', '--color'])
-    except GetoptError:
-        print ('Invalid command line options')
-        return
+class MainApp:
+    
+    opt = {
+        'ref' : None,
+        'out' : None,
+        'color': 'Gi',
+        'files': None,
+        }
 
-    for o, a in optlist:
-        if a[:1] == ':':
-            a = a[1:]
-        elif o == '-r':
-            commandLineOptions['ref'] = a
-        elif o == '-o':
-            commandLineOptions['out'] = a
-        elif o == '-c':
-            commandLineOptions['color'] = a
 
-    commandLineOptions['files'] = args
-    if not commandLineOptions['out']:
-        commandLineOptions['out'] = args[0] + '.refout'
+    def __init__(self, argv):
+        self.argv = argv
+        pass
+
+
+    def processCommands(self):
+        try:
+            optlist, args = getopt (argv[1:], "r:o:c:", ['--ref', '--out', '--color'])
+        except GetoptError:
+            print ('Invalid command line options')
+            return
+
+        for o, a in optlist:
+            if a[:1] == ':':
+                a = a[1:]
+            elif o == '-r':
+                self.opt['ref'] = a
+            elif o == '-o':
+                self.opt['out'] = a
+            elif o == '-c':
+                self.opt['color'] = a
+
+        self.opt['files'] = args
+        if not self.opt['out']:
+            self.opt['out'] = args[0] + '.refout'
+
+
+    def run(self):
+        self.processCommands()
+
+        matcher = CatalogMatcher(self.opt)
+        matcher.process()
 
 
 if __name__ == '__main__':
 
-    processCommands()
-
-    # if commandLineOptions['ref']:
-
-    matchCatalogsByGrmatch(commandLineOptions['ref'], commandLineOptions['files'][0], commandLineOptions['out'])
-
-    # matchCatalogsNaiveApproach(commandLineOptions['ref'], commandLineOptions['files'][0], commandLineOptions['out'])
+    app = MainApp(argv)
+    app.run()
 
 # end main.

@@ -296,7 +296,7 @@ class RefCat:
                 self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
             outFile.write('### chartid: ' + self.chartId + '\n')
-            outFile.write('### fov: ' + self.opt['field'] + ' arcmin\n')
+            outFile.write('### fov: ' + str(self.opt['field']) + ' arcmin\n')
 
             outFile.close()
 

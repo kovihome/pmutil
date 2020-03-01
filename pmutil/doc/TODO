@@ -1,6 +1,15 @@
 TODO
 ----
 
+- az osszeg exptime kiiratasnal irja oda, hogy sec
+
+- pythonositas:
+	ppl-calibration		pmcalibration.py	link
+	ppl-setup		pmsetup.py
+	ppl-disco		pmdisco.py
+	ppl-clean		pmclean.py		link
+
+
 === V 1.1 ==================================================
 
 (469) config: tetszoleges parameter megadhato legyen command line-ban
@@ -69,6 +78,10 @@ TODO
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
+
+(502) Ha a valamelyik kep nem match-el, es szekvenciat adunk ossze, akkor nem lesz jo a szekvencia, 
+	elcsuszik, es a szinek is elcsusznak egymashoz kepes
+	A pythonos verzioban a szekvencia szamolaskor ezt figyelembe kell venni, a szekvenciabol kihagyni
 
 --- photometry ---------------------------------------------
 
