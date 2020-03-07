@@ -10,6 +10,7 @@ Created on Jan 1, 2020
 
 from sys import argv
 from os import getenv, makedirs
+from os.path import isfile
 from datetime import datetime
 from glob import glob
 from astropy.io import fits
@@ -56,6 +57,17 @@ def invoke(cmd):
     a = subprocess.check_output(r)
     return a.decode('ascii')[:-1]
 
+def invokep(cmds):
+    r = cmds[0].split()
+    p = []
+    p.append(subprocess.Popen(r, stdout=subprocess.PIPE))
+    j = 0
+    for cmd in cmds[1:]:
+        r = cmd.split()
+        p.append(subprocess.Popen(r, stdin=p[j].stdout , stdout=subprocess.PIPE))
+        j += 1
+    out = p[j].communicate()
+    return out[0].decode('ascii')[:-1]
 
 def hexa2deg(s):
     r = s.split(':')
@@ -104,18 +116,17 @@ def jd(dateObs):
     jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
     return jd
 
+
 def getPair(s, delim = ','):
     ss = s.split(delim)
     return [ss[0].strip(), ss[1].strip()]
 
 
-def determineCoordsFromImage(imageFileName):
+def determineCoordsFromImage(imageFileName, pplSetup = None):
     configFolder = pplSetup["PMLIB"]
     if configFolder == None:
         configFolder = "$HOME/.pmlib"
     SOLVE_ARGS = "-O --config " + configFolder + "/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
-
-    # /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
     makedirs("temp", exist_ok = True)
 
@@ -151,14 +162,22 @@ def saveCommand(basePath, argv, cmdName):
     cmd = " ".join(argv)
     cmd = cmd[cmd.find("ppl-"):]
 
-    path = ""
-    j = basePath.rfind("/")
-    if j != -1:
-        path = basePath[:j+1]
-	
-    f = open(path + cmdName, "w+")
-    f.write(cmd + "\n")
-    f.close()
+    if isfile(basePath):
+        path = ""
+        j = folder.rfind("/")
+        if j != -1:
+            path = folder[:j + 1]
+        FOLDERS = [ path ]
+    else:
+        FOLDERS = glob('*' + basePath + '*/')
+
+    for folder in FOLDERS:
+        if not folder.endswith('/'):
+            folder += '/'
+
+        f = open(folder + cmdName, "w+")
+        f.write(cmd + "\n")
+        f.close()
 
 
 def discoverFolders(baseFolder, seqFolderName):
@@ -174,24 +193,56 @@ def getFitsHeaders(fitsFileName, headers):
     try:
         hdul = fits.open(fitsFileName)
     except Exception as e:
-        print('Exception:',e)
+        print('Exception:', e)
         return None
 
     fitsHeaders = {}
     for h in headers:
-        fitsHeaders[h] = hdul[0].header[h]
+        if h in hdul[0].header:
+            fitsHeaders[h] = hdul[0].header[h]
 
     hdul.close()
     return fitsHeaders
 
+
 def getFitsHeader(fitsFileName, header):
     hdrs = getFitsHeaders(fitsFileName, [header])
-    if hdrs:
+    if hdrs and header in hdrs:
         return hdrs[header]
     else:
-        return {}
+        return None
+
+def setFitsHeader(fitsFileName, headerName, headerValue, comment = None):
+    if comment:
+        headers = { headerName: ( headerValue, comment ) }
+    else:
+        headers = { headerName: headerValue }
+    setFitsHeaders(fitsFileName, headers)
+
+def setFitsHeaders(fitsFileName, headers):
+    try:
+        hdul = fits.open(fitsFileName, mode = 'update')
+    except Exception as e:
+        print('Exception:', e)
+        return
+
+    h = hdul[0].header
+    for key in headers.keys():
+        h[key] = headers[key]
+    hdul.flush()
+    hdul.close()
+
+def findInFile(fileName, s):
+    f = open(fileName)
+    for line in f:
+        if s in line:
+             f.close()
+             return line
+    f.close()
+    return None
 
 
+# end pmbase.
 
 
 # end pmbase.

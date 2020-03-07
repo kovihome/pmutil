@@ -19,12 +19,13 @@ import json
 import xmltodict
 import re
 
-from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
+from pmbase import printError, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
+
 
 class RefCat:
 
-    opt = {}                 # command line options
-    pplSetup = {}            # PPL setup from ppl-setup config file
+    opt = {}  # command line options
+    pplSetup = {}  # PPL setup from ppl-setup config file
 
     defMgLimit = 18.0
     defFov = 60
@@ -110,7 +111,6 @@ class RefCat:
             else:
                 print(s)
 
-
     def loadVsxCatalogData(self, outFile, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
         '''
         &coords   The central J2000 RA/DEC coordinates for a radius search, expressed sexagesimally (by default), or in decimal degrees if format is set to d. Northern hemisphere coordinates must have the plus () sign URL-encoded as %2B. Space characters between all other figures must be replaced with the URL whitespace character (). The order argument (which see) must also be included in the query string with its value set to 9 in order to prompt VSX to display distances from the central coordinates in the results listing. Default is empty string (no radius search).
@@ -155,11 +155,11 @@ class RefCat:
         for tr in trs:
             # [None, 'PS1-3PI J185203.12+325154.5', 'Lyr', '283.01304000,32.86516000', 'RRAB', '16.810', 'r', '0.400', 'r', '57000.85600', None, '0.839122', None, None, None]
             # print("AUID:", tr['TD'][0], "Coord:", tr['TD'][3], "LABEL", tr['TD'][1])
-    
+
             # #0.00    Variable    AY Lyr                000-BCD-108    18 44 26.69 +37 59 51.9    Lyr    UGSU    0.0733    12.5 - 18.4 B
             # distance, varstate, label(1), auid(0), coords(3), constell(2), type(4), period(11), max(5,6) - min(7,8)
             # print("   Constell:", tr['TD'][2], "Type:", tr['TD'][4], "Period:", tr['TD'][11], "Mg:", tr['TD'][5] + tr['TD'][6], "-", tr['TD'][7] + tr['TD'][8])
-    
+
             auid = tr['TD'][0]
             if auid == None:
                 if auidOnly:
@@ -217,7 +217,6 @@ class RefCat:
     def getPair(self, s, delim = ','):
         ss = s.split(delim)
         return [ss[0].strip(), ss[1].strip()]
-
 
     def determineCoordsFromImage(self, imageFileName):
         configFolder = self.pplSetup["PMLIB"]
@@ -307,7 +306,7 @@ class RefCat:
             printInfo("Reference catalog file %s is exists." % (outFileName))
 
         if self.opt['folder']:
-        
+
             for f in glob(self.opt['folder'] + '*.cat'):
                 remove(f)
             symlink(outFileName, self.opt['folder'] + 'ref.cat')
@@ -315,19 +314,19 @@ class RefCat:
 
 class MainApp:
 
-    appName        = 'ppl-refcat'
-    appVersion     = '1.1.0'
+    appName = 'ppl-refcat'
+    appVersion = '1.1.0'
     appDescription = 'Create reference catalog for photometry.'
 
     opt = {
-        'coords'   : None,   # coordinates of reference field
-        'source'   : None,   # source catalog of field stars
-        'object'   : None,   # object (variable star) name
-        'image'    : None,   # image file
-        'field'    : RefCat.defFov, # reference field size in arcmins
-        'auidOnly' : True,   # variables having auid only
+        'coords'   : None,  # coordinates of reference field
+        'source'   : None,  # source catalog of field stars
+        'object'   : None,  # object (variable star) name
+        'image'    : None,  # image file
+        'field'    : RefCat.defFov,  # reference field size in arcmins
+        'auidOnly' : True,  # variables having auid only
         'overwrite': False,  # overwrite catalog
-        'folder'   : None,   # reference catalog file name
+        'folder'   : None,  # reference catalog file name
         }
 
     def __init__(self, argv):
