@@ -162,7 +162,9 @@ def saveCommand(basePath, argv, cmdName):
     cmd = " ".join(argv)
     cmd = cmd[cmd.find("ppl-"):]
 
-    if isfile(basePath):
+    if not basePath:
+        FOLDERS = [ './' ]
+    elif isfile(basePath):
         path = ""
         j = folder.rfind("/")
         if j != -1:

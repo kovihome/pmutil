@@ -59,8 +59,8 @@ class Colorize:
         img = zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
         for j in range(3):
             smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
-#            smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
-            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
+            smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
+#            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
             if self.SCALE_METHOD == self.scaleMethods[0]:
                 img[:,:,j] = img_scale.linear(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[1]:
@@ -110,7 +110,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "m:h", ['--scale-method', '--help'])
+            optlist, args = getopt (self.argv[1:], "m:h", ['scale-method=', 'help'])
         except GetoptError:
             printError ('Invalid command line options')
             return
@@ -118,11 +118,11 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-m':
+            elif o == '-m' or o == '--scale-method':
                 if not a in Colorize.scaleMethods:
                     printError("Invalid scaling method value: %s" % (a))
                 self.opt['scaleMethod'] = a
-            elif o == '-h':
+            elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
 

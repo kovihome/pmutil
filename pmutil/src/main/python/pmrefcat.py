@@ -360,7 +360,7 @@ class MainApp:
     def processCommands(self):
 
         try:
-            optlist, args = getopt (argv[1:], "ac:s:o:i:f:wh", ['--all', '--coord', '--source', '--object', '--image', '--field', '--overwrite', '--help'])
+            optlist, args = getopt (argv[1:], "ac:s:o:i:f:wh", ['all', 'coord=', 'source=', 'object=', 'image=', 'field=', 'overwrite', 'help'])
         except GetoptError:
             print ('Invalid command line options')
             exit(1)
@@ -368,24 +368,24 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c':
+            elif o == '-c' or o == '--coord':
                 self.opt['coords'] = a
-            elif o == '-s':
+            elif o == '-s' or o == '--source':
                 self.opt['source'] = a
-            elif o == '-o':
+            elif o == '-o' or o == '--object':
                 self.opt['object'] = a.replace('_', ' ')
-            elif o == '-i':
+            elif o == '-i' or o == '--image':
                 self.opt['image'] = a
-            elif o == '-f':
+            elif o == '-f' or o == '--field':
                 if a.isdigit():
                     self.opt['field'] = int(a)
                 else:
                     print("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
-            elif o == '-a':
+            elif o == '-a' or o == '--all':
                 self.opt['auidOnly'] = False
-            elif o == '-w':
+            elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
-            elif o == '-h':
+            elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
 

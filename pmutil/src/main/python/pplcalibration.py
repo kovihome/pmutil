@@ -13,7 +13,7 @@ from getopt import getopt, GetoptError
 from sys import argv
 from datetime import datetime, timedelta
 import glob
-from os import makedirs
+from os import makedirs, remove
 from os.path import isdir, exists, basename
 from shutil import copyfile
 import time
@@ -46,7 +46,7 @@ class Pipeline:
         self.opt = opt
 
     def discoverFolders(self):
-        disco = Discovery(self.opt['flatOnly'], self.opt['useMasterFlat'], self.opt['baseFolder'], self.pplSetup)
+        disco = Discovery(self.opt, self.pplSetup)
         disco.discover()
         self.BIAS_FOLDER = disco.BIAS_FOLDER
         self.DARK_FOLDER = disco.DARK_FOLDER
@@ -91,10 +91,14 @@ class Pipeline:
 
     def raw2fitsFile(self, rawfile, color):
         FITS_NAME = "%s-%s.fits" % (rawfile[:rawfile.rfind('.')], color)
-        if self.opt['overwrite'] or not exists(FITS_NAME):
+        if self.opt['overwrite'] and exists(FITS_NAME):
+            os.remove(FITS_NAME)
+     
+        if not exists(FITS_NAME):
             print("%s -> %s" % (rawfile, FITS_NAME))
 
             # convert raw image to fits
+            # TODO: use invoke, parse options with ' or " correctly, or use preparsed options
             os.system("rawtran -c %s -o %s -B 16 -C '-4 -D' -X '-q 3 -w' %s" % (color, FITS_NAME, rawfile))
 
             # read image temperature from raw file
@@ -158,6 +162,7 @@ class Pipeline:
         # Names of the individual files storing the raw bias, dark, flat and object frames:
         DARK_PATTERN = "%s/%s*-%s.fits" % (darkFolder, self.pplSetup['DARK_FILE_PREFIX'], color)
         DARKLIST = glob.glob(DARK_PATTERN)
+        DARKLIST.sort()
 
         masterDarkFile = "%s/%s-%s.fits" % (darkFolder, self.pplSetup['MASTER_DARK_FILE'], color)
         masterBiasFile = "%s/%s-%s.fits" % (biasFolder, self.pplSetup['MASTER_BIAS_FILE'], color)
@@ -198,6 +203,7 @@ class Pipeline:
         # Names of the individual files storing the raw bias, dark, flat and object frames:
         FLAT_PATTERN = "%s/%s*-%s.fits" % (flatfolder, self.pplSetup['FLAT_FILE_PREFIX'], color)
         FLATLIST = glob.glob(FLAT_PATTERN)
+        FLATLIST.sort()
 
         masterFlatFile = "%s/%s-%s.fits" % (flatfolder, self.pplSetup['MASTER_FLAT_FILE'], color)
         masterDarkFile = "%s/%s-%s.fits" % (darkFolder, self.pplSetup['MASTER_DARK_FILE'], color)
@@ -229,6 +235,7 @@ class Pipeline:
         # Names of the individual files storing the raw bias, dark, flat and object frames:
         LIGHT_PATTERN = "%s/%s*-%s.fits" % (lightFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
         IOBJLIST = glob.glob(LIGHT_PATTERN)
+        IOBJLIST.sort()
         if len(IOBJLIST) == 0:
             return 1
 
@@ -248,6 +255,7 @@ class Pipeline:
         # Names of the individual files storing the raw bias, dark, flat and object frames:
         CALIB_PATTERN = "%s/%s*-%s.fits" % (calibFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
         COBJLIST = glob.glob(CALIB_PATTERN)
+        COBJLIST.sort()
         if len(COBJLIST) == 0:
             return 1
 
@@ -277,7 +285,6 @@ class Pipeline:
             invoke("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
 
             ln = findInFile(ftrans, 'Match failed')
-            print(ln)
             matchFailed = 1 if ln != None else 0
             if matchFailed == 1:
                 printError("Match failed on %s." % (f))
@@ -290,6 +297,7 @@ class Pipeline:
         # list of transformed frames
         TR_PATTERN = "%s/%s*-%s.fits" % (self.TEMPDIR, self.pplSetup['LIGHT_FILE_PREFIX'], color)
         TROBJLIST = glob.glob(TR_PATTERN)
+        TROBJLIST.sort()
 
         # create a sequence of combined frames
         cc = self.opt['countCombine']
@@ -486,6 +494,7 @@ class MainApp:
         'onError'   : 'noop',  # mg calculation method: comp, gcx, lfit
         'overwrite': False,  # force to overwrite existing results, optional
         'baseFolder': None,  # base folder, optional
+        'calibFolder': None, # optional folder for calibration frames (bias, dark, flat)
         }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
@@ -505,14 +514,15 @@ class MainApp:
         print("Make calibration process for raw or fits images.")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
-        print("  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
-        print("  -n, --count-combine n          set number of frames to combine in the sequence, 0 means all frames, default is 0")
-        print("  -f,  --flat                     make master flat frame only")
-        print("  -m, --master-flat folder       use the given master-flat folder")
-        print("  -t,  --image-time LT|UT         specify orignal image time zone, LT=local time, UT=universal time")
-        print("  -w,  --overwrite        force to overwrite existing results")
-        print("  -e,  --on-error noop|skip|stop  specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all")
-        print("  -h,  --help             print this page")
+        print("  -c,  --color arg               set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
+        print("  -n,  --count-combine n         set number of frames to combine in the sequence, 0 means all frames, default is 0")
+        print("  -f,  --flat                    make master flat frame only")
+        print("  -m,  --master-flat folder      use the given master-flat folder")
+        print("  -t,  --image-time LT|UT        specify orignal image time zone, LT=local time, UT=universal time")
+        print("       --calib-folder folder     alternative folder for calibration frames (bias, dark, flat)")
+        print("  -w,  --overwrite               force to overwrite existing results")
+        print("  -e,  --on-error noop|skip|stop specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all")
+        print("  -h,  --help                    print this page")
         print()
         print("Available filter color codes are:")
         print("  Gi | G | gi | g         green channel")
@@ -523,7 +533,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['--color', '--count-combine', '--flat', '--master-flat', '--image-time', '--overwrite', '--on-error', '--help'])
+            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder='])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -531,7 +541,7 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c':
+            elif o == '-c' or o == '--color':
                 color = a.lower()
                 if not color in self.availableBands:
                     printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % (a))
@@ -540,26 +550,31 @@ class MainApp:
                     self.opt['color'] = ['Ri', 'Gi', 'Bi']
                 else:
                     self.opt['color'] = [a]
-            elif o == '-f':
+            elif o == '-f' or o == '--flat':
                 self.opt['flatOnly'] = True
-            elif o == '-m':
+            elif o == '-m' or o == '--master-flat':
                 self.opt['useMasterFlat'] = True
                 self.opt['masterFlat'] = a
-            elif o == '-n':
+            elif o == '-n' or o == '--count-combine':
                 self.opt['countCombine'] = int(a)
-            elif o == '-t':
+            elif o == '-t' or o == '--image-time':
                 if a in ['LT', 'UT']:
                     self.opt['imageTime'] = a
                 else:
                     printWarning("Bad image time zone value: %s, using default %s instead." % (a, self.opt['imageTime']))
-            elif o == '-r':
+            elif o == '-e' or o == '--on-error':
                 if not a in ['noop', 'skip', 'stop']:
                     printWarning("Bad on-error instruction; available values are: noop, stop, skip.")
                 else:
                     self.opt['onError'] = a
-            elif o == '-w':
+            elif o == '--calib-folder':
+                if not isdir(a):
+                    printError("%s is not a folder. Calibration folder option is ignored." % (a))
+                else:
+                    self.opt['calibFolder'] = a
+            elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
-            elif o == '-h':
+            elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
 

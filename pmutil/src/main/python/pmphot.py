@@ -6,15 +6,13 @@ Created on Dec 28, 2019
 
 @author: kovi
 '''
-from numpy import median, sqrt #, polyfit
+from numpy import median, sqrt  # , polyfit
 from numpy.polynomial.polynomial import Polynomial
-from subprocess import Popen, PIPE
 from getopt import getopt, GetoptError
 from sys import argv
-from datetime import datetime
 from glob import glob
 
-from pmbase import jd, getFitsHeader
+from pmbase import jd, getFitsHeader, printError
 
 
 def loadCatalog(refFileName):
@@ -53,6 +51,7 @@ def getHeaderPos(cat, headerName):
         index = index + 1
     return None
 
+
 def addHeader(cat, headerName):
     pos = getHeaderPos(cat, headerName)
     if pos != None:
@@ -72,6 +71,7 @@ fieldRole = 'ROLE'
 
 MAG_ERR_DEFAULT = 0.2
 
+
 def getDateObs(fileName):
     '''
     fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
@@ -84,9 +84,9 @@ def getDateObs(fileName):
 
 class Photometry:
 
-    opt = {}                 # command line options
+    opt = {}  # command line options
 #    pplSetup = {}            # PPL setup from ppl-setup config file
-    pos = None               # catalog header positions
+    pos = None  # catalog header positions
 
     def __init__(self, opt):
         self.opt = opt
@@ -109,7 +109,6 @@ class Photometry:
                 result.append(pm)
         # print (result)
         return result
-
 
     def calculateMgsRobustAveraging(self, refCat, color):
         '''
@@ -143,7 +142,7 @@ class Photometry:
 #                print("ev:[" + pm[evPos] + "]")
                     ev = float(pm[evPos])
                 else:
-                    ev = MAG_ERR_DEFAULT    # TODO: what to do, if no mg error value?
+                    ev = MAG_ERR_DEFAULT  # TODO: what to do, if no mg error value?
                 y.append(mv - mi)
                 ek2 = ei * ei + ev * ev
                 e2.append(ek2)
@@ -176,7 +175,7 @@ class Photometry:
                 w_[k] = w_k
                 r_[k] = r_k
                 zsum = zsum + (y[k]) * w_k
-                wsum = wsum + w_k    
+                wsum = wsum + w_k
             z = zsum / wsum
         # iteration ends
 
@@ -206,7 +205,6 @@ class Photometry:
         # print (result)
         return result
 
-
     def calculateMgsLinearFit(self, refCat, color):
         '''
         Calculate magnitudes with naive linear fit
@@ -235,11 +233,11 @@ class Photometry:
                 ev = float(pm[evPos])
                 er.append(1.0 / sqrt(ei * ei + ev * ev))
 
-        p = Polynomial.fit(mi, mv, 1, w=er)
+        p = Polynomial.fit(mi, mv, 1, w = er)
         # print ('polyfit result:', p)
 
         # apply result to variables
-        result = self.transformMgs(refcat, stdcolor, [p.coef[1], p.coef[0]])
+        result = self.transformMgs(refCat, stdcolor, [p.coef[1], p.coef[0]])
 #        result = []
 #        for pm in refCat['cat']:
 #            if pm[rolePos] == 'V':
@@ -268,21 +266,21 @@ class Photometry:
         compId = None
         for pm in refCat['cat']:
             if pm[rolePos] == 'C' and pm[mvPos] != '-':
-#                if comp != None and pm[idPos] == comp:
-#                    p = float(pm[mvPos]) - float(pm[miPos])
-#                    ep = max(float(pm[evPos]), float(pm[eiPos])
-                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
-                 ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
-                 e = ei * ei + ev * ev
-                 if e < emin:
-                     emin = e
-                     p[1] = float(pm[mvPos]) - float(pm[miPos])
-                     ep = max(ev, ei)
-                     compId = pm[idPos]
+#               if comp != None and pm[idPos] == comp:
+#                   p = float(pm[mvPos]) - float(pm[miPos])
+#                   ep = max(float(pm[evPos]), float(pm[eiPos])
+                ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
+                ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
+                e = ei * ei + ev * ev
+                if e < emin:
+                    emin = e
+                    p[1] = float(pm[mvPos]) - float(pm[miPos])
+                    ep = max(ev, ei)
+                    compId = pm[idPos]
         print('Best comp star: %s, poly: [ %4.3f, %4.3f ], err: %4.3f' % (compId, p[0], p[1], ep))
 
         # apply result to variables
-        result = self.transformMgs(refcat, stdcolor, p, ep)
+        result = self.transformMgs(refCat, stdcolor, p, ep)
 #        result = []
 #        for pm in refCat['cat']:
 #            if pm[rolePos] == 'V':
@@ -366,7 +364,7 @@ class Photometry:
             r.write(color.ljust(5))
             r.write(("%5.3f" % float(res[evPos])).ljust(20))
             r.write('\n')
-    
+
         r.close()
 
     # standardization functions
@@ -389,7 +387,7 @@ class Photometry:
             stdcolor = color[:1].upper()
             if stdcolor == 'G':
                 stdcolor = 'V'
-            
+
             mgsPos = self.pos['MAG_' + stdcolor]
 
             result = allCatalogs[color]['cat']
@@ -404,7 +402,7 @@ class Photometry:
                 if role == 'C' and mgs and mgs != '-' and mgi and mgi != '-':
                     ids.add(auid)
 
- #           print('ids',self.opt['color'][j],ids)
+#           print('ids',self.opt['color'][j],ids)
             if len(allIds) == 0:
                 allIds = ids
             else:
@@ -457,7 +455,7 @@ class Photometry:
             bi_vi.append(float(row[4]) - float(row[5]))
             B_V.append(float(row[1]) - float(row[2]))
 
-            for p in range(7,12):
+            for p in range(7, 12):
                 if row[p] == '-':
                     row[p] = "0.1"
             e_V_vi = max(float(row[8]), float(row[11]))
@@ -479,12 +477,12 @@ class Photometry:
         print('w(Tvr):' , w_Tvr)
         print('w(Tbv):' , w_Tbv)
 
-        p = Polynomial.fit(V_vi, V_R, 1, w=w_Tv)
+        p = Polynomial.fit(V_vi, V_R, 1, w = w_Tv)
         print(p.coef)
         Tv = p.coef[1]
-        p = Polynomial.fit(vi_ri, V_R, 1, w=w_Tvr)
+        p = Polynomial.fit(vi_ri, V_R, 1, w = w_Tvr)
         Tvr = 1.0 / p.coef[1]
-        p = Polynomial.fit(bi_vi, B_V, 1, w=w_Tbv)
+        p = Polynomial.fit(bi_vi, B_V, 1, w = w_Tbv)
         Tbv = p.coef[1]
 
         print ('standard coeffs: Tv =', Tv, 'Tvr =', Tvr, 'Tbv = ', Tbv)
@@ -524,16 +522,15 @@ class Photometry:
                 result = self.calculateMgsComparision(refCat, color)
 
             elif self.opt['method'] == 'lfit':
-               result = self.calculateMgsLinearFit(refCat, color)
+                result = self.calculateMgsLinearFit(refCat, color)
 
             else:
                 result = self.calculateMgsRobustAveraging(refCat, color)
-        
+
             allResults[color] = result
             allCatalogs[color] = refCat
 
             self.reportResult(result, refCat, fileName + '.pm', color, dateObs)
-
 
         coeffs = None
 
@@ -565,49 +562,45 @@ class Photometry:
             # save result
 
 
-
 class MainApp:
-    
+
     opt = {
-        'out' : None,         # output photometry file name, if None, '*.pm' will be created
-        'method': 'gcx',      # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
-        'color' : ['Gi'],     # photometry bands
-        'loadCoeffs' : False, # load std coeffs
-        'useCoeffs': False,   # use std coeffs
+        'out' : None,  # output photometry file name, if None, '*.pm' will be created
+        'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
+        'color' : ['Gi'],  # photometry bands
+        'loadCoeffs' : False,  # load std coeffs
+        'useCoeffs': False,  # use std coeffs
         'makeCoeffs': False,  # create std coeffs
         'saveCoeffs': False,  # save std coeffs
         'files': None,
         }
 
-
     def __init__(self, argv):
         self.argv = argv
         pass
 
-
     def processCommands(self):
         try:
-            optlist, args = getopt (argv[1:], "c:so:p:", ['--color', '--std', '--out', '--comp'])
+            optlist, args = getopt (argv[1:], "c:smo:p:", ['color=', 'std', 'make-std', 'out=', 'comp='])
         except GetoptError:
-            printError ('Invalid command line options')
+            printError('Invalid command line options')
             return
 
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c':
+            elif o == '-c' or o == '--color':
                 self.opt['color'] = [a]
-            elif o == '-s':
+            elif o == '-s' or o == '--std':
                 self.opt['std'] = True
-            elif o == '-m':
+            elif o == '-m' or o == '--make-std':
                 self.opt['makestd'] = True
-            elif o == '-c':
+            elif o == '-p' or o == '--comp':
                 self.opt['comp'] = a
-            elif o == '-o':
+            elif o == '-o' or o == '--':
                 self.opt['out'] = a
 
         self.opt['files'] = args
-
 
     def run(self):
         self.processCommands()

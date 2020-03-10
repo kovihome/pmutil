@@ -12,7 +12,7 @@ from sys import argv
 from datetime import datetime
 from glob import glob
 from os import getcwd, mkdir
-from os.path import isdir, exists, basename
+from os.path import exists, basename
 
 from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, discoverFolders
 from pmphot import Photometry
@@ -22,25 +22,25 @@ from pmfilter import CatalogMatcher
 
 class Pipeline:
 
-    opt = {}                 # command line options
-    pplSetup = {}            # PPL setup from ppl-setup config file
+    opt = {}  # command line options
+    pplSetup = {}  # PPL setup from ppl-setup config file
 
-    AST_CFG = ''             # astrometry.net config file
-    SEX_CFG = ''             # sextractor config file
-    SOLVE_ARGS = ''          # astrometry.net command line arguments
+    AST_CFG = ''  # astrometry.net config file
+    SEX_CFG = ''  # sextractor config file
+    SOLVE_ARGS = ''  # astrometry.net command line arguments
 
     def __init__(self, opt):
         self.opt = opt
 
     def photometry(self, seqFolder, photFolder, refcatFileName, color):
-    
+
         # Names of the sequence/combined files:
         SEQLIST = glob(seqFolder + '/' + self.pplSetup['SEQ_FILE_PREFIX'] + '*-' + color + '.fits')
         if len(SEQLIST) == 0:
             SEQLIST = glob(seqFolder + '/Combined-' + color + '.fits')
             if len(SEQLIST) == 0:
-              printWarning("No files for photometry in folder %s" % (seqFolder))
-              return False
+                printWarning("No files for photometry in folder %s" % (seqFolder))
+                return False
 
         for f in SEQLIST:
 
@@ -51,7 +51,12 @@ class Pipeline:
 
             printInfo("Make astrometry for %s" % (f))
             if not exists(AST_FILE) or self.opt['overwrite']:
+                print("%s/solve-field %s -D %s -N %s %s" % (self.pplSetup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
                 invoke("%s/solve-field %s -D %s -N %s %s" % (self.pplSetup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
+                fsolved = PMCAT_FILE.replace('.cat', '.solved')
+                if not exists(fsolved):
+                    printError("Astrometry of %s failed." % (fsolved))
+                    break
             else:
                 print("astrometry file %s already exists." % (AST_FILE))
 
@@ -63,7 +68,7 @@ class Pipeline:
 
             PMCAT_FILE_FLT = PMCAT_FILE + ".cat"
             printInfo("Filtering result catalog to %s" % (PMCAT_FILE_FLT))
-            if not exists(PMCAT_FILE) or self.opt['overwrite']:
+            if not exists(PMCAT_FILE_FLT) or self.opt['overwrite']:
                 # TODO: call directly
                 # invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
                 opt = {
@@ -76,7 +81,7 @@ class Pipeline:
                 matcher.process()
 
             else:
-                print("filtered photometry file %s already exists." % (PMCAT_FILE))
+                print("filtered photometry file %s already exists." % (PMCAT_FILE_FLT))
 
         return True
 
@@ -112,7 +117,6 @@ class Pipeline:
             phot = Photometry(pmopt)
             phot.process()
 
-
     def process_photometry(self, seqFolder, photFolder, title):
 
         printInfo("%s: Make photometry on sequence file(s)." % (title))
@@ -130,7 +134,7 @@ class Pipeline:
         else:
             printError("No reference catalog file (.cat) in folder %s" % (basedir))
             printInfo("Use ppl-refcat command to create reference catalog for the object.")
-            return False    
+            return False
 
         for color in self.opt['color']:
             self.photometry(seqFolder, photFolder, PMREF, color)
@@ -140,7 +144,6 @@ class Pipeline:
         # TODO: cleanup - delete light FITS files
 
         return True
-
 
     def execute(self):
 
@@ -154,13 +157,12 @@ class Pipeline:
             printError('No sequence folder found in base folder %s' % (self.opt['baseFolder']))
             exit(1)
         print("Sequence folders discovered:", seqFolders)
-        
-        ### Common arguments (saturation level, image section & trimming, etc.):
+
+        # ## Common arguments (saturation level, image section & trimming, etc.):
         self.AST_CFG = self.pplSetup['CONFIG_FOLDER'] + "/astrometry.cfg"
         self.SEX_CFG = self.pplSetup['CONFIG_FOLDER'] + "/sex.cfg"
-        #SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
+        # SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
         self.SOLVE_ARGS = "-O --config %s --use-sextractor --sextractor-path sextractor -r -y -p" % (self.AST_CFG)
-
 
         ####################################
         # step 1. do photometry for all file
@@ -170,12 +172,11 @@ class Pipeline:
         for sf in seqFolders:
 
             pf = sf.replace(self.pplSetup['SEQ_FOLDER_NAME'], self.pplSetup['PHOT_FOLDER_NAME'])
-    
+
             success = self.process_photometry(sf, pf, "PHOTOMETRY")
             if not success:
                 PMERROR = True
-                break	
-  
+                break
 
         ########################################
         # step 2. create report from all results
@@ -185,7 +186,7 @@ class Pipeline:
             if self.opt['baseFolder'] != None:
                 PM_FILES = glob('*' + self.opt['baseFolder'] + '*/' + self.pplSetup['PHOT_FOLDER_NAME'] + '/*.pm')
                 BASE_FOLDERS = glob('*' + self.opt['baseFolder'] + '*')
-                REPORT_FOLDER=BASE_FOLDERS[0]
+                REPORT_FOLDER = BASE_FOLDERS[0]
             else:
                 PM_FILES = glob(self.pplSetup['PHOT_FOLDER_NAME'] + '/*.pm')
                 REPORT_FOLDER = getcwd()
@@ -205,16 +206,16 @@ class Pipeline:
 
 
 class MainApp:
-    
+
     opt = {
-        'color' : ['Gi'],    # photometry band, mandatory
-        'nameCode' : None,   # observer code for the AAVSO report, mandatory
+        'color' : ['Gi'],  # photometry band, mandatory
+        'nameCode' : None,  # observer code for the AAVSO report, mandatory
         'makeStd'  : False,  # make std coeffs
         'useStd'   : False,  # use std coeffs
         'adhocStd' : False,  # make and use std coeffs for this image only
-        'method'   : 'gcx',   # mg calculation method: comp, gcx, lfit
+        'method'   : 'gcx',  # mg calculation method: comp, gcx, lfit
         'overwrite': False,  # force to overwrite existing results, optional
-        'files': None,       
+        'files': None,
         'baseFolder': None,  # base folder, optional
         }
 
@@ -226,7 +227,6 @@ class MainApp:
         'lfit': 'Linear fit ensemble',
         }
 
-
     def __init__(self, argv):
         self.argv = argv
         pass
@@ -236,7 +236,6 @@ class MainApp:
         print(BGreen + "ppl-photometry, version 1.1.0 " + Color_Off)
         print(Blue + "Make photometry on calibrated FITS images." + Color_Off)
         print()
-
 
     def usage(self):
         print("Usage: ppl-photometry [OPTIONS]... [BASE_FOLDER]")
@@ -259,10 +258,9 @@ class MainApp:
         print("  all | ALL | All         all channels, results 3 separate frame")
         print()
 
-
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:msat:wh", ['--color', '--name', '--make-std', '--use-std', '--adhoc-std', '--method', '--overwrite', '--help'])
+            optlist, args = getopt (self.argv[1:], "c:n:msat:wh", ['color=', 'name=', 'make-std', 'use-std', 'adhoc-std', 'method=', 'overwrite', 'help'])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -270,7 +268,7 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c':
+            elif o == '-c' or o == '--color':
                 color = a.lower()
                 if not color in self.availableBands:
                     printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % (a))
@@ -279,29 +277,29 @@ class MainApp:
                     self.opt['color'] = ['Ri', 'Gi', 'Bi']
                 else:
                     self.opt['color'] = [a]
-            elif o == '-n':
+            elif o == '-n' or o == '--name':
                 self.opt['nameCode'] = a.upper()
-            elif o == '-m':
+            elif o == '-m' or o == '--make-std':
                 self.opt['makeStd'] = True
-            elif o == '-s':
+            elif o == '-s' or o == '--use-std':
                 self.opt['useStd'] = True
-            elif o == '-a':
+            elif o == '-a' or o == '--adhoc-std':
                 self.opt['adhocStd'] = True
-            elif o == '-t':
+            elif o == '-t' or o == '--method':
                 if not a in self.mgCalcMethods.keys():
                     printWarning('Invalid mg calculation method %s ; use gcx instead.')
                 else:
                     self.opt['method'] = a
-                    
-            elif o == '-w':
+
+            elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
-            elif o == '-h':
+            elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
 
-        if self.opt['adhocStd'] and ( self.opt['makeStd'] or self.opt['useStd']):
-           printWarning('Both -a and either -m or -s option cannot be used at once.')
-           exit(0)
+        if self.opt['adhocStd'] and (self.opt['makeStd'] or self.opt['useStd']):
+            printWarning('Both -a and either -m or -s option cannot be used at once.')
+            exit(0)
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]
@@ -313,7 +311,6 @@ class MainApp:
             self.opt['nameCode'] = 'XYZ'
 
         print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
-    
 
     def run(self):
         self.printTitle()
@@ -327,7 +324,6 @@ class MainApp:
 
         exectime = (datetime.now() - start).total_seconds()
         print("%sexecution time was %d seconds.%s" % (Blue, exectime, Color_Off))
-
 
 
 if __name__ == '__main__':

@@ -20,10 +20,11 @@ class Discovery:
     FLAT_DARK_FOLDER = None
     LIGHT_FOLDERS = None
 
-    def __init__(self, flatOnly, nonFlatFolderOnly, folderPattern, pplSetup):
-        self.flatOnly = flatOnly
-        self.nonFlatFolderOnly = nonFlatFolderOnly
-        self.folderPattern = folderPattern
+    def __init__(self, opt, pplSetup):
+        self.flatOnly = opt['flatOnly']
+        self.nonFlatFolderOnly = opt['useMasterFlat']
+        self.folderPattern = opt['baseFolder']
+        self.calibFolder = opt['calibFolder']
         self.ppl = pplSetup
 
     def findFolders(self, baseFolder, folderName):
@@ -55,11 +56,11 @@ class Discovery:
 
     # discover Bias folder
     def discoverBiasFolder(self, baseFolder):
-        self.BIAS_FOLDER = self.discoverFolder(baseFolder, self.ppl['BIAS_FOLDER_NAME'], 'Bias')
+        self.BIAS_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder, self.ppl['BIAS_FOLDER_NAME'], 'Bias')
 
     # discover Dark folder
     def discoverDarkFolder(self, baseFolder):
-        self.DARK_FOLDER = self.discoverFolder(baseFolder, self.ppl['DARK_FOLDER_NAME'], 'Dark')
+        self.DARK_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder, self.ppl['DARK_FOLDER_NAME'], 'Dark')
 
     def discover(self):
         if not self.flatOnly:
@@ -69,7 +70,7 @@ class Discovery:
         if not self.nonFlatFolderOnly:
 
             # discover flat bias folder
-            FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern, self.ppl['FLAT_BIAS_FOLDER_NAME'])
+            FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_BIAS_FOLDER_NAME'])
             if len(FLAT_BIAS_FOLDERS) > 1:
                 print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Bias'))
                 print("  --> " + ' '.join(FLAT_BIAS_FOLDERS))
@@ -84,7 +85,7 @@ class Discovery:
             print("Flat Bias folder discovered: %s" % (self.FLAT_BIAS_FOLDER))
 
             # discover flat dark folder
-            FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern, self.ppl['FLAT_DARK_FOLDER_NAME'])
+            FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_DARK_FOLDER_NAME'])
             if len(FLAT_DARK_FOLDERS) > 1:
                 print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Dark'))
                 print("  --> " + ' '.join(FLAT_DARK_FOLDERS))
@@ -99,7 +100,7 @@ class Discovery:
             print("Flat Bias folder discovered: %s" % (self.FLAT_DARK_FOLDER))
 
             # discover flat folder
-            self.FLAT_FOLDER = self.discoverFolder(self.folderPattern, self.ppl['FLAT_FOLDER_NAME'], 'Flat')
+            self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_FOLDER_NAME'], 'Flat')
 
         if not self.flatOnly:
 
