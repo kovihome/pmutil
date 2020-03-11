@@ -81,7 +81,8 @@ class CatalogMatcher:
 
         # 1. convert refCat to fits format
         # TODO: move this part into pmrefcat, do this when the reference catalog is created
-        refFitsFile = 'ref_cat.fits'
+        
+        refFitsFile = refCatFile + '.fits'  #'ref_cat.fits'
         table = Table.read(refCatFile, format='ascii')
         if not exists(refFitsFile):
             table.write(refFitsFile)
@@ -89,7 +90,7 @@ class CatalogMatcher:
         # 2. calculate ref objects' frame xy points
         wcsFile = pmCatFile.replace('.cat', '.wcs')
         axyFile = pmCatFile.replace('.cat', '.ref.axy')
-        invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG" % (wcsFile, refFitsFile, axyFile))
+        invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG -f " % (wcsFile, refFitsFile, axyFile))
 
         # 3. merge frame xy point to refCat
         refCatExFile = pmCatFile.replace('.cat', '.axy.cat')

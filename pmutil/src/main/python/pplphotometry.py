@@ -114,7 +114,7 @@ class Pipeline:
                 'saveCoeffs': self.opt['makeStd'],
                 'files': inputFiles,
             }
-            phot = Photometry(pmopt)
+            phot = Photometry(pmopt, self.pplSetup)
             phot.process()
 
     def process_photometry(self, seqFolder, photFolder, title):

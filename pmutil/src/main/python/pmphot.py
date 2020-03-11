@@ -11,8 +11,9 @@ from numpy.polynomial.polynomial import Polynomial
 from getopt import getopt, GetoptError
 from sys import argv
 from glob import glob
+from astropy.table import Table
 
-from pmbase import jd, getFitsHeader, printError
+from pmbase import jd, getFitsHeader, printError, loadPplSetup
 
 
 def loadCatalog(refFileName):
@@ -85,11 +86,12 @@ def getDateObs(fileName):
 class Photometry:
 
     opt = {}  # command line options
-#    pplSetup = {}            # PPL setup from ppl-setup config file
+    ppl = {}  # PPL setup from ppl-setup config file
     pos = None  # catalog header positions
 
-    def __init__(self, opt):
+    def __init__(self, opt, ppl):
         self.opt = opt
+        self.ppl = ppl
 
     def transformMgs(self, refCat, stdcolor, p, err):
         mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
@@ -489,10 +491,36 @@ class Photometry:
         return [Tv, Tvr, Tbv]
 
     def saveCoeffs(self, coeffs):
-        pass
+        configFolder = self.ppl['CONFIG_FOLDER'].strip('/')
+        coeffFile = configFolder + '/stdcoeffs.cat'
+        if not exists(coeffFile):
+            f = open(coeffFile, "w")
+            f.write('DATE          TV         ERR_TV    TVR        ERR_TVR   TBV        ERR_TBV   CAMERA               TELESCOPE                 FIELD\n')
+        else:
+            f = open(coeffFIle, "a+")
+        f.write("%-14s" % ('2020-02-02')) # TODO: date of image
+        f.write("%-11.4f" % (coeff[0]))   # Tv
+        f.write("%-11.4f" % (0.0))        # TODO: error of Tv
+        f.write("%-11.4f" % (coeff[1]))   # Tvr
+        f.write("%-11.4f" % (0.0))        # TODO: error of Tvr
+        f.write("%-11.4f" % (coeff[2]))   # Tbv
+        f.write("%-11.4f" % (0.0))        # TODO: error of Tbv
+        f.write("%-21s" % ('Canon EOS 1100D')) # TODO: camera type from image
+        f.write("%-21s" % ('250/1200 T')) # TODO: telescope
+        f.write("%-21s" % ('SA104'))      # TODO: standard field or target object
+        f.write("\n")
+        f.close()
 
     def loadCoeffs(self):
-        return []
+        # TODO: search for appropriate coeffs (i.e. matching camera and telescope, near of image date, etc.), or average coeffs of same camera/telescope
+        configFolder = self.ppl['CONFIG_FOLDER'].strip('/')
+        coeffFile = configFolder + '/stdcoeffs.cat'
+        if not exists(coeffFile):
+            return None
+#        f = open(coeffFile,)
+        coeffTable = Table.read(coeffFile, format='ascii')
+        lastRow = coeffTable[len(coeffTable)-1]
+        return [lastRow['TV'], lastRow['TVR'], lastRow['TBV']]
 
     def calculateStdMgs(self, coeffs, mergedCat):
         pass
@@ -605,7 +633,9 @@ class MainApp:
     def run(self):
         self.processCommands()
 
-        phot = Photometry(self.opt)
+        ppl = loadPplSetup()
+
+        phot = Photometry(self.opt, ppl)
         phot.process()
 
 

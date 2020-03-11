@@ -1,13 +1,45 @@
 TODO
 ----
 
-- az osszeg exptime kiiratasnal irja oda, hogy sec
+- !!! refcat: saveCommand rossz konyvtarba teszi a commandot
+
++(511) !!! PHOT: filterezesnel, a nem match-elo valtozot fainter-nek vesszuk, pedig lehet, hogy csak nincs a kepen
+
+	+ a grmatch megtalalja, pedig nem kellene
+
+	+ meg kellene probalni a wcs-rdls2xy -> grmatch (xy) modszert
+
+	- a ref.cat.fits file kesziteses a refCat/ban legyen
 
 - pythonositas:
-	ppl-calibration		pmcalibration.py	link
 	ppl-setup		pmsetup.py
-	ppl-disco		pmdisco.py
 	ppl-clean		pmclean.py		link
+
+- !!! PHOT: hmg szamitas felulvizsgalata
+
+	- a filterben is van hmg szamolas, ugyan annak kell lennie a kettonek
+
+(516) AST: 20090717_ez_aql eseteben sikertelen az asztrometria, B es G szinben, R-ben is eszmeletlen sokaig tart
+
+(515) COLORIZE: 20090717_nsv_11154 eseteben elszall sqrt modban, linearban ok
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-colorize", line 148, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-colorize", line 140, in run
+	    col.execute()
+	  File "/home/kovi/bin/ppl-colorize", line 77, in execute
+	    imsave(imgFileName, img)
+	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/image.py", line 1496, in imsave
+	    rgba = sm.to_rgba(arr, bytes=True)
+	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/cm.py", line 271, in to_rgba
+	    raise ValueError("Floating point image RGB values "
+	ValueError: Floating point image RGB values must be in the 0..1 range.
+
+(513) AST: egy objektum fotometralasanal, az elso kepbol ki kell szedni a koordinatakat (CRVAL1, CRVAl2), 
+	es felhasznalni a tobbi kepnel hintnek.
+
+(514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
+	es ne kelljen meg egyszer meghivni
 
 
 === V 1.1 ==================================================
@@ -37,23 +69,39 @@ TODO
 
 (449) hot and dead pixel removing with fiign
 
-(450) standardization (s15n)
+(450) !!! standardization (s15n)
 
-- fiphot
+	- mentes coeff file-ba
 
-- SCAMP
+	- coeff file: image date, camera, telescope, field
+
+	- calculate coeff errors
+
+	- std mag szamolasahoz comp star ensemble modban
+
+	- average coeff szamolasa
+
+	- fits es cat/pm tartalmazza a coeff infokat
+
+	- SA catalogs
+
+	- refcat kezelje a SA nevu objektumokat
+
+- fiphot: sextractor helyett
+
+- SCAMP: grmatch helyett
 
 (452) pmphot: calculate mg with some different method, and put in the result catalog file
 
-	- auto comp star selection, by the least instrumental error value
+	+ auto comp star selection, by the least instrumental error value
 	
 (483) az aavso riport file-ban vannak kitoltetlen mezok: 
-	cmag = 'na'  # TODO: set comp star mg if not ensemble
+    cmag = 'na'  # TODO: set comp star mg if not ensemble
     kname = 'na'  # TODO: specify ensemble reference comp star when ensemble, or set a check star
     kmag = 'na'  # TODO: set measured mg of check star
     airmass = 'na'  # TODO: calculate airmass
 
-- cosmetic: less output from astrometry (solve-plate) and photometry (sextractor) apps
+- cosmetic: less output from photometry (sextractor) apps
 
 
 === V 1.2 ==================================================
