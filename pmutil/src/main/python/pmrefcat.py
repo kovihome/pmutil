@@ -15,6 +15,7 @@ from datetime import datetime
 from os import makedirs, symlink, remove
 from os.path import isdir, exists
 from glob import glob
+from astropy.table import Table
 import json
 import xmltodict
 import re
@@ -25,14 +26,12 @@ from pmbase import printError, printInfo, saveCommand, loadPplSetup, invoke, Blu
 class RefCat:
 
     opt = {}  # command line options
-    pplSetup = {}  # PPL setup from ppl-setup config file
+    ppl = {}  # PPL setup from ppl-setup config file
 
     defMgLimit = 18.0
     defFov = 60
 
     chartId = None
-
-    catalogHeader = "AUID         ROLE RA          RA_DEG         DEC         DEC_DEG       MAG_B  ERR_B   MAG_V  ERR_V   MAG_R  ERR_R   LABEL"
 
     def __init__(self, opt):
         self.opt = opt
@@ -55,12 +54,6 @@ class RefCat:
         respJson = f.read().decode('UTF-8')
 
         resp = json.loads(respJson)
-
-        # print("Star:", resp['star'])
-        # print("AUID:", resp['auid'])
-        # print("Coord:", resp['ra'], resp['dec'])
-        # print("ChartID:", resp['chartid'])
-        # print("Photometry table:")
 
         self.chartId = resp['chartid']
 
@@ -105,11 +98,9 @@ class RefCat:
                 mgerrR = "-"
             label = str(pm['label']).replace(' ', '_')
 
-            s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + mgB.ljust(7) + mgerrB.ljust(8) + mgV.ljust(7) + mgerrV.ljust(8) + mgR.ljust(7) + mgerrR.ljust(8) + label
-            if outFile != None:
-                outFile.write(s + "\n")
-            else:
-                print(s)
+            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
+
+        print("%d comparision stars were found in VSP databse" % (len(resp['photometry'])))
 
     def loadVsxCatalogData(self, outFile, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
         '''
@@ -123,12 +114,9 @@ class RefCat:
         if objectName != None:
             # https://www.aavso.org/vsx/index.php?view=results.csv&ident=R+Car
             vsxUrl = "https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident=%s" % (objectName.replace(' ', '+'))
-            # print(vsxUrl)
             f = request.urlopen(vsxUrl)
             respJson = f.read().decode('UTF-8')
             resp = json.loads(respJson)
-            # print(resp)
-            # print("Object:", resp['VSXObject']['Name'], "RA:", resp['VSXObject']['RA2000'], "Dec:", resp['VSXObject']['Declination2000'])
 
             sra = deg2hexa(float(resp['VSXObject']['RA2000']) / 15.0)
             sdec = deg2hexa(float(resp['VSXObject']['Declination2000']))
@@ -140,25 +128,13 @@ class RefCat:
 
         vsxUrl = "https://www.aavso.org/vsx/index.php?view=query.votable&format=d&coords=%s&size=%d&unit=2&geom=b" % (coords, fov)
         # https://www.aavso.org/vsx/index.php?view=query.votable&coords=19:54:17+32:13:08&format=d&size=60&unit=2
-        # print(vsxUrl)
         f = request.urlopen(vsxUrl)
         respVOTable = f.read().decode('UTF-8')
-        # resp = json.loads(respJson)
-        # print(respVOTable)
         votable = xmltodict.parse(respVOTable)
-        # print(votable)
-        # print(votable['VOTABLE']['RESOURCE']['TABLE'].keys())
-        # print(votable['VOTABLE']['RESOURCE']['TABLE']['FIELD'])
-        # print(votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA'])
         trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
         nrUnknown = 1
         for tr in trs:
             # [None, 'PS1-3PI J185203.12+325154.5', 'Lyr', '283.01304000,32.86516000', 'RRAB', '16.810', 'r', '0.400', 'r', '57000.85600', None, '0.839122', None, None, None]
-            # print("AUID:", tr['TD'][0], "Coord:", tr['TD'][3], "LABEL", tr['TD'][1])
-
-            # #0.00    Variable    AY Lyr                000-BCD-108    18 44 26.69 +37 59 51.9    Lyr    UGSU    0.0733    12.5 - 18.4 B
-            # distance, varstate, label(1), auid(0), coords(3), constell(2), type(4), period(11), max(5,6) - min(7,8)
-            # print("   Constell:", tr['TD'][2], "Type:", tr['TD'][4], "Period:", tr['TD'][11], "Mg:", tr['TD'][5] + tr['TD'][6], "-", tr['TD'][7] + tr['TD'][8])
 
             auid = tr['TD'][0]
             if auid == None:
@@ -176,13 +152,10 @@ class RefCat:
                 decDeg = "+" + decDeg
             label = tr['TD'][1].replace(' ', '_')
 
-            s = auid.ljust(13) + role.ljust(5) + ra.ljust(12) + raDeg.ljust(15) + dec.ljust(12) + decDeg.ljust(14) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + "-".ljust(7) + "-".ljust(8) + label
-            if outFile != None:
-                outFile.write(s + "\n")
-            else:
-                print(s)
+            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, '-', '-', '-', '-', '-', '-', label)
 
         nrUnknown = 1
+        count = 0
         for tr in trs:
 
             auid = tr['TD'][0]
@@ -213,24 +186,95 @@ class RefCat:
                 outFile.write(s + "\n")
             else:
                 print(s)
+            count = count + 1
+        print("%d variable stars were found in VSX databse" % (count))
+
+    def loadStdFieldData(self, outFile, stdFieldName):
+        saName = self.opt['stdFieldName']
+        configFolder = self.ppl["CONFIG_FOLDER"]
+        if configFolder == None:
+            configFolder = "$HOME/.pmlib"
+        
+        # load stdArea file
+        saFieldsFile = configFolder + "/landolt_fields.txt"
+        if not exists(saFieldsFile):
+            printError("Landolt standard field catalog file %s not found" % (saFieldsFile))
+            return 'NoFile'
+        saFields = Table.read(saFieldsFile, format='ascii')
+
+        # find std area
+        rows = list(filter(lambda r: r['FIELD_NAME'] == saName, saFields))
+        if len(rows) == 0:
+            printError("No field name %s found in standard area file %s." % (saName, saFieldsFile))
+            return 'NoField'
+        sa = rows[0]
+        printInfo("StdArea: %s, Coords: %s %s, NumStars: %d, Comment: %s" % (saName, sa['RA_2000'], sa['DEC_2000'], sa['NS'], sa['COMMENT']))
+
+        self.opt['ra'] = hexa2deg(sa['RA_2000']) * 15.0
+        self.opt['dec'] = hexa2deg(sa['DEC_2000'])
+        self.chartId = saName
+
+        # load stdStars file
+        saStarsFile = configFolder + "/landolt_stars.txt"
+        if not exists(saStarsFile):
+            printError("Landolt standard stars catalog file %s not found" % (saStarsFile))
+            return 'NoFile'
+        saStars = Table.read(saStarsFile, format='ascii')
+
+        # find std stars
+        stars = list(filter(lambda r: r['FIELD_NAME'] == saName, saStars))
+        if len(stars) == 0:
+            printError("No stars for standard field %s in standard area file %s." % (saName, saStarsFile))
+            return 'NoStars'
+
+        # write stars to catalog file
+        nrUnknown = 1
+        for star in stars:
+            auid = '999-STD-%03d' % (nrUnknown)
+            nrUnknown = nrUnknown + 1
+            role = "C"
+            ra = star['RA_2000']
+            raDeg = "%10.8f" % (hexa2deg(ra) * 15.0)
+            dec = star['RA_2000']
+            decDeg = "%+10.8f" % (hexa2deg(dec))
+            mv = float(star['MAG_V'])
+            ev = float(star['ERR_V'])
+            magB = "%+6.4f" % (float(star['MAG_BV']) + mv)
+            errB = "%+7.4f" % (max(ev, float(star['ERR_BV'])))
+            magV = "%+6.4f" % (mv)
+            errV = "%+7.4f" % (ev)
+            magR = "%+6.4f" % (mv - float(star['MAG_VR']))
+            errR = "%+7.4f" % (max(ev, float(star['ERR_VR'])))
+            label = saName + ":" + star['STAR']
+
+            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label)
+          
+        print("%d standard star found for standard area %s" % (len(stars), saName))
+        return None
+
+    def writeRecord(self, outFile, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label):
+        s = auid.ljust(13) + role.ljust(5) + ra.ljust(15) + raDeg.ljust(15) + dec.ljust(15) + decDeg.ljust(15) + magB.ljust(10) + errB.ljust(10) + magV.ljust(10) + errV.ljust(10) + magR.ljust(10) + errR.ljust(10) + label
+        if outFile != None:
+            outFile.write(s + "\n")
+        else:
+            print(s)
+
 
     def getPair(self, s, delim = ','):
         ss = s.split(delim)
         return [ss[0].strip(), ss[1].strip()]
 
     def determineCoordsFromImage(self, imageFileName):
-        configFolder = self.pplSetup["PMLIB"]
+        configFolder = self.ppl["CONFIG_FOLDER"]
         if configFolder == None:
             configFolder = "$HOME/.pmlib"
         SOLVE_ARGS = "-O --config " + configFolder + "/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
-
-        # /usr/local/astrometry/bin/solve-field $SOLVE_ARGS -D $2 -N $AST_FILE $f
 
         makedirs("temp", exist_ok = True)
 
         invoke("cp " + imageFileName + " temp/src.fits")
 
-        astFolder = self.pplSetup["AST_BIN_FOLDER"]
+        astFolder = self.ppl["AST_BIN_FOLDER"]
         if astFolder == None:
             astFolder = "/usr/local/astrometry/bin"
 
@@ -253,7 +297,7 @@ class RefCat:
         return sCoords
 
     def execute(self):
-        self.pplSetup = loadPplSetup()
+        self.ppl = loadPplSetup()
 
         if self.opt['image'] != None:
 
@@ -261,9 +305,7 @@ class RefCat:
             self.opt['ra'] = coords[0]
             self.opt['dec'] = coords[1]
 
-#        print("coords:", coords)
-
-        outFileName = self.pplSetup['CONFIG_FOLDER']
+        outFileName = self.ppl['CONFIG_FOLDER']
         if not outFileName.endswith('/'):
             outFileName += '/'
         outFileName += 'cat/'
@@ -272,6 +314,8 @@ class RefCat:
 
         if self.opt['object'] != None:
             outFileName += self.opt['object'].lower().replace(' ', '_') + '.cat'
+        elif self.opt['stdFieldName'] != None:
+            outFileName += self.opt['stdFieldName'].lower().replace(' ', '_') + '.cat'
         else:
             if not self.opt['dec'].startswith('+') and not self.opt['dec'].startswith('-'):
                 self.opt['dec'] = '+' + self.opt['dec']
@@ -280,13 +324,20 @@ class RefCat:
         if not exists(outFileName) or self.opt['overwrite']:
 
             outFile = open(outFileName, 'w')
-            outFile.write(self.catalogHeader + "\n")
+            self.writeRecord(outFile, 'AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_B', 'ERR_B', 'MAG_V', 'ERR_V', 'MAG_R', 'ERR_R', 'LABEL')
 
             if self.opt['object'] != None:
 
                 self.loadVspPhotometryData(outFile, self.opt['object'], fov = self.opt['field'])
 
                 self.loadVsxCatalogData(outFile, self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+
+            elif self.opt['stdFieldName'] != None:
+
+                error = self.loadStdFieldData(outFile, self.opt['stdFieldName'])
+
+                if not error:
+                    self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
             else:
 
@@ -348,19 +399,20 @@ class MainApp:
         print(self.appDescription)
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
-        print("  -o,  --object object_name   object (variable star) name")
-        print("  -c,  --coords ra,decl       coordinates of the center of reference frame, valid format is 12:34:56.7,-12:34:56.7")
-        print("  -i,  --image filename       image file name")
-        print("  -s,  --source catalog       source catalog for field stars")
-        print("  -f,  --field size           field size in arcmin, default is 60 arcmin")
-        print("  -a,  --all                  collect all variables ; if not set, collect variables having AUID only")
-        print("  -w,  --overwrite            overwrite catalog file, if exists")
-        print("  -h,  --help                 print this page")
+        print("  -o,  --object object_name     object (variable star) name")
+        print("  -c,  --coords ra,decl         coordinates of the center of reference frame, valid format is 12:34:56.7,-12:34:56.7")
+        print("  -n,  --field-name field_name  standard field name")
+        print("  -i,  --image filename         image file name")
+        print("  -s,  --source catalog         source catalog for field stars")
+        print("  -f,  --field size             field size in arcmin, default is 60 arcmin")
+        print("  -a,  --all                    collect all variables ; if not set, collect variables having AUID only")
+        print("  -w,  --overwrite              overwrite catalog file, if exists")
+        print("  -h,  --help                   print this page")
 
     def processCommands(self):
 
         try:
-            optlist, args = getopt (argv[1:], "ac:s:o:i:f:wh", ['all', 'coord=', 'source=', 'object=', 'image=', 'field=', 'overwrite', 'help'])
+            optlist, args = getopt (argv[1:], "ac:s:o:n:i:f:wh", ['all', 'coord=', 'source=', 'object=', 'field-name=', 'image=', 'field=', 'overwrite', 'help'])
         except GetoptError:
             print ('Invalid command line options')
             exit(1)
@@ -374,6 +426,8 @@ class MainApp:
                 self.opt['source'] = a
             elif o == '-o' or o == '--object':
                 self.opt['object'] = a.replace('_', ' ')
+            elif o == '-n' or o == '--field-name':
+                self.opt['stdFieldName'] = a
             elif o == '-i' or o == '--image':
                 self.opt['image'] = a
             elif o == '-f' or o == '--field':
@@ -397,8 +451,8 @@ class MainApp:
             if not self.opt['folder'].endswith('/'):
                 self.opt['folder'] += '/'
 
-        if self.opt['object'] == None and self.opt['coords'] == None and self.opt['image'] == None:
-            printError("Either object name (-o), coordinates (-c) or image file (-i) must be given.")
+        if self.opt['object'] == None and self.opt['coords'] == None and self.opt['stdFieldName'] == None and self.opt['image'] == None:
+            printError("Either object name (-o), coordinates (-c), standard field name (-n) or image file (-i) must be given.")
             exit(1)
 
         if self.opt['coords'] != None:
