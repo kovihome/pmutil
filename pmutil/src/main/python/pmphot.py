@@ -6,12 +6,15 @@ Created on Dec 28, 2019
 
 @author: kovi
 '''
-from numpy import median, sqrt  # , polyfit
+from numpy import median, sqrt, arange  # , polyfit
 from numpy.polynomial.polynomial import Polynomial
 from getopt import getopt, GetoptError
 from sys import argv
 from glob import glob
 from astropy.table import Table
+from os.path import exists
+
+import matplotlib.pyplot as plt
 
 from pmbase import jd, getFitsHeader, printError, loadPplSetup
 
@@ -88,6 +91,7 @@ class Photometry:
     opt = {}  # command line options
     ppl = {}  # PPL setup from ppl-setup config file
     pos = None  # catalog header positions
+    imageProps = {} # image properties from FITS header
 
     def __init__(self, opt, ppl):
         self.opt = opt
@@ -107,7 +111,7 @@ class Photometry:
                 mv = p[0] * float(pm[miPos]) + p[1]
                 pm[mvPos] = mv
                 if err:
-                    pm[evPos] = max(float(pm[eiPos]), err)
+                    pm[evPos] = float(pm[eiPos]) + err
                 result.append(pm)
         # print (result)
         return result
@@ -233,20 +237,22 @@ class Photometry:
                 mv.append(float(pm[mvPos]))
                 ei = float(pm[eiPos])
                 ev = float(pm[evPos])
-                er.append(1.0 / sqrt(ei * ei + ev * ev))
+                er.append(1.0 / ei * ei + ev * ev)
 
-        p = Polynomial.fit(mi, mv, 1, w = er)
+#        p = Polynomial.fit(mi, mv, 1, w = er)
+        coef = self.linfit(mi, mv, er)
+
         # print ('polyfit result:', p)
 
+        xr = arange(min(mi), max(mi), 0.01)
+        plt.plot(mi, mv, 'go', xr, coef[0]*xr+coef[1], 'k')
+        plt.xlabel('v')
+        plt.ylabel('V')
+        plt.show()
+        
         # apply result to variables
-        result = self.transformMgs(refCat, stdcolor, [p.coef[1], p.coef[0]])
-#        result = []
-#        for pm in refCat['cat']:
-#            if pm[rolePos] == 'V':
-#                mv = p.coef[1] * float(pm[miPos]) + p.coef[0]
-#                pm[mvPos] = mv
-#                result.append(pm)
-        # print (result)
+#        result = self.transformMgs(refCat, stdcolor, [p.coef[1], p.coef[0]])
+        result = self.transformMgs(refCat, stdcolor, coef)
         return result
 
     def calculateMgsComparision(self, refCat, color):
@@ -270,27 +276,19 @@ class Photometry:
             if pm[rolePos] == 'C' and pm[mvPos] != '-':
 #               if comp != None and pm[idPos] == comp:
 #                   p = float(pm[mvPos]) - float(pm[miPos])
-#                   ep = max(float(pm[evPos]), float(pm[eiPos])
+#                   ep = float(pm[evPos]) + float(pm[eiPos])
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
                 ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
                 e = ei * ei + ev * ev
                 if e < emin:
                     emin = e
                     p[1] = float(pm[mvPos]) - float(pm[miPos])
-                    ep = max(ev, ei)
+                    ep = ev + ei
                     compId = pm[idPos]
         print('Best comp star: %s, poly: [ %4.3f, %4.3f ], err: %4.3f' % (compId, p[0], p[1], ep))
 
         # apply result to variables
         result = self.transformMgs(refCat, stdcolor, p, ep)
-#        result = []
-#        for pm in refCat['cat']:
-#            if pm[rolePos] == 'V':
-#                mv = p[0] * float(pm[miPos]) + p[1]
-#                pm[mvPos] = mv
-#                pm[evPos] = max(float(pm[eiPos]), ep)
-#                result.append(pm)
-        # print (result)
         return result
 
     def getHeaderPositions(self, refCat):
@@ -437,6 +435,25 @@ class Photometry:
 
         return merged
 
+    def linfit(self, x, y, w = None):
+        # TODO: wieghts
+        N = len(x)
+        X = 0.0
+        Y = 0.0
+        XY = 0.0
+        X2 = 0.0
+        M = 0.0
+        for j in range(N):
+            wj = w[j] if w else 1.0
+            X += x[j] * wj
+            Y += y[j] * wj
+            XY += x[j] * y[j] * wj
+            X2 += x[j] * x[j] * wj
+            M += wj
+        m = (Y * X - M * XY) / (X * X - M * X2)
+        b = (Y - m * X) / M
+        return m,b
+
     def calculateCoeffs(self, mergedCat):
         # Tv:  slope of (V-v) -> (V-R)
         # Tvr: 1/slope of (v-r) -> (V-R)
@@ -449,7 +466,6 @@ class Photometry:
         w_Tv = []
         w_Tvr = []
         w_Tbv = []
-#        print(mergedCat)
         for row in mergedCat:
             V_vi.append(float(row[2]) - float(row[5]))
             V_R.append(float(row[2]) - float(row[3]))
@@ -460,54 +476,66 @@ class Photometry:
             for p in range(7, 12):
                 if row[p] == '-':
                     row[p] = "0.1"
-            e_V_vi = max(float(row[8]), float(row[11]))
-            e_V_R = max(float(row[8]), float(row[9]))
-            e_vi_ri = max(float(row[11]), float(row[12]))
-            e_bi_vi = max(float(row[10]), float(row[11]))
-            e_B_V = max(float(row[7]), float(row[8]))
-            w_Tv.append(1.0 / sqrt(e_V_vi * e_V_vi + e_V_R * e_V_R))
-            w_Tvr.append(1.0 / sqrt(e_vi_ri * e_vi_ri + e_V_R * e_V_R))
-            w_Tbv.append(1.0 / sqrt(e_bi_vi * e_bi_vi + e_B_V * e_B_V))
+            e_V_vi = float(row[8]) + float(row[11])
+            e_V_R = float(row[8]) + float(row[9])
+            e_vi_ri = float(row[11]) + float(row[12])
+            e_bi_vi = float(row[10]) + float(row[11])
+            e_B_V = float(row[7]) + float(row[8])
+            w_Tv.append(1.0 / (e_V_vi * e_V_vi + e_V_R * e_V_R))
+            w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
+            w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
 
-        print('V-vi:', V_vi)
-        print('V-R:', V_R)
-        print('vi-ri:', vi_ri)
-        print('bi-vi:', bi_vi)
-        print('B-V:', B_V)
+        coef = self.linfit(V_R, V_vi, w_Tv)
+        Tv = coef[0]
+        Bv = coef[1] ###
+        coef = self.linfit(V_R, vi_ri, w_Tvr)
+        Tvr = 1.0 / coef[0]
+        Bvr = coef[1] ###
+        coef = self.linfit(B_V, bi_vi, w_Tbv)
+        Tbv = 1.0 / coef[0]
+        Bbv = coef[1] ###
 
-        print('w(Tv):' , w_Tv)
-        print('w(Tvr):' , w_Tvr)
-        print('w(Tbv):' , w_Tbv)
+        if self.opt['showCoeffGraphs']:
+            plt.figure()
+            plt.subplot(311)
+            xr = arange(min(V_R), max(V_R), 0.01)
+            plt.plot(V_R, V_vi, 'go', xr, Tv*xr+Bv, 'k')
+            plt.xlabel('V-R')
+            plt.ylabel('V-v')
 
-        p = Polynomial.fit(V_vi, V_R, 1, w = w_Tv)
-        print(p.coef)
-        Tv = p.coef[1]
-        p = Polynomial.fit(vi_ri, V_R, 1, w = w_Tvr)
-        Tvr = 1.0 / p.coef[1]
-        p = Polynomial.fit(bi_vi, B_V, 1, w = w_Tbv)
-        Tbv = p.coef[1]
+            plt.subplot(312)
+            plt.plot(V_R, vi_ri, 'ro', xr, xr/Tvr+Bvr, 'k')
+            plt.xlabel('V-R')
+            plt.ylabel('v-r')
+        
+            plt.subplot(313)
+            xr = arange(min(B_V), max(B_V), 0.01)
+            plt.plot(B_V, bi_vi, 'bo', xr, xr/Tbv+Bbv, 'k')
+            plt.xlabel('B-V')
+            plt.ylabel('b-v')
+            plt.show() 
 
         print ('standard coeffs: Tv =', Tv, 'Tvr =', Tvr, 'Tbv = ', Tbv)
         return [Tv, Tvr, Tbv]
 
     def saveCoeffs(self, coeffs):
-        configFolder = self.ppl['CONFIG_FOLDER'].strip('/')
+        configFolder = self.ppl['CONFIG_FOLDER'].rstrip('/')
         coeffFile = configFolder + '/stdcoeffs.cat'
         if not exists(coeffFile):
             f = open(coeffFile, "w")
-            f.write('DATE          TV         ERR_TV    TVR        ERR_TVR   TBV        ERR_TBV   CAMERA               TELESCOPE                 FIELD\n')
+            f.write('DATE          TV         ERR_TV     TVR        ERR_TVR    TBV        ERR_TBV    CAMERA               TELESCOPE            FIELD\n')
         else:
-            f = open(coeffFIle, "a+")
+            f = open(coeffFile, "a+")
         f.write("%-14s" % ('2020-02-02')) # TODO: date of image
-        f.write("%-11.4f" % (coeff[0]))   # Tv
+        f.write("%-11.4f" % (coeffs[0]))  # Tv
         f.write("%-11.4f" % (0.0))        # TODO: error of Tv
-        f.write("%-11.4f" % (coeff[1]))   # Tvr
+        f.write("%-11.4f" % (coeffs[1]))  # Tvr
         f.write("%-11.4f" % (0.0))        # TODO: error of Tvr
-        f.write("%-11.4f" % (coeff[2]))   # Tbv
+        f.write("%-11.4f" % (coeffs[2]))  # Tbv
         f.write("%-11.4f" % (0.0))        # TODO: error of Tbv
-        f.write("%-21s" % ('Canon EOS 1100D')) # TODO: camera type from image
-        f.write("%-21s" % ('250/1200 T')) # TODO: telescope
-        f.write("%-21s" % ('SA104'))      # TODO: standard field or target object
+        f.write("%-21s" % ('Canon EOS 1100D'.replace(' ', '_'))) # TODO: camera type from image
+        f.write("%-21s" % ('250/1200 T'.replace(' ', '_')))      # TODO: telescope
+        f.write("%-21s" % ('SA104'.replace(' ', '_')))           # TODO: standard field or target object
         f.write("\n")
         f.close()
 
@@ -517,7 +545,6 @@ class Photometry:
         coeffFile = configFolder + '/stdcoeffs.cat'
         if not exists(coeffFile):
             return None
-#        f = open(coeffFile,)
         coeffTable = Table.read(coeffFile, format='ascii')
         lastRow = coeffTable[len(coeffTable)-1]
         return [lastRow['TV'], lastRow['TVR'], lastRow['TBV']]
@@ -527,9 +554,11 @@ class Photometry:
 
     def process(self):
         if not self.opt['files']:
-            f = glob('Phot/Seq_*.fits.cat.cat')
-            f.sort()
-            self.opt['files'] = f
+#            f = glob('Phot/Seq_*.fits.cat.cat')
+#            f.sort()
+#            self.opt['files'] = f
+            printError('No input files are given.')
+            return
 
         allResults = {}
         allCatalogs = {}
@@ -593,13 +622,14 @@ class Photometry:
 class MainApp:
 
     opt = {
-        'out' : None,  # output photometry file name, if None, '*.pm' will be created
-        'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
-        'color' : ['Gi'],  # photometry bands
-        'loadCoeffs' : False,  # load std coeffs
-        'useCoeffs': False,  # use std coeffs
-        'makeCoeffs': False,  # create std coeffs
-        'saveCoeffs': False,  # save std coeffs
+        'out' : None,             # output photometry file name, if None, '*.pm' will be created
+        'method': 'gcx',          # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
+        'color' : ['Gi'],         # photometry bands
+        'loadCoeffs' : False,     # load std coeffs
+        'useCoeffs': False,       # use std coeffs
+        'makeCoeffs': False,      # create std coeffs
+        'saveCoeffs': False,      # save std coeffs
+        'showCoeffGraphs': False, # show standard coefficient graphs 
         'files': None,
         }
 

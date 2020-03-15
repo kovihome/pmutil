@@ -112,6 +112,7 @@ class Pipeline:
                 'useCoeffs': self.opt['useStd'] or self.opt['adhocStd'],
                 'makeCoeffs': self.opt['makeStd'] or self.opt['adhocStd'],
                 'saveCoeffs': self.opt['makeStd'],
+                'showCoeffGraphs': self.opt['showCoeffGraphs'],
                 'files': inputFiles,
             }
             phot = Photometry(pmopt, self.pplSetup)
@@ -213,6 +214,7 @@ class MainApp:
         'makeStd'  : False,  # make std coeffs
         'useStd'   : False,  # use std coeffs
         'adhocStd' : False,  # make and use std coeffs for this image only
+        'showCoeffGraphs': False, # show standard coefficient graphs
         'method'   : 'gcx',  # mg calculation method: comp, gcx, lfit
         'overwrite': False,  # force to overwrite existing results, optional
         'files': None,
@@ -245,11 +247,13 @@ class MainApp:
         print("  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
         print("  -n,  --name nameCode    set observer code for the AAVSO report")
         print("  -t,  --method method    magnitude calculation method ; values are: comp, gcx, lfit")
+        print("  -h,  --help             print this page")
+        print("  -w,  --overwrite        force to overwrite existing results")
+        print("standardization:")
         print("  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
         print("  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
         print("  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
-        print("  -h,  --help             print this page")
-        print("  -w,  --overwrite        force to overwrite existing results")
+        print("       --show-coeff       show standard coefficient graphs for diagnostic or illustration purpose")
         print()
         print("Available filter color codes are:")
         print("  Gi | G | gi | g         green channel")
@@ -260,7 +264,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:msat:wh", ['color=', 'name=', 'make-std', 'use-std', 'adhoc-std', 'method=', 'overwrite', 'help'])
+            optlist, args = getopt (self.argv[1:], "c:n:msat:wh", ['color=', 'name=', 'make-std', 'use-std', 'adhoc-std', 'show-coeff', 'method=', 'overwrite', 'help'])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -285,6 +289,8 @@ class MainApp:
                 self.opt['useStd'] = True
             elif o == '-a' or o == '--adhoc-std':
                 self.opt['adhocStd'] = True
+            elif o == '--show-coeff':
+                self.opt['showCoeffGraphs'] = True
             elif o == '-t' or o == '--method':
                 if not a in self.mgCalcMethods.keys():
                     printWarning('Invalid mg calculation method %s ; use gcx instead.')
@@ -300,6 +306,9 @@ class MainApp:
         if self.opt['adhocStd'] and (self.opt['makeStd'] or self.opt['useStd']):
             printWarning('Both -a and either -m or -s option cannot be used at once.')
             exit(0)
+
+        if self.opt['showCoeffGraphs'] and (not self.opt['adhocStd'] and not self.opt['makeStd']):
+            printWarning('--show-coeff option can be used together with -a or -m option.')
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]

@@ -9,7 +9,7 @@ TODO
 
 	+ meg kellene probalni a wcs-rdls2xy -> grmatch (xy) modszert
 
-	- a ref.cat.fits file kesziteses a refCat/ban legyen
+	- a ref.cat.fits file kesziteses a refCat-ban legyen
 
 - pythonositas:
 	ppl-setup		pmsetup.py
@@ -40,6 +40,13 @@ TODO
 
 (514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
 	es ne kelljen meg egyszer meghivni
+
+- Katalogus kezeles astropy.table.Table segitsegevel
+
+- configure: add matplotlib
+
+- doc: ppl-photometry --show-coeff option, matplotlib dependency
+	
 
 
 === V 1.1 ==================================================
@@ -73,9 +80,12 @@ TODO
 
 	- mentes coeff file-ba
 
-	- coeff file: image date, camera, telescope, field
+		- ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
+		  overwrite modban update-elje az ertekeket
 
-	- calculate coeff errors
+		- hianyzo adatok: image date, camera, telescope, field
+
+		- calculate coeff errors
 
 	- std mag szamolasahoz comp star ensemble modban
 
