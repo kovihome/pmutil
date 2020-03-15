@@ -11,6 +11,9 @@ import getopt
 import sys
 import glob
 from os.path import exists
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz, ICRS
+from astropy.time import Time
+import astropy.units as u
 
 from pmbase import loadPplSetup
 
@@ -91,6 +94,14 @@ class ReportProcessor:
         cf.close()
         return chartId
 
+    def calcAirmass(self, ra, dec, obsDate):
+        co = SkyCoord(ra, dec, frame=ICRS, unit=(u.hourangle, u.deg))
+        t = Time(obsDate.replace('T', ' '))
+        # TODO: store observer's location in config
+        loc = EarthLocation.of_address('Budapest')
+        hc = co.transform_to(AltAz(obstime=t, location=loc))
+        return float(hc.secz)
+
     def reportForAAVSO(self, allResults, header, outFolder, obsName):
         '''
         header:
@@ -136,13 +147,16 @@ class ReportProcessor:
             TAver=2.47
         '''
 
-        # idPos = getHeaderPos(header, 'AUID')
+        auidPos = getHeaderPos(header, 'AUID')
         labelPos = getHeaderPos(header, 'LABEL')
         mvPos = getHeaderPos(header, 'MAG')
         colorPos = getHeaderPos(header, 'COL')
         errPos = getHeaderPos(header, 'ERR')
         jdPos = getHeaderPos(header, 'JD')
         flagPos = getHeaderPos(header, 'FLAG')
+        raPos = getHeaderPos(header, 'RA')
+        decPos = getHeaderPos(header, 'DEC')
+        datePos = getHeaderPos(header, 'DATE-OBS')
 
         r = outFolder.split('/')
         fileName = r[-1]
@@ -158,29 +172,53 @@ class ReportProcessor:
         r.write('#DATE=JD\n')
         r.write('#OBSTYPE=DSLR\n')
 
+        ixColor = {'B':'1', 'G':'2', 'V':'3', 'R':'4'}
+        allResults.sort(key = lambda e: e[jdPos] + e[auidPos] + ixColor[e[colorPos][:1]])
+
         for res in allResults:
+
+            if res[flagPos] == 'K':
+                continue
 
             color = self.aavso_colors[res[colorPos]]
 
             starid = res[labelPos].replace('_', ' ')
             date = res[jdPos]
             magnitude = res[mvPos]
-            magerr = res[errPos]
+            magerr = "%4.3f" % (float(res[errPos])) if res[errPos] != '-' else self.NOT_AVAILABLE
             fainter = "<" if res[flagPos] == "F" else ""
             flt = color
             trans = 'NO'
             mtype = 'STD'
-            cname = 'ENSEMBLE'
-            cmag = self.NOT_AVAILABLE  # TODO: set comp star mg if not ensemble
-            kname = self.NOT_AVAILABLE  # TODO: specify ensemble reference comp star when ensemble, or set a check star
-            kmag = self.NOT_AVAILABLE  # TODO: set measured mg of check star
-            airmass = self.NOT_AVAILABLE  # TODO: calculate airmass
+
+            compStar = self.findCompStar(header, allResults, res[datePos], res[colorPos])
+
+            if self.opt['method'] == 'comp':
+                cname = compStar[auidPos] if compStar else self.NOT_AVAILABLE
+                cmag = compStar[mvPos] if compStar else self.NOT_AVAILABLE
+                kname = self.NOT_AVAILABLE  # TODO: set a check star
+                kmag = self.NOT_AVAILABLE  # TODO: set measured mg of check star
+            else:
+                cname = 'ENSEMBLE'
+                cmag = self.NOT_AVAILABLE
+                kname = compStar[auidPos] if compStar else self.NOT_AVAILABLE
+                kmag = compStar[mvPos] if compStar else self.NOT_AVAILABLE
+            airmass = "%6.4f" % (self.calcAirmass(res[raPos], res[decPos], res[datePos]))
             group = self.NOT_AVAILABLE
             chart = self.chartId
             notes = self.NOT_AVAILABLE
-            r.write(('%s,%s,%s%4.3f,%4.3f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n') % (starid.upper(), date, fainter, float(magnitude), float(magerr), flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes))
+            r.write(('%s,%s,%s%4.3f,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n') % (starid.upper(), date, fainter, float(magnitude), magerr, flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes))
 
         r.close()
+
+    def findCompStar(self, header, results, obsDate, color):
+        colorPos = getHeaderPos(header, 'COL')
+        flagPos = getHeaderPos(header, 'FLAG')
+        datePos = getHeaderPos(header, 'DATE-OBS')
+        for res in results:
+            if res[flagPos] == 'K' and res[datePos] == obsDate and res[colorPos] == color:
+                return res
+        return None
 
     def process(self):
 
@@ -216,6 +254,7 @@ class MainApp:
         'out' : None,  # output folder
         'rpt' : 'aavso',  # report format, default: aavso extended
         'name': '?',  # observer name code
+        'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
         'files': None,
         }
 

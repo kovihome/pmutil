@@ -106,11 +106,11 @@ class Photometry:
 
         result = []
         for pm in refCat['cat']:
-            if pm[rolePos] == 'V' or pm[rolePos] == 'VF':
+            if pm[rolePos] == 'V' or pm[rolePos] == 'VF' or pm[rolePos] == 'K':
 #            if pm[rolePos] == 'V':
                 mv = p[0] * float(pm[miPos]) + p[1]
                 pm[mvPos] = mv
-                if err:
+                if err and pm[rolePos] != 'VF':
                     pm[evPos] = float(pm[eiPos]) + err
                 result.append(pm)
         # print (result)
@@ -125,6 +125,9 @@ class Photometry:
                    ei[k] - error of instrumental mgs    MAGERR_ISOCORR | MAGERR_BEST
                    es[k] - error of standard mgs        ERR_R | ERR_V | ERR_B
         '''
+
+        self.findBestCompStar(refCat, color)
+
         stdcolor = color[:1].upper()
         if stdcolor == 'G':
             stdcolor = 'V'
@@ -217,6 +220,8 @@ class Photometry:
         '''
         # TODO: calculate comp mag error
 
+        self.findBestCompStar(refCat, color)
+
         stdcolor = color[:1].upper()
         if stdcolor == 'G':
             stdcolor = 'V'
@@ -231,18 +236,24 @@ class Photometry:
         mv = []
         er = []
 #    p = [1.0, 0.0]
+        ep = 0.0
+        N = 0
         for pm in refCat['cat']:
             if pm[rolePos] == 'C' and pm[mvPos] != '-':
                 mi.append(float(pm[miPos]))
                 mv.append(float(pm[mvPos]))
                 ei = float(pm[eiPos])
                 ev = float(pm[evPos])
-                er.append(1.0 / ei * ei + ev * ev)
+                e2 = ei * ei + ev * ev
+                ep = ep + sqrt(e2)
+                N = N + 1
+                er.append(1.0 / e2)
 
 #        p = Polynomial.fit(mi, mv, 1, w = er)
         coef = self.linfit(mi, mv, er)
+        ep = ep / sqrt(float(N * N * N))
 
-        # print ('polyfit result:', p)
+        print ('polyfit result:', coef, 'error:', ep)
 
         xr = arange(min(mi), max(mi), 0.01)
         plt.plot(mi, mv, 'go', xr, coef[0]*xr+coef[1], 'k')
@@ -252,40 +263,64 @@ class Photometry:
         
         # apply result to variables
 #        result = self.transformMgs(refCat, stdcolor, [p.coef[1], p.coef[0]])
-        result = self.transformMgs(refCat, stdcolor, coef)
+        result = self.transformMgs(refCat, stdcolor, coef, ep)
         return result
 
-    def calculateMgsComparision(self, refCat, color):
+    def findBestCompStar(self, refCat, color):
         stdcolor = color[:1].upper()
         if stdcolor == 'G':
             stdcolor = 'V'
 
         idPos = getHeaderPos(refCat, fieldAuid)
         mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        miPos = getHeaderPos(refCat, fieldMgInstrumental)
+        #miPos = getHeaderPos(refCat, fieldMgInstrumental)
         evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
         eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
         rolePos = getHeaderPos(refCat, fieldRole)
 
-        # find best comp star
-        p = [1.0, 0.0]
+        #p = [1.0, 0.0]
         emin = 1.0
-        ep = 0.0
+        #ep = 0.0
         compId = None
+        bestComp = None
         for pm in refCat['cat']:
             if pm[rolePos] == 'C' and pm[mvPos] != '-':
-#               if comp != None and pm[idPos] == comp:
-#                   p = float(pm[mvPos]) - float(pm[miPos])
-#                   ep = float(pm[evPos]) + float(pm[eiPos])
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
                 ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
                 e = ei * ei + ev * ev
                 if e < emin:
                     emin = e
-                    p[1] = float(pm[mvPos]) - float(pm[miPos])
-                    ep = ev + ei
-                    compId = pm[idPos]
-        print('Best comp star: %s, poly: [ %4.3f, %4.3f ], err: %4.3f' % (compId, p[0], p[1], ep))
+                    bestComp = pm
+                    #p[1] = float(pm[mvPos]) - float(pm[miPos])
+                    #ep = ev + ei
+                    #compId = pm[idPos]
+        
+        ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
+        ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
+        e = sqrt(ei * ei + ev * ev)
+        bestComp[rolePos] = 'K'
+        print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPos], e))
+        return bestComp
+
+
+    def calculateMgsComparision(self, refCat, color):
+        stdcolor = color[:1].upper()
+        if stdcolor == 'G':
+            stdcolor = 'V'
+
+#        idPos = getHeaderPos(refCat, fieldAuid)
+        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
+        miPos = getHeaderPos(refCat, fieldMgInstrumental)
+        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
+        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+#        rolePos = getHeaderPos(refCat, fieldRole)
+
+        # find best comp star
+        bestComp = self.findBestCompStar(refCat, color)
+        p = [ 1.0, float(bestComp[mvPos]) - float(bestComp[miPos]) ]
+        ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
+        ev = float(bestComp[evPos]) if bestComp[evPos] != '-' else MAG_ERR_DEFAULT
+        ep = sqrt(ei * ei + ev * ev)
 
         # apply result to variables
         result = self.transformMgs(refCat, stdcolor, p, ep)
@@ -358,11 +393,16 @@ class Photometry:
             r.write(res[decPos].ljust(20))
             r.write(dateObs.ljust(20))
             r.write(jds.ljust(20))
-            flag = "F" if res[rolePos] == "VF" else "-"
+            if res[rolePos] == 'VF':
+                flag = 'F'
+            elif res[rolePos] == 'K':
+                flag = 'K'
+            else:
+                flag = '-'
             r.write(flag.ljust(5))
-            r.write(("%6.3f" % float(res[mvPos])).ljust(20))
+            r.write(("%6.3f" % (float(res[mvPos]))).ljust(20))
             r.write(color.ljust(5))
-            r.write(("%5.3f" % float(res[evPos])).ljust(20))
+            r.write(("%5.3f" % (float(res[evPos])) if res[evPos] != '-' else '-').ljust(20))
             r.write('\n')
 
         r.close()
@@ -436,7 +476,6 @@ class Photometry:
         return merged
 
     def linfit(self, x, y, w = None):
-        # TODO: wieghts
         N = len(x)
         X = 0.0
         Y = 0.0

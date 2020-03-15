@@ -3,14 +3,6 @@ TODO
 
 - !!! refcat: saveCommand rossz konyvtarba teszi a commandot
 
-+(511) !!! PHOT: filterezesnel, a nem match-elo valtozot fainter-nek vesszuk, pedig lehet, hogy csak nincs a kepen
-
-	+ a grmatch megtalalja, pedig nem kellene
-
-	+ meg kellene probalni a wcs-rdls2xy -> grmatch (xy) modszert
-
-	- a ref.cat.fits file kesziteses a refCat-ban legyen
-
 - pythonositas:
 	ppl-setup		pmsetup.py
 	ppl-clean		pmclean.py		link
@@ -19,34 +11,26 @@ TODO
 
 	- a filterben is van hmg szamolas, ugyan annak kell lennie a kettonek
 
-(516) AST: 20090717_ez_aql eseteben sikertelen az asztrometria, B es G szinben, R-ben is eszmeletlen sokaig tart
-
-(515) COLORIZE: 20090717_nsv_11154 eseteben elszall sqrt modban, linearban ok
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-colorize", line 148, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-colorize", line 140, in run
-	    col.execute()
-	  File "/home/kovi/bin/ppl-colorize", line 77, in execute
-	    imsave(imgFileName, img)
-	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/image.py", line 1496, in imsave
-	    rgba = sm.to_rgba(arr, bytes=True)
-	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/cm.py", line 271, in to_rgba
-	    raise ValueError("Floating point image RGB values "
-	ValueError: Floating point image RGB values must be in the 0..1 range.
-
-(513) AST: egy objektum fotometralasanal, az elso kepbol ki kell szedni a koordinatakat (CRVAL1, CRVAl2), 
-	es felhasznalni a tobbi kepnel hintnek.
-
-(514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
-	es ne kelljen meg egyszer meghivni
-
 - Katalogus kezeles astropy.table.Table segitsegevel
 
-- configure: add matplotlib
+- fiphot: sextractor helyett
 
-- doc: ppl-photometry --show-coeff option, matplotlib dependency
-	
+- SCAMP: grmatch helyett
+
+- cosmetic: less output from photometry (sextractor) apps
+
+- more standard areas:
+
+	AAVSO VSP:
+
+	Table 6.1 – Standard clusters
+	Name              RA       Dec       Mag Range Diameter(arc min)
+	NGC 1252          03:10:49 -57:46:00 8 – 15    300+
+	M67               08:51:18 +11:48:00 7 – 16    74
+	NGC 3532          11:05:39 -58:45:12 8 – 13.5  30
+	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450
+	M11               18:51:05 -06:16:12 8.5 – 17  20
+	NGC 7790          23:58:23 +61:12:25 10 – 20   7
 
 
 === V 1.1 ==================================================
@@ -68,13 +52,15 @@ TODO
 	FICOMBINE_ARGS:
 		m [sum] (combination algorithm)
 
+(453) FITS headerek
+
 --- calibration --------------------------------------------
 
-(448) create/use 3D/4D FITS
+(490) Flat library
+
+(459) Dark library kezelés
 
 --- photometry ---------------------------------------------
-
-(449) hot and dead pixel removing with fiign
 
 (450) !!! standardization (s15n)
 
@@ -97,21 +83,31 @@ TODO
 
 	+ refcat kezelje a SA nevu objektumokat
 
-- fiphot: sextractor helyett
-
-- SCAMP: grmatch helyett
+	+ a pmresult-nak at kell adni a modszert, hogy tudja, hogy comp/ensemble volt-e
 
 (452) pmphot: calculate mg with some different method, and put in the result catalog file
 
 	+ auto comp star selection, by the least instrumental error value
-	
-(483) az aavso riport file-ban vannak kitoltetlen mezok: 
-    cmag = 'na'  # TODO: set comp star mg if not ensemble
-    kname = 'na'  # TODO: specify ensemble reference comp star when ensemble, or set a check star
-    kmag = 'na'  # TODO: set measured mg of check star
-    airmass = 'na'  # TODO: calculate airmass
 
-- cosmetic: less output from photometry (sextractor) apps
+	- ensemble mags need auto comp^check star too
+
+	- put comp star data into .pm file for reporting: id, calculated mg?
+	
++(511) PHOT: filterezesnel, a nem match-elo valtozot fainter-nek vesszuk, pedig lehet, hogy csak nincs a kepen
+
+	+ a grmatch megtalalja, pedig nem kellene
+
+	+ meg kellene probalni a wcs-rdls2xy -> grmatch (xy) modszert
+
+	/ a ref.cat.fits file kesziteses a refCat-ban legyen
+
++(483) az aavso riport file-ban vannak kitoltetlen mezok: 
+    +cmag = 'na'  # TODO: set comp star mg if not ensemble
+    +kname = 'na'  # TODO: specify ensemble reference comp star when ensemble, or set a check star
+    +kmag = 'na'  # TODO: set measured mg of check star
+    +airmass = 'na'  # TODO: calculate airmass
+
+(449) hot and dead pixel removing with fiign
 
 
 === V 1.2 ==================================================
@@ -122,24 +118,76 @@ TODO
 
 --- photometry ---------------------------------------------
 
-(451) whole frame photometry
-
-(488) Tranziens detektálás
+(510) PSF fotometria ködös objektumok esetén
 
 (489) Referencia katalógus tartalmazzon mezőcsillagokat is
 
+(488) Tranziens detektálás
 
-=== NOT VERSIONED  ==================================================
+(451) whole frame photometry
 
-(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
+=== V 2.0 ==================================================
 
-(482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
+(493) Szűrő nélküli CCD képek kezelése
 
 --- calibration --------------------------------------------
+
+(515) COLORIZE: 20090717_nsv_11154 eseteben elszall sqrt modban, linearban ok
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-colorize", line 148, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-colorize", line 140, in run
+	    col.execute()
+	  File "/home/kovi/bin/ppl-colorize", line 77, in execute
+	    imsave(imgFileName, img)
+	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/image.py", line 1496, in imsave
+	    rgba = sm.to_rgba(arr, bytes=True)
+	  File "/home/kovi/.local/lib/python3.6/site-packages/matplotlib/cm.py", line 271, in to_rgba
+	    raise ValueError("Floating point image RGB values "
+	ValueError: Floating point image RGB values must be in the 0..1 range.
 
 (502) Ha a valamelyik kep nem match-el, es szekvenciat adunk ossze, akkor nem lesz jo a szekvencia, 
 	elcsuszik, es a szinek is elcsusznak egymashoz kepes
 	A pythonos verzioban a szekvencia szamolaskor ezt figyelembe kell venni, a szekvenciabol kihagyni
 
+(501) Utility: regisztráció és stackelés
+
+(448) Create/use 3D/4D FITS
+
+(472) A RAW -> FITS konverziónál ne csak CR2 file-okat tudjon konvertálni
+
 --- photometry ---------------------------------------------
+
+(516) AST: 20090717_ez_aql eseteben sikertelen az asztrometria, B es G szinben, R-ben is eszmeletlen sokaig tart
+
+(491) Két szín fotometria
+
+(461) Fénygörbe készítése
+
+=== NOT VERSIONED  ==================================================
+
+(482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
+
+(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
+
+	- printDebug()
+
+	- esetleg Print/Log class, Print.info(), etc. metodusokkal, init-ben log mode
+
+--- calibration --------------------------------------------
+
+(492) Szintetikus bias, dark és flat képek használata
+
+(473) Master flat kép analízis
+
+(471) Gi csatornák összegzése átlagolás helyett
+
+--- photometry ---------------------------------------------
+
+(514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
+	es ne kelljen meg egyszer meghivni
+
+(513) AST: egy objektum fotometralasanal, az elso kepbol ki kell szedni a koordinatakat (CRVAL1, CRVAl2), 
+	es felhasznalni a tobbi kepnel hintnek.
+
 

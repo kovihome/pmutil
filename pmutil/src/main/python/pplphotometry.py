@@ -197,6 +197,7 @@ class Pipeline:
                 'out' : REPORT_FOLDER,  # output folder
                 'rpt' : 'aavso',  # report format, default: aavso extended
                 'name': self.opt['nameCode'],  # observer name code
+                'method' : self.opt['method'], # mg calculation method, comp - single com star, gcx/lfit - ensemble
                 'files': PM_FILES,
                 }
             proc = ReportProcessor(opt)

@@ -358,6 +358,8 @@ class RefCat:
 
         if self.opt['folder']:
 
+            # create link to refcat in given folder
+            linkName = self.opt['folder'] + 'ref.cat'
             for f in glob(self.opt['folder'] + '*.cat'):
                 remove(f)
             symlink(outFileName, self.opt['folder'] + 'ref.cat')

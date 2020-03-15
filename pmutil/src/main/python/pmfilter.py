@@ -13,6 +13,7 @@ from getopt import getopt, GetoptError
 from sys import argv
 from astropy.table import Table
 from astropy.io import fits
+from os import remove
 from os.path import exists
 from math import sqrt
 
@@ -92,6 +93,8 @@ class CatalogMatcher:
         axyFile = pmCatFile.replace('.cat', '.ref.axy')
         invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG -f " % (wcsFile, refFitsFile, axyFile))
 
+        remove(refFitsFile)
+
         # 3. merge frame xy point to refCat
         refCatExFile = pmCatFile.replace('.cat', '.axy.cat')
         tlen = len(table)
@@ -99,6 +102,7 @@ class CatalogMatcher:
         table['Y'] = [0.0] * tlen
         table['ID'] = [0] * tlen
         table['ROLE_'] = ['AA'] * tlen
+        table['HMG_'] = [0.0] * tlen
 
         f = fits.open(axyFile)
         d = f[1].data
@@ -148,6 +152,7 @@ class CatalogMatcher:
                 if table[j]['ROLE'] == 'V' and float(pmrow['MAG_BEST']) > hmgs[1]:
                     print('   and under limit, mi:%7.3f, hmg:%7.3f' % (float(pmrow['MAG_BEST']), hmgs[1]))
                     table[j]['ROLE_'] = 'VF'
+                    table[j]['HMG_'] = hmgs[1]
                 else:
                     table[j]['ROLE_'] = table[j]['ROLE']
             elif onFrameStatus == 'B' and matched:
@@ -163,6 +168,7 @@ class CatalogMatcher:
                 print('AUID: %s, ID:%d, d:%f, BAD-MATCH, out-of-frame and mathed' % (table[j]['AUID'], pmid, d))
             elif onFrameStatus == '' and not matched:
                 table[j]['ROLE_'] = table[j]['ROLE'] + 'F'
+                table[j]['HMG_'] = hmgs[1]
                 print('AUID: %s, FAINTER, on-frame and not mathed' % (table[j]['AUID']))
                 print('   and under limit, hmg:%7.3f' % (hmgs[1]))
             elif onFrameStatus == 'B' and not matched:
@@ -190,20 +196,26 @@ class CatalogMatcher:
         outf.write('\n')
 
 #        rlen = len(refCat['header'])
+        goodRoles = [ 'C', 'V', 'VF' ]
         for ref in refTable:
+            if ref['ROLE_'] not in goodRoles:
+                continue
+            pm = None
             if ref['ID'] != 0:
                 pm = pmTable[ref['ID'] - 1]
+            else:
+                pm = { 'NUMBER':'-', 'MAG_ISOCOR': ref['HMG_'], 'MAGERR_ISOCOR':'-', 'MAG_BEST': ref['HMG_'], 'MAGERR_BEST':'-', 'ALPHA_J2000':'-', 'DELTA_J2000':'-' }
 
-                for h in self.refHeaders:
-                    v = str(ref[h])
-                    if v == '-1.0':
-                        v = '-'
-                    outf.write(v.ljust(15))
-                for h in self.pmHeaders:
-                    outf.write(str(pm[h]).ljust(15))
-                for h in self.refTrailerHeaders:
-                    outf.write(str(ref[h]).ljust(30))
-                outf.write('\n')
+            for h in self.refHeaders:
+                v = str(ref[h])
+                if v == '-1.0':
+                    v = '-'
+                outf.write(v.ljust(15))
+            for h in self.pmHeaders:
+                outf.write(str(pm[h]).ljust(15))
+            for h in self.refTrailerHeaders:
+                outf.write(str(ref[h]).ljust(30))
+            outf.write('\n')
 
         outf.close()
         print ('outpuf file: ', outFileName)
