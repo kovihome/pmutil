@@ -13,18 +13,19 @@ from matplotlib.image import imsave
 from astropy.io import fits
 from numpy import zeros
 
-from pmbase import printError, printWarning, printInfo, loadPplSetup, Blue, Color_Off, BGreen
+from pmbase import printError, printInfo, loadPplSetup, Blue, Color_Off, BGreen
 import img_scale
+
 
 class Colorize:
 
-    opt = {}                 # command line options
-    pplSetup = {}            # PPL setup from ppl-setup config file
+    opt = {}  # command line options
+    pplSetup = {}  # PPL setup from ppl-setup config file
 
     scaleMethods = ['linear', 'sqrt', 'log', 'asinh']
 
 #    wb = [1.15, 1.0, 0.79]   # for Canon EOS 1100D
-    wb = [1.25, 1.0, 0.96]   # for Canon EOS 1100D sRGB
+    wb = [1.25, 1.0, 0.96]  # for Canon EOS 1100D sRGB
 #   wb = [1.12, 1.0, 0.77]   # for Canon EOS 350D
 #   wb = [1.04, 1.0, 0.72]   # for Canon EOS 450D
 #   wb = [0.98, 1.0, 0.82]   # for Canon EOS 1300D
@@ -62,13 +63,13 @@ class Colorize:
             smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
 #            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
             if self.SCALE_METHOD == self.scaleMethods[0]:
-                img[:,:,j] = img_scale.linear(rgb[j], scale_min=smin, scale_max=smax)
+                img[:, :, j] = img_scale.linear(rgb[j], scale_min = smin, scale_max = smax)
             elif self.SCALE_METHOD == self.scaleMethods[1]:
-                img[:,:,j] = img_scale.sqrt(rgb[j], scale_min=smin, scale_max=smax)
+                img[:, :, j] = img_scale.sqrt(rgb[j], scale_min = smin, scale_max = smax)
             elif self.SCALE_METHOD == self.scaleMethods[2]:
-                img[:,:,j] = img_scale.log(rgb[j], scale_min=smin, scale_max=smax)
+                img[:, :, j] = img_scale.log(rgb[j], scale_min = smin, scale_max = smax)
             elif self.SCALE_METHOD == self.scaleMethods[3]:
-                img[:,:,j] = img_scale.asinh(rgb[j], scale_min=smin, scale_max=smax)
+                img[:, :, j] = img_scale.asinh(rgb[j], scale_min = smin, scale_max = smax)
 
         # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
         # need som normalization
@@ -78,15 +79,13 @@ class Colorize:
         printInfo("Color image %s created." % (imgFileName))
 
 
-
 class MainApp:
-    
+
     # TODO: wb should be command line option somehow
     opt = {
         'scaleMethod': 'linear',
         'baseFolder': None,
         }
-
 
     def __init__(self, argv):
         self.argv = argv
@@ -97,7 +96,6 @@ class MainApp:
         print(BGreen + "pmcolorize, version 1.1.0 " + Color_Off)
         print(Blue + "Make color jpeg image from calibrated FITS images." + Color_Off)
         print()
-
 
     def usage(self):
         print("Usage: pmcolorize [OPTIONS]... [BASE_FOLDER]")
@@ -139,8 +137,8 @@ class MainApp:
         col = Colorize(self.opt)
         col.execute()
 
-
 # main program
+
 
 if __name__ == '__main__':
 

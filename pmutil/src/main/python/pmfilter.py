@@ -35,7 +35,7 @@ class CatalogMatcher:
     HMG_MAX_ERR = 0.4
     HMG_SIGMA = 3.0
 
-    IMAGE_BORDER_SIZE = 10 # pixels
+    IMAGE_BORDER_SIZE = 10  # pixels
 
     def __init__(self, opt):
         self.opt = opt
@@ -74,7 +74,6 @@ class CatalogMatcher:
             return 'B'
         return ''
 
-
     def matchCatalogsByGrmatchPoints(self, refCatFile, pmCatFile, outFile):
         '''
         Match reference catalog with sextractor's .cat file by frame xy points
@@ -82,9 +81,9 @@ class CatalogMatcher:
 
         # 1. convert refCat to fits format
         # TODO: move this part into pmrefcat, do this when the reference catalog is created
-        
-        refFitsFile = refCatFile + '.fits'  #'ref_cat.fits'
-        table = Table.read(refCatFile, format='ascii')
+
+        refFitsFile = refCatFile + '.fits'  # 'ref_cat.fits'
+        table = Table.read(refCatFile, format = 'ascii')
         if not exists(refFitsFile):
             table.write(refFitsFile)
 
@@ -96,7 +95,7 @@ class CatalogMatcher:
         remove(refFitsFile)
 
         # 3. merge frame xy point to refCat
-        refCatExFile = pmCatFile.replace('.cat', '.axy.cat')
+#        refCatExFile = pmCatFile.replace('.cat', '.axy.cat')
         tlen = len(table)
         table['X'] = [0.0] * tlen
         table['Y'] = [0.0] * tlen
@@ -108,7 +107,7 @@ class CatalogMatcher:
         d = f[1].data
 
         for j in range(tlen):
-            x,y = d[j]
+            x, y = d[j]
             table[j]['X'] = x
             table[j]['Y'] = y
 
@@ -120,8 +119,8 @@ class CatalogMatcher:
         astFile = pmCatFile.replace('.cat', '.ast.fits')
         im_x, im_y = self.readFrameSize(astFile)
 
-        idTable = Table.read(idFile, format='ascii')
-        pmTable = Table.read(pmCatFile, format='ascii')
+        idTable = Table.read(idFile, format = 'ascii')
+        pmTable = Table.read(pmCatFile, format = 'ascii')
 
         hmgs = self.hmg(pmTable)
         print("Instumental HMG: HMG_ISOCORR = %8.4f, HMG_BEST = %8.4f" % (hmgs[0], hmgs[1]))
@@ -140,7 +139,7 @@ class CatalogMatcher:
             pmid = int(table[j]['ID'])
             d = -1.0
             if id != 0:
-                pmrow = pmTable[pmid-1]
+                pmrow = pmTable[pmid - 1]
                 dx = pmrow['XWIN_IMAGE'] - table[j]['X']
                 dy = pmrow['YWIN_IMAGE'] - table[j]['Y']
                 d = sqrt(dx * dx + dy * dy)
@@ -178,9 +177,8 @@ class CatalogMatcher:
                 table[j]['ROLE_'] = table[j]['ROLE'] + 'O'
                 print('AUID: %s, OK, out-of-frame and not mathed' % (table[j]['AUID']))
 
-	# save result
+        # save result
         self.dumpResult(table, pmTable, outFile)
-
 
     def dumpResult(self, refTable, pmTable, outFileName):
 
@@ -223,7 +221,6 @@ class CatalogMatcher:
     def process(self):
 
         self.matchCatalogsByGrmatchPoints(self.opt['ref'], self.opt['files'][0], self.opt['out'])
-
 
 
 class MainApp:

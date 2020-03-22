@@ -53,14 +53,15 @@ def getHeaderPos(hdr, headerName):
         index = index + 1
     return None
 
+
 # create report
 class ReportProcessor:
 
     NOT_AVAILABLE = 'na'
 
-    opt = {}                 # command line options
-    pplSetup = {}            # PPL setup from ppl-setup config file
-    pos = None               # catalog header positions
+    opt = {}  # command line options
+    pplSetup = {}  # PPL setup from ppl-setup config file
+    pos = None  # catalog header positions
 
     chartId = NOT_AVAILABLE
 
@@ -72,7 +73,7 @@ class ReportProcessor:
         'R' : 'R',
         'B' : 'B'
     }
- 
+
     def __init__(self, opt):
         self.opt = opt
 
@@ -83,7 +84,7 @@ class ReportProcessor:
             if len(catfiles) < 1:
                 return self.NOT_AVAILABLE
             catfile = catfiles[0]
-        
+
         cf = open(catfile)
         chartId = self.NOT_AVAILABLE
         for line in cf:
@@ -95,11 +96,11 @@ class ReportProcessor:
         return chartId
 
     def calcAirmass(self, ra, dec, obsDate):
-        co = SkyCoord(ra, dec, frame=ICRS, unit=(u.hourangle, u.deg))
+        co = SkyCoord(ra, dec, frame = ICRS, unit = (u.hourangle, u.deg))
         t = Time(obsDate.replace('T', ' '))
         # TODO: store observer's location in config
         loc = EarthLocation.of_address('Budapest')
-        hc = co.transform_to(AltAz(obstime=t, location=loc))
+        hc = co.transform_to(AltAz(obstime = t, location = loc))
         return float(hc.secz)
 
     def reportForAAVSO(self, allResults, header, outFolder, obsName):
@@ -249,7 +250,7 @@ class ReportProcessor:
 
 
 class MainApp:
-    
+
     opt = {
         'out' : None,  # output folder
         'rpt' : 'aavso',  # report format, default: aavso extended
@@ -295,7 +296,7 @@ class MainApp:
 
 if __name__ == '__main__':
 
-    app = MainApp(argv)
+    app = MainApp(sys.argv)
     app.run()
 
 # end main.

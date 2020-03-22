@@ -8,7 +8,6 @@ Created on Jan 1, 2020
 @author: kovi
 '''
 
-from sys import argv
 from os import getenv, makedirs
 from os.path import isfile
 from datetime import datetime
@@ -57,17 +56,19 @@ def invoke(cmd):
     a = subprocess.check_output(r)
     return a.decode('ascii')[:-1]
 
+
 def invokep(cmds):
     r = cmds[0].split()
     p = []
-    p.append(subprocess.Popen(r, stdout=subprocess.PIPE))
+    p.append(subprocess.Popen(r, stdout = subprocess.PIPE))
     j = 0
     for cmd in cmds[1:]:
         r = cmd.split()
-        p.append(subprocess.Popen(r, stdin=p[j].stdout , stdout=subprocess.PIPE))
+        p.append(subprocess.Popen(r, stdin = p[j].stdout , stdout = subprocess.PIPE))
         j += 1
     out = p[j].communicate()
     return out[0].decode('ascii')[:-1]
+
 
 def hexa2deg(s):
     r = s.split(':')
@@ -166,9 +167,9 @@ def saveCommand(basePath, argv, cmdName):
         FOLDERS = [ './' ]
     elif isfile(basePath):
         path = ""
-        j = folder.rfind("/")
+        j = basePath.rfind("/")
         if j != -1:
-            path = folder[:j + 1]
+            path = basePath[:j + 1]
         FOLDERS = [ path ]
     else:
         FOLDERS = glob('*' + basePath + '*/')
@@ -214,12 +215,14 @@ def getFitsHeader(fitsFileName, header):
     else:
         return None
 
+
 def setFitsHeader(fitsFileName, headerName, headerValue, comment = None):
     if comment:
-        headers = { headerName: ( headerValue, comment ) }
+        headers = { headerName: (headerValue, comment) }
     else:
         headers = { headerName: headerValue }
     setFitsHeaders(fitsFileName, headers)
+
 
 def setFitsHeaders(fitsFileName, headers):
     try:
@@ -234,17 +237,16 @@ def setFitsHeaders(fitsFileName, headers):
     hdul.flush()
     hdul.close()
 
+
 def findInFile(fileName, s):
     f = open(fileName)
     for line in f:
         if s in line:
-             f.close()
-             return line
+            f.close()
+            return line
     f.close()
     return None
 
-
 # end pmbase.
-
 
 # end pmbase.

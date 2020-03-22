@@ -194,13 +194,13 @@ class RefCat:
         configFolder = self.ppl["CONFIG_FOLDER"]
         if configFolder == None:
             configFolder = "$HOME/.pmlib"
-        
+
         # load stdArea file
         saFieldsFile = configFolder + "/landolt_fields.txt"
         if not exists(saFieldsFile):
             printError("Landolt standard field catalog file %s not found" % (saFieldsFile))
             return 'NoFile'
-        saFields = Table.read(saFieldsFile, format='ascii')
+        saFields = Table.read(saFieldsFile, format = 'ascii')
 
         # find std area
         rows = list(filter(lambda r: r['FIELD_NAME'] == saName, saFields))
@@ -219,7 +219,7 @@ class RefCat:
         if not exists(saStarsFile):
             printError("Landolt standard stars catalog file %s not found" % (saStarsFile))
             return 'NoFile'
-        saStars = Table.read(saStarsFile, format='ascii')
+        saStars = Table.read(saStarsFile, format = 'ascii')
 
         # find std stars
         stars = list(filter(lambda r: r['FIELD_NAME'] == saName, saStars))
@@ -248,7 +248,7 @@ class RefCat:
             label = saName + ":" + star['STAR']
 
             self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label)
-          
+
         print("%d standard star found for standard area %s" % (len(stars), saName))
         return None
 
@@ -258,7 +258,6 @@ class RefCat:
             outFile.write(s + "\n")
         else:
             print(s)
-
 
     def getPair(self, s, delim = ','):
         ss = s.split(delim)
@@ -359,7 +358,6 @@ class RefCat:
         if self.opt['folder']:
 
             # create link to refcat in given folder
-            linkName = self.opt['folder'] + 'ref.cat'
             for f in glob(self.opt['folder'] + '*.cat'):
                 remove(f)
             symlink(outFileName, self.opt['folder'] + 'ref.cat')

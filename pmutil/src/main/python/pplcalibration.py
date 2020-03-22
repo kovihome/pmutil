@@ -13,12 +13,12 @@ from getopt import getopt, GetoptError
 from sys import argv
 from datetime import datetime, timedelta
 import glob
-from os import makedirs, remove
+from os import makedirs
 from os.path import isdir, exists, basename
 from shutil import copyfile
 import time
 
-from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, invokep, setFitsHeaders, findInFile
+from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile
 from pmdisco import Discovery
 
 
@@ -93,7 +93,7 @@ class Pipeline:
         FITS_NAME = "%s-%s.fits" % (rawfile[:rawfile.rfind('.')], color)
         if self.opt['overwrite'] and exists(FITS_NAME):
             os.remove(FITS_NAME)
-     
+
         if not exists(FITS_NAME):
             print("%s -> %s" % (rawfile, FITS_NAME))
 
@@ -494,7 +494,7 @@ class MainApp:
         'onError'   : 'noop',  # mg calculation method: comp, gcx, lfit
         'overwrite': False,  # force to overwrite existing results, optional
         'baseFolder': None,  # base folder, optional
-        'calibFolder': None, # optional folder for calibration frames (bias, dark, flat)
+        'calibFolder': None,  # optional folder for calibration frames (bias, dark, flat)
         }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
