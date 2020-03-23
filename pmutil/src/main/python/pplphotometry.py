@@ -36,6 +36,7 @@ class Pipeline:
 
         # Names of the sequence/combined files:
         SEQLIST = glob(seqFolder + '/' + self.pplSetup['SEQ_FILE_PREFIX'] + '*-' + color + '.fits')
+        SEQLIST.sort()
         if len(SEQLIST) == 0:
             SEQLIST = glob(seqFolder + '/Combined-' + color + '.fits')
             if len(SEQLIST) == 0:
@@ -69,8 +70,6 @@ class Pipeline:
             PMCAT_FILE_FLT = PMCAT_FILE + ".cat"
             printInfo("Filtering result catalog to %s" % (PMCAT_FILE_FLT))
             if not exists(PMCAT_FILE_FLT) or self.opt['overwrite']:
-                # TODO: call directly
-                # invoke("pmfilter -c %s -r %s -o %s %s" % (color, refcatFileName, PMCAT_FILE_FLT, PMCAT_FILE))
                 opt = {
                     'ref' : refcatFileName,
                     'out' : PMCAT_FILE_FLT,
@@ -90,9 +89,10 @@ class Pipeline:
         # Names of the sequence/combined files:
         color = colors[0]
         PHOTLIST = glob(photFolder + '/' + self.pplSetup['SEQ_FILE_PREFIX'] + '*-' + color + '.cat.cat')
+        PHOTLIST.sort()
         if len(PHOTLIST) == 0:
             PHOTLIST = glob(photFolder + '/Combined-' + color + '.cat.cat')
-            print(PHOTLIST)
+#            print(PHOTLIST)
             if len(PHOTLIST) == 0:
                 printWarning("No files for calculate magnitudes in folder %s" % (photFolder))
                 return False

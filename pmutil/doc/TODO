@@ -1,17 +1,80 @@
 TODO
 ----
 
-- !!! refcat: saveCommand rossz konyvtarba teszi a commandot
+(521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
+
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-photometry", line 341, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-photometry", line 332, in run
+	    ppl.execute()
+	  File "/home/kovi/bin/ppl-photometry", line 176, in execute
+	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
+	  File "/home/kovi/bin/ppl-photometry", line 142, in process_photometry
+	    self.calculateMags(photFolder, self.opt['color'])
+	  File "/home/kovi/bin/ppl-photometry", line 118, in calculateMags
+	    phot.process()
+	  File "/home/kovi/bin/pmphot.py", line 781, in process
+	    bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
+	  File "/home/kovi/bin/pmphot.py", line 397, in findBestCompStar
+	    bestComp[rolePos] = 'K'
+	TypeError: 'NoneType' object does not support item assignment
+
+
+(520) !!! pmphot: elszall, ha nincs R mg. Kellene valami vizsgalat, hogy ha all color lett megadva, hogy az oh-k jok-e ehhez. 
+	Ha hianyzik mondjuk az R mag, akkor vagy kapcsoljon at ketszin fotometriara, vagy irjon ki hibauzenetet
+
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-photometry", line 341, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-photometry", line 332, in run
+	    ppl.execute()
+	  File "/home/kovi/bin/ppl-photometry", line 176, in execute
+	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
+	  File "/home/kovi/bin/ppl-photometry", line 142, in process_photometry
+	    self.calculateMags(photFolder, self.opt['color'])
+	  File "/home/kovi/bin/ppl-photometry", line 118, in calculateMags
+	    phot.process()
+	  File "/home/kovi/bin/pmphot.py", line 792, in process
+	    coeffs = self.calculateCoeffs(mergedCat)
+	  File "/home/kovi/bin/pmphot.py", line 612, in calculateCoeffs
+	    V_R.append(float(row[2]) - float(row[3]))
+	ValueError: could not convert string to float: '-'
+
+
+- !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
+
+- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
+
++ ppl-fotometria: a seq fileokat lougrasban dolgozza fel, itt is sort-olni kellene elotte
+
+- autoclean: lehetne egy kapcsolo, hogy a feldolgozas vegen tol egy clean-t, es csak az eredmeny file-ok maradnak meg
+
+- pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
+
++ refcat: saveCommand rossz konyvtarba teszi a commandot
+
+- !!! pmfilter: hmg szamitas felulvizsgalata
+
+- more standard areas:
+
+	AAVSO VSP:
+
+	Table 6.1 – Standard clusters
+	Name              RA       Dec       Mag Range Diameter(arc min)
+	NGC 1252          03:10:49 -57:46:00 8 – 15    300+
+	M67               08:51:18 +11:48:00 7 – 16    74
+	NGC 3532          11:05:39 -58:45:12 8 – 13.5  30
+	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450
+	M11               18:51:05 -06:16:12 8.5 – 17  20
+	NGC 7790          23:58:23 +61:12:25 10 – 20   7
 
 - pythonositas:
 	ppl-setup		pmsetup.py
-	ppl-clean		pmclean.py		link
-
-- !!! PHOT: hmg szamitas felulvizsgalata
-
-	- a filterben is van hmg szamolas, ugyan annak kell lennie a kettonek
 
 - Katalogus kezeles astropy.table.Table segitsegevel
+
+	pmphot, pmresult
 
 - fiphot: sextractor helyett
 
@@ -37,35 +100,28 @@ TODO
 
 - cosmetic: less output from photometry (sextractor) apps
 
-- more standard areas:
-
-	AAVSO VSP:
-
-	Table 6.1 – Standard clusters
-	Name              RA       Dec       Mag Range Diameter(arc min)
-	NGC 1252          03:10:49 -57:46:00 8 – 15    300+
-	M67               08:51:18 +11:48:00 7 – 16    74
-	NGC 3532          11:05:39 -58:45:12 8 – 13.5  30
-	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450
-	M11               18:51:05 -06:16:12 8.5 – 17  20
-	NGC 7790          23:58:23 +61:12:25 10 – 20   7
-
 - PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
 	a kep koordinataja alapjan keszitsen refcat-ot
 	a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
 		vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
 	feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
 
-- mg calc: lfit - legyen itt is kappa-sigma iteracio
-	lehet, hogy lfit egyaltalan nem kell
++ pmfilter: wcs-rd2xy: option requires an argument -- 'f'
 
-- mg calc: coeff szamolasnal is legyen kappa-sigma iteracio ???
-
-- szaturalt csillagok kezelese, ha tul fenyes a csillag, akkor nem szabad fotometralni, se comp starnak hasznalni
-	ezt a kappa-sigma kimutatja?
+	+ all argumentumot kapott, ettol elszallt, a -f nelkul ok
 
 
 === V 1.1 ==================================================
+
+(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
+
+	- printDebug()
+
+	- esetleg Print/Log class, Print.info(), etc. metodusokkal, init-ben log mode
+
+	- normalis esetben file-ba os logolhatna, akkor megmaradna a hiba is
+
+	- invoke hiba eseten, a valaszt is logolni kellene
 
 --- calibration --------------------------------------------
 
@@ -75,7 +131,13 @@ TODO
 
 --- photometry ---------------------------------------------
 
+(518) pmphot: ha keves a comp star a refcat-ban, es adhoc std, make-std vagy ensemble lenne, irjon figyelmeztetest, hogy ehelyett comp mg kellene
+
 (450) !!! standardization (s15n)
+
+	- ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
+
+	- best comp star kepernyo kiiratasnal rossz a hiba erteke: 0.2
 
 	- az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 		az std rendben van, a tobbit kell megnezni
@@ -113,6 +175,12 @@ TODO
 --- calibration --------------------------------------------
 
 --- photometry ---------------------------------------------
+
+(522) kappa-sigma iteracio egyenes illesztesnel
+
+	- mg calc: lfit - legyen itt is kappa-sigma iteracio, lehet, hogy lfit egyaltalan nem kell
+
+	- mg calc: coeff szamolasnal is legyen kappa-sigma iteracio ???
 
 (510) PSF fotometria ködös objektumok esetén
 
@@ -161,6 +229,12 @@ TODO
 	    raise ValueError("Floating point image RGB values "
 	ValueError: Floating point image RGB values must be in the 0..1 range.
 
+	elszallt meg:
+
+		20090717_es_aql
+
+
+
 (502) Ha a valamelyik kep nem match-el, es szekvenciat adunk ossze, akkor nem lesz jo a szekvencia, 
 	elcsuszik, es a szinek is elcsusznak egymashoz kepes
 	A pythonos verzioban a szekvencia szamolaskor ezt figyelembe kell venni, a szekvenciabol kihagyni
@@ -181,13 +255,11 @@ TODO
 
 === NOT VERSIONED  ==================================================
 
+(523) colorize: kellene valami histogram equalization, opcionalisan
+
+(519) colorize: legyen parameterezheto, hogy csak 1 csatornabol csinaljon kepet, pl. csak Gi csatorna, grayscale jpg image
+
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
-
-(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
-
-	- printDebug()
-
-	- esetleg Print/Log class, Print.info(), etc. metodusokkal, init-ben log mode
 
 --- calibration --------------------------------------------
 
@@ -198,6 +270,11 @@ TODO
 (471) Gi csatornák összegzése átlagolás helyett
 
 --- photometry ---------------------------------------------
+
+(517) szaturalt csillagok kezelese, ha tul fenyes a csillag, akkor nem szabad fotometralni, se comp starnak hasznalni
+	ezt a kappa-sigma kimutatja?
+
+	- tudjuk-e valahogy megmerni a szaturacios szintet, es flagelni a szaturalt csillagokat
 
 (514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
 	es ne kelljen meg egyszer meghivni

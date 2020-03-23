@@ -353,7 +353,9 @@ class Photometry:
         result = self.transformMgs(refCat, stdcolor, coef, ep)
         return result
 
-    def findBestCompStar(self, refCat, color):
+    def findBestCompStar(self, allCatalogs, color):
+
+        refCat = allCatalogs[color]
         stdcolor = self.stdColor(color)
 
         idPos = getHeaderPos(refCat, fieldAuid)
@@ -369,11 +371,20 @@ class Photometry:
         # compId = None
         bestComp = None
         for pm in refCat['cat']:
-            if pm[rolePos] == 'C' and pm[mvPos] != '-':
+            if pm[rolePos] == 'C' and pm[mvPos] != '-' and pm[evPos] != '-' and pm[evPos] != '0.0':
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
-                ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
+                ev = float(pm[evPos])
                 e = ei * ei + ev * ev
                 if e < emin:
+                    haveAllMags = True
+                    for c in self.opt['color']:
+                       if c != color:
+                           r = self.findRow(allCatalogs[color]['cat'], pm[idPos])
+                           if r[mvPos] == '-' or r[evPos] == '-':
+                               haveAllMags = False
+                               break
+                    if not haveAllMags:
+                        continue
                     emin = e
                     bestComp = pm
                     # p[1] = float(pm[mvPos]) - float(pm[miPos])
@@ -615,6 +626,9 @@ class Photometry:
             w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
             w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
 
+        #print(V_R)
+        #print(V_vi)
+        #print(w_Tv)
         coef = self.linfit(V_R, V_vi, w_Tv)
         Tv = coef[0]
         Bv = coef[1]  # ##
@@ -750,31 +764,21 @@ class Photometry:
             fileName = self.opt['files'][j]
             color = self.opt['color'][j]
 
+            if not exists(fileName):
+                printError("File %s is not exists." % (fileName))
+                return
+
             refCat = loadCatalog(fileName)
             if not self.pos:
                 self.pos = self.getHeaderPositions(refCat)
 
-#            dateObs = getDateObs(fileName)
-
-#            if self.opt['method'] == 'comp':
-#                result = self.calculateMgsComparision(refCat, color)
-
-#            elif self.opt['method'] == 'lfit':
-#                result = self.calculateMgsLinearFit(refCat, color)
-
-#            else:
-#                result = self.calculateMgsRobustAveraging(refCat, color)
-
-#            allResults[color] = result
             allCatalogs[color] = refCat
-
-#            self.reportResult(result, refCat, fileName + '.pm', color, dateObs)
 
         # find best comp star in Gi frame
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         indexGi = self.opt['color'].index(color)
         dateObs = getDateObs(self.opt['files'][indexGi])
-        bestComp = self.findBestCompStar(allCatalogs[color], color)  # refcat record of best comp in Gi
+        bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
 
         # calculate instrumental mgs
         allResults = {}

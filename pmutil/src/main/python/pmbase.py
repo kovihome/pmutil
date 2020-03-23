@@ -21,6 +21,56 @@ BGreen = '\033[1;32m'  # Green
 Blue = '\033[0;34m'  # Blue
 BCyan = '\033[1;36m'  # Cyan
 
+pmlog = None
+
+class Logger:
+
+    LOG_MODE_SILENT  = 0
+    LOG_MODE_ERROR   = 1
+    LOG_MODE_WARNING = 2
+    LOG_MODE_INFO    = 3
+    LOG_MODE_DEBUG   = 4
+
+    logFileName = None;
+    logMode = LOG_MODE_INFO
+
+    def __init__(self, logFileName, mode = LOG_MODE_INFO):
+        self.logFileName = logFileName
+        self.logMode = mode
+        pmlog = self
+
+    def write(self, text):
+        if self.logFileName:
+            f = open(self.logFileName, "a+")
+            f.write(text + '\n')
+            f.close()
+
+    def error(self, text):
+        s = BRed + "Error: " + text + Color_Off
+        if self.logMode >= self.LOG_MODE_ERROR:
+            print(s)
+        self.write(s)
+
+    def warning(self, text):
+        s = BGreen + "Warning: " + text + Color_Off
+        if self.logMode >= self.LOG_MODE_WARNING:
+            print(s)
+        self.write(s)
+
+    def info(self, text):
+        s = BCyan + text + Color_Off
+        if self.logMode >= self.LOG_MODE_INFO:
+            print(s)
+        self.write(s)
+
+    def debug(self, text):
+        if self.logMode >= self.LOG_MODE_DEBUG:
+            print(text)
+        self.write(text)
+
+    def print(self, text):
+        print(text)
+        self.write(text)
 
 def printError(s):
     print(BRed + "Error: " + s + Color_Off)
@@ -52,6 +102,8 @@ def loadPplSetup():
 
 
 def invoke(cmd):
+    if pmlog:
+        pmlog.write('invoke: ' + cmd)
     r = cmd.split()
     a = subprocess.check_output(r)
     return a.decode('ascii')[:-1]
@@ -172,7 +224,7 @@ def saveCommand(basePath, argv, cmdName):
             path = basePath[:j + 1]
         FOLDERS = [ path ]
     else:
-        FOLDERS = glob('*' + basePath + '*/')
+        FOLDERS = glob('*' + basePath.rstrip('/') + '*/')
 
     for folder in FOLDERS:
         if not folder.endswith('/'):

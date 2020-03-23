@@ -100,7 +100,7 @@ class RefCat:
 
             self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
 
-        print("%d comparision stars were found in VSP databse" % (len(resp['photometry'])))
+        print("%d comparision stars were found in VSP database" % (len(resp['photometry'])))
 
     def loadVsxCatalogData(self, outFile, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
         '''
@@ -187,7 +187,7 @@ class RefCat:
             else:
                 print(s)
             count = count + 1
-        print("%d variable stars were found in VSX databse" % (count))
+        print("%d variable stars were found in VSX database" % (count))
 
     def loadStdFieldData(self, outFile, stdFieldName):
         saName = self.opt['stdFieldName']
@@ -373,6 +373,7 @@ class MainApp:
         'coords'   : None,  # coordinates of reference field
         'source'   : None,  # source catalog of field stars
         'object'   : None,  # object (variable star) name
+        'stdFieldName': None, # standard area name
         'image'    : None,  # image file
         'field'    : RefCat.defFov,  # reference field size in arcmins
         'auidOnly' : True,  # variables having auid only
