@@ -1,6 +1,23 @@
 TODO
 ----
 
+- 20090719:
+
+	kalibracio problemak:
+		20090719_tt_boo/Calibrated/Light_004-Ri.fits
+		20090719_asas_173513/Calibrated/Light_001-Bi.fits
+		20090719_asas_173513/Calibrated/Light_002-Bi.fits
+		20090719_asas_173513/Calibrated/Light_003-Bi.fits
+		20090719_asas_173513/Calibrated/Light_006-Bi.fits
+		20090719_asas_173513/Calibrated/Light_008-Bi.fits
+		20090719_Her_gal_cl/Calibrated/Light_008-Ri.fits
+	colorize:
+		sqrt - cy_lyr, fh_sct
+
+(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
+
+- calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
+
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
 	Traceback (most recent call last):
@@ -255,7 +272,10 @@ TODO
 
 === NOT VERSIONED  ==================================================
 
-(523) colorize: kellene valami histogram equalization, opcionalisan
+(525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
+	- ezt a colorize csinalja? ez lenne a legjobb
+	- csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
+	- com star legyen sarga, a valtozo feher
 
 (519) colorize: legyen parameterezheto, hogy csak 1 csatornabol csinaljon kepet, pl. csak Gi csatorna, grayscale jpg image
 

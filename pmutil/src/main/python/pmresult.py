@@ -168,7 +168,7 @@ class ReportProcessor:
 
         r.write('#TYPE=Extended\n')
         r.write('#OBSCODE=%s\n' % (obsName))
-        r.write('#SOFTWARE=pmutil v1.0\n')
+        r.write('#SOFTWARE=pmutil v1.1\n')
         r.write('#DELIM=,\n')
         r.write('#DATE=JD\n')
         r.write('#OBSTYPE=DSLR\n')

@@ -11,7 +11,7 @@ from getopt import getopt, GetoptError
 from sys import argv
 from matplotlib.image import imsave
 from astropy.io import fits
-from numpy import zeros
+import numpy as np
 
 from pmbase import printError, printInfo, loadPplSetup, Blue, Color_Off, BGreen
 import img_scale
@@ -34,7 +34,7 @@ class Colorize:
 
     SKY_SIGMA = 3.0
     SKY_CONVERGENCE = 0.01
-    SCALE_RANGE = 10000.0
+    SCALE_RANGE = 256.0
     SCALE_METHOD = 'linear'
 
     def __init__(self, opt):
@@ -57,10 +57,11 @@ class Colorize:
             print("%s color source image: %s" % (c, fitsFileName))
             rgb.append(fits.open(fitsFileName)[0].data)
 
-        img = zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
+        img = np.zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
         for j in range(3):
             smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
-            smax = int(self.wb[j] * (self.SCALE_RANGE + smin))
+            pxmax = max(rgb[j].flatten())
+            smax = int(self.wb[j] * (self.SCALE_RANGE / self.opt['scaling'] + smin))
 #            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
             if self.SCALE_METHOD == self.scaleMethods[0]:
                 img[:, :, j] = img_scale.linear(rgb[j], scale_min = smin, scale_max = smax)
@@ -74,7 +75,7 @@ class Colorize:
         # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
         # need som normalization
 
-        imgFileName = "%s%s/Combined-color.jpg" % (baseFolder, seqFolder)
+        imgFileName = "%s%s.jpg" % (baseFolder, baseFolder.split('/')[-2])
         imsave(imgFileName, img)
         printInfo("Color image %s created." % (imgFileName))
 
@@ -84,6 +85,7 @@ class MainApp:
     # TODO: wb should be command line option somehow
     opt = {
         'scaleMethod': 'linear',
+        'scaling': 1.0,
         'baseFolder': None,
         }
 
@@ -93,22 +95,23 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(BGreen + "pmcolorize, version 1.1.0 " + Color_Off)
+        print(BGreen + "ppl-colorize, version 1.1.0 " + Color_Off)
         print(Blue + "Make color jpeg image from calibrated FITS images." + Color_Off)
         print()
 
     def usage(self):
-        print("Usage: pmcolorize [OPTIONS]... [BASE_FOLDER]")
+        print("Usage: ppl-colorize [OPTIONS]... [BASE_FOLDER]")
         print("Make color jpeg image from calibrated FITS images.")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
-        print("  -m,  --scale-method     scaling method, available values are: linear, sqrt, log, asinh")
-        print("  -h,  --help             print this page")
+        print("  -m,  --method      scaling method, available values are: linear, sqrt, log, asinh")
+        print("       --scale       scaling constant")
+        print("  -h,  --help        print this page")
         print()
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "m:h", ['scale-method=', 'help'])
+            optlist, args = getopt (self.argv[1:], "m:h", ['method=', 'scale=', 'help'])
         except GetoptError:
             printError ('Invalid command line options')
             return
@@ -116,10 +119,12 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-m' or o == '--scale-method':
+            elif o == '-m' or o == '--method':
                 if not a in Colorize.scaleMethods:
                     printError("Invalid scaling method value: %s" % (a))
                 self.opt['scaleMethod'] = a
+            elif o == '--scale':
+                self.opt['scaling'] = float(a)
             elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)

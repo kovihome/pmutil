@@ -33,10 +33,12 @@ class RefCat:
 
     chartId = None
 
+    cache = []
+
     def __init__(self, opt):
         self.opt = opt
 
-    def loadVspPhotometryData(self, outFile, objectName, ra = None, dec = None, fov = defFov):
+    def loadVspPhotometryData(self, objectName, ra = None, dec = None, fov = defFov):
         '''
         star*: name of the star to plot. You must provide EITHER the star parameter OR ra and dec parameters (see below)
         ra*: right ascension
@@ -98,11 +100,18 @@ class RefCat:
                 mgerrR = "-"
             label = str(pm['label']).replace(' ', '_')
 
-            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
+            self.writeRecord(auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
 
         print("%d comparision stars were found in VSP database" % (len(resp['photometry'])))
 
-    def loadVsxCatalogData(self, outFile, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
+    def dismissSameAUID(self, auid):
+        for j in range(len(self.cache)):
+            s = self.cache[j]
+            if s.startswith(auid):
+                self.cache[j] = '#' + s
+                break
+
+    def loadVsxCatalogData(self, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
         '''
         &coords   The central J2000 RA/DEC coordinates for a radius search, expressed sexagesimally (by default), or in decimal degrees if format is set to d. Northern hemisphere coordinates must have the plus () sign URL-encoded as %2B. Space characters between all other figures must be replaced with the URL whitespace character (). The order argument (which see) must also be included in the query string with its value set to 9 in order to prompt VSX to display distances from the central coordinates in the results listing. Default is empty string (no radius search).
         &ident    Object identification for name searches. Space characters must be replaced with the URL whitespace character (+). Other special characters may also need to be URL-encoded. Default is empty string (no name search).
@@ -152,7 +161,9 @@ class RefCat:
                 decDeg = "+" + decDeg
             label = tr['TD'][1].replace(' ', '_')
 
-            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, '-', '-', '-', '-', '-', '-', label)
+            self.dismissSameAUID(auid)
+
+            self.writeRecord(auid, role, ra, raDeg, dec, decDeg, '-', '-', '-', '-', '-', '-', label)
 
         nrUnknown = 1
         count = 0
@@ -182,14 +193,11 @@ class RefCat:
                 minmg += tr['TD'][8]
 
             s = "#" + label.ljust(29) + auid.ljust(14) + ra.ljust(15) + dec.ljust(14) + constell.ljust(4) + vartype.ljust(11) + period.ljust(11) + maxmg + " - " + minmg
-            if outFile != None:
-                outFile.write(s + "\n")
-            else:
-                print(s)
+            self.cache.append(s)
             count = count + 1
         print("%d variable stars were found in VSX database" % (count))
 
-    def loadStdFieldData(self, outFile, stdFieldName):
+    def loadStdFieldData(self, stdFieldName):
         saName = self.opt['stdFieldName']
         configFolder = self.ppl["CONFIG_FOLDER"]
         if configFolder == None:
@@ -247,17 +255,14 @@ class RefCat:
             errR = "%+7.4f" % (max(ev, float(star['ERR_VR'])))
             label = saName + ":" + star['STAR']
 
-            self.writeRecord(outFile, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label)
+            self.writeRecord(auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label)
 
         print("%d standard star found for standard area %s" % (len(stars), saName))
         return None
 
-    def writeRecord(self, outFile, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label):
+    def writeRecord(self, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label):
         s = auid.ljust(13) + role.ljust(5) + ra.ljust(15) + raDeg.ljust(15) + dec.ljust(15) + decDeg.ljust(15) + magB.ljust(10) + errB.ljust(10) + magV.ljust(10) + errV.ljust(10) + magR.ljust(10) + errR.ljust(10) + label
-        if outFile != None:
-            outFile.write(s + "\n")
-        else:
-            print(s)
+        self.cache.append(s)
 
     def getPair(self, s, delim = ','):
         ss = s.split(delim)
@@ -322,31 +327,33 @@ class RefCat:
 
         if not exists(outFileName) or self.opt['overwrite']:
 
-            outFile = open(outFileName, 'w')
-            self.writeRecord(outFile, 'AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_B', 'ERR_B', 'MAG_V', 'ERR_V', 'MAG_R', 'ERR_R', 'LABEL')
+            self.writeRecord('AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_B', 'ERR_B', 'MAG_V', 'ERR_V', 'MAG_R', 'ERR_R', 'LABEL')
 
             if self.opt['object'] != None:
 
-                self.loadVspPhotometryData(outFile, self.opt['object'], fov = self.opt['field'])
+                self.loadVspPhotometryData(self.opt['object'], fov = self.opt['field'])
 
-                self.loadVsxCatalogData(outFile, self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+                self.loadVsxCatalogData(self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
             elif self.opt['stdFieldName'] != None:
 
-                error = self.loadStdFieldData(outFile, self.opt['stdFieldName'])
+                error = self.loadStdFieldData(self.opt['stdFieldName'])
 
                 if not error:
-                    self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+                    self.loadVsxCatalogData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
             else:
 
-                self.loadVspPhotometryData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'])
+                self.loadVspPhotometryData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'])
 
-                self.loadVsxCatalogData(outFile, None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
+                self.loadVsxCatalogData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
+            # write cataglog to file
+            outFile = open(outFileName, 'w')
+            for s in self.cache:
+                outFile.write(s + '\n')
             outFile.write('### chartid: ' + self.chartId + '\n')
             outFile.write('### fov: ' + str(self.opt['field']) + ' arcmin\n')
-
             outFile.close()
 
             printInfo("Reference catalog file %s created." % (outFileName))

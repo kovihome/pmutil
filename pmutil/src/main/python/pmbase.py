@@ -13,6 +13,7 @@ from os.path import isfile
 from datetime import datetime
 from glob import glob
 from astropy.io import fits
+from math import sqrt
 import subprocess
 
 Color_Off = '\033[0m'  # Text Reset
@@ -105,8 +106,11 @@ def invoke(cmd):
     if pmlog:
         pmlog.write('invoke: ' + cmd)
     r = cmd.split()
-    a = subprocess.check_output(r)
-    return a.decode('ascii')[:-1]
+    try:
+        a = subprocess.check_output(r)
+        return a.decode('ascii')[:-1]
+    except subprocess.CalledProcessError as e:
+        return 'ERROR: exit code: %d, answer: %s' % (e.returncode, e.output)
 
 
 def invokep(cmds):
@@ -298,6 +302,9 @@ def findInFile(fileName, s):
             return line
     f.close()
     return None
+
+def quad(a ,b):
+    return sqrt(a*a + b*b)
 
 # end pmbase.
 

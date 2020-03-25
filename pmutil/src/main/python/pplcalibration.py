@@ -282,12 +282,18 @@ class Pipeline:
 
             invoke("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
 
-            invoke("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
-
-            ln = findInFile(ftrans, 'Match failed')
-            matchFailed = 1 if ln != None else 0
+            matchFailed = 0
+            answer = invoke("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
+            if answer.startswith('ERROR'):
+                matchFailed = 1
+            else:
+                ln = findInFile(ftrans, 'Match failed')
+                answer = ''
+                matchFailed = 1 if ln != None else 0
             if matchFailed == 1:
                 printError("Match failed on %s." % (f))
+                if answer:
+                    print('    ' + answer)
                 if self.opt['onError'] == "stop":
                     self.exitOnError()
 
