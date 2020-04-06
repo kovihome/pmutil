@@ -243,7 +243,7 @@ class RefCat:
             role = "C"
             ra = star['RA_2000']
             raDeg = "%10.8f" % (hexa2deg(ra) * 15.0)
-            dec = star['RA_2000']
+            dec = star['DEC_2000']
             decDeg = "%+10.8f" % (hexa2deg(dec))
             mv = float(star['MAG_V'])
             ev = float(star['ERR_V'])

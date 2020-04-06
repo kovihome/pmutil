@@ -672,7 +672,7 @@ class Photometry:
     def saveCoeffs(self, coeffs, obsDate):
         self.openCoeffs(obsDate)
         self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, 'SA104'.replace(' ', '_'))
-        self.coeffTable.save()
+        self.coeffTable.save(overwrite=True)
 
     def loadCoeffs(self, obsDate):
         self.openCoeffs(obsDate)
@@ -778,11 +778,12 @@ class Photometry:
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         indexGi = self.opt['color'].index(color)
         dateObs = getDateObs(self.opt['files'][indexGi])
+        dateObsDate = dateObs.split('T')[0]
         bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
 
         # calculate instrumental mgs
         allResults = {}
-        if self.opt['useCoeffs']:
+        if self.opt['useCoeffs'] or self.opt['makeCoeffs']:
             # standardization
             coeffs = None
 
@@ -792,11 +793,11 @@ class Photometry:
                 coeffs = self.calculateCoeffs(mergedCat)
 
                 if self.opt['saveCoeffs']:
-                    self.saveCoeffs(coeffs, dateObs)
+                    self.saveCoeffs(coeffs, dateObsDate)
 
             elif self.opt['loadCoeffs']:
 
-                coeffs = self.loadCoeffs(dateObs)
+                coeffs = self.loadCoeffs(dateObsDate)
 
             if not coeffs:
                 printError('No std coefficients for transformation ; use Tv = 0, Tvr = -1, Tbv = 1 for comp star method.')
