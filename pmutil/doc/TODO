@@ -1,23 +1,15 @@
 TODO
 ----
 
-- refcat elszallt 202020404_uz_boo:
+NEW BUGS:
 
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-refcat", line 500, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-refcat", line 491, in run
-	    cat.execute()
-	  File "/home/kovi/bin/ppl-refcat", line 336, in execute
-	    self.loadVsxCatalogData(self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
-	  File "/home/kovi/bin/ppl-refcat", line 148, in loadVsxCatalogData
-	    auid = tr['TD'][0]
-	TypeError: string indices must be integers
+- calib: 20200404: kalibracio hibas
 
+	ficalib: error: dark image size differs from the expected image size.
 
-- kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
+	A dark keppel lesz valami gond, a 20200331-i darkkal jo
 
-- aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
+- !!! aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
 
 - refcat: elszall a 'ppl-refcat -i 20200331_atlas/Sequence/Combined-Gi.fits  20200331_atlas/' commandra
 
@@ -31,44 +23,6 @@ TODO
 	  File "/home/kovi/bin/ppl-refcat", line 143, in loadVsxCatalogData
 	    trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
 	TypeError: 'NoneType' object is not subscriptable
-
-
-- refcat: elszall a VSX J133234.9+061339 valtozonevre, valszeg a + jel nincs urlencode-olva
-	20200404_asas_j1522 ASAS J152200+2428.2
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-refcat", line 500, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-refcat", line 491, in run
-	    cat.execute()
-	  File "/home/kovi/bin/ppl-refcat", line 334, in execute
-	    self.loadVspPhotometryData(self.opt['object'], fov = self.opt['field'])
-	  File "/home/kovi/bin/ppl-refcat", line 55, in loadVspPhotometryData
-	    f = request.urlopen(vspUrl)
-	  File "/usr/lib/python3.6/urllib/request.py", line 223, in urlopen
-	    return opener.open(url, data, timeout)
-	  File "/usr/lib/python3.6/urllib/request.py", line 532, in open
-	    response = meth(req, response)
-	  File "/usr/lib/python3.6/urllib/request.py", line 642, in http_response
-	    'http', request, response, code, msg, hdrs)
-	  File "/usr/lib/python3.6/urllib/request.py", line 570, in error
-	    return self._call_chain(*args)
-	  File "/usr/lib/python3.6/urllib/request.py", line 504, in _call_chain
-	    result = func(*args)
-	  File "/usr/lib/python3.6/urllib/request.py", line 650, in http_error_default
-	    raise HTTPError(req.full_url, code, msg, hdrs, fp)
-	urllib.error.HTTPError: HTTP Error 400: BAD REQUEST
-
-
-- colorize: astropy.visualization normalizalas
-
-- photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
-
-- refcat: astropy.io.votable - egyszerubb votable kezeles 
-
-(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
-
-- calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
@@ -113,17 +67,25 @@ TODO
 
 - !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
 
-- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
+- !!! pmfilter: hmg szamitas felulvizsgalata
 
-+ ppl-fotometria: a seq fileokat lougrasban dolgozza fel, itt is sort-olni kellene elotte
+NEW IDEAS:
+
+- colorize: astropy.visualization normalizalas
+
+- photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
+
+- refcat: astropy.io.votable - egyszerubb votable kezeles 
+
+(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
+
+- calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
+
+- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
 
 - autoclean: lehetne egy kapcsolo, hogy a feldolgozas vegen tol egy clean-t, es csak az eredmeny file-ok maradnak meg
 
 - pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
-
-+ refcat: saveCommand rossz konyvtarba teszi a commandot
-
-- !!! pmfilter: hmg szamitas felulvizsgalata
 
 - more standard areas:
 
@@ -137,9 +99,6 @@ TODO
 	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450
 	M11               18:51:05 -06:16:12 8.5 – 17  20
 	NGC 7790          23:58:23 +61:12:25 10 – 20   7
-
-- pythonositas:
-	ppl-setup		pmsetup.py
 
 - Katalogus kezeles astropy.table.Table segitsegevel
 
@@ -175,9 +134,7 @@ TODO
 		vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
 	feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
 
-+ pmfilter: wcs-rd2xy: option requires an argument -- 'f'
-
-	+ all argumentumot kapott, ettol elszallt, a -f nelkul ok
+- kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
 
 
 === V 1.1 ==================================================
@@ -328,8 +285,6 @@ TODO
 	- ezt a colorize csinalja? ez lenne a legjobb
 	- csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
 	- com star legyen sarga, a valtozo feher
-
-(519) colorize: legyen parameterezheto, hogy csak 1 csatornabol csinaljon kepet, pl. csak Gi csatorna, grayscale jpg image
 
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 

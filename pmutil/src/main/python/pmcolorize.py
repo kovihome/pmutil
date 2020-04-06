@@ -9,6 +9,8 @@ Created on Feb 22, 2020
 '''
 from getopt import getopt, GetoptError
 from sys import argv
+from glob import glob
+from os.path import isdir
 from matplotlib.image import imsave
 from astropy.io import fits
 import numpy as np
@@ -42,18 +44,13 @@ class Colorize:
         if 'scaleMethod' in self.opt:
             self.SCALE_METHOD = self.opt['scaleMethod']
 
-    def execute(self):
-        self.pplSetup = loadPplSetup()
-
-        baseFolder = self.opt['baseFolder']
-
-        colors = ['Ri', 'Gi', 'Bi']
+    def createImage(self, baseFolder, colors):
         rgb = []
         seqFolder = self.pplSetup['SEQ_FOLDER_NAME']
         # TODO: before addition, images should be reregistered with Gi as reference, for more exact alignment
 
         for c in colors:
-            fitsFileName = "%s%s/Combined-%s.fits" % (baseFolder, seqFolder, c)
+            fitsFileName = "%s/%s/Combined-%s.fits" % (baseFolder, seqFolder, c)
             print("%s color source image: %s" % (c, fitsFileName))
             rgb.append(fits.open(fitsFileName)[0].data)
 
@@ -75,9 +72,28 @@ class Colorize:
         # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
         # need som normalization
 
-        imgFileName = "%s%s.jpg" % (baseFolder, baseFolder.split('/')[-2])
+        imgFileName = "%s/%s.jpg" % (baseFolder, baseFolder.split('/')[-1])
         imsave(imgFileName, img)
-        printInfo("Color image %s created." % (imgFileName))
+        if self.opt['color'] == 'all':
+            printInfo("Color image %s created." % (imgFileName))
+        else:
+            printInfo("Monochrome %s image %s created." % (self.opt['color'], imgFileName))
+
+    def execute(self):
+        self.pplSetup = loadPplSetup()
+        seqFolder = self.pplSetup['SEQ_FOLDER_NAME']
+
+        baseFolderPattern = self.opt['baseFolder']
+        baseFolders = glob('*' + baseFolderPattern + '*')
+
+        colors = ['Ri', 'Gi', 'Bi']
+        if self.opt['color'] != 'all':
+            colors = [self.opt['color']] * 3
+            self.wb = [1.0] * 3
+
+        for folder in baseFolders:
+            if isdir(folder + '/' + seqFolder):
+                self.createImage(folder, colors)
 
 
 class MainApp:
@@ -86,6 +102,7 @@ class MainApp:
     opt = {
         'scaleMethod': 'linear',
         'scaling': 1.0,
+        'color': 'all',
         'baseFolder': None,
         }
 
@@ -105,13 +122,14 @@ class MainApp:
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
         print("  -m,  --method      scaling method, available values are: linear, sqrt, log, asinh")
+        print("  -c,  --color       use selected color for all channel ; it results monochrome image")
         print("       --scale       scaling constant")
         print("  -h,  --help        print this page")
         print()
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "m:h", ['method=', 'scale=', 'help'])
+            optlist, args = getopt (self.argv[1:], "c:m:h", ['color=', 'method=', 'scale=', 'help'])
         except GetoptError:
             printError ('Invalid command line options')
             return
@@ -125,13 +143,18 @@ class MainApp:
                 self.opt['scaleMethod'] = a
             elif o == '--scale':
                 self.opt['scaling'] = float(a)
+            elif o == '-c' or o == '--color':
+                if a in ['Gi', 'Bi', 'Ri']:
+                   self.opt['color'] = a
+                else:
+                   print("Invalid color code %s. Available color codes are: Gi, Bi, Ri")
             elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
 
         self.opt['baseFolder'] = args[0]
-        if not self.opt['baseFolder'].endswith('/'):
-            self.opt['baseFolder'] += '/'
+        if self.opt['baseFolder'].endswith('/'):
+            self.opt['baseFolder'] = args[0][:-1]
 
         print("scaling method: %s" % (self.opt['scaleMethod']))
 

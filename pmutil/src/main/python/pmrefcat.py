@@ -19,6 +19,7 @@ from astropy.table import Table
 import json
 import xmltodict
 import re
+import urllib
 
 from pmbase import printError, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
 
@@ -48,7 +49,7 @@ class RefCat:
         other: other variable stars to mark on the chart. Omit or leave blank for none, "gcvs" for GCVS variables, "all" for all variables
         '''
         if objectName != None:
-            ids = "star=%s" % (objectName.replace(' ', '+'))
+            ids = "star=%s" % (urllib.parse.quote_plus(objectName))
         else:
             ids = "ra=%s&dec=%s" % (ra, dec)
         vspUrl = "https://www.aavso.org/apps/vsp/api/chart/?format=json&%s&fov=%d&maglimit=%4.1f&other=all" % (ids, fov, self.defMgLimit)
@@ -122,7 +123,8 @@ class RefCat:
         '''
         if objectName != None:
             # https://www.aavso.org/vsx/index.php?view=results.csv&ident=R+Car
-            vsxUrl = "https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident=%s" % (objectName.replace(' ', '+'))
+            vsxUrl = "https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident=%s" % (urllib.parse.quote_plus(objectName))
+            ids = "star=%s" % (urllib.parse.quote_plus(objectName))
             f = request.urlopen(vsxUrl)
             respJson = f.read().decode('UTF-8')
             resp = json.loads(respJson)
@@ -142,9 +144,10 @@ class RefCat:
         votable = xmltodict.parse(respVOTable)
         trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
         nrUnknown = 1
+        if not isinstance(trs, list):
+            trs = [trs]
         for tr in trs:
             # [None, 'PS1-3PI J185203.12+325154.5', 'Lyr', '283.01304000,32.86516000', 'RRAB', '16.810', 'r', '0.400', 'r', '57000.85600', None, '0.839122', None, None, None]
-
             auid = tr['TD'][0]
             if auid == None:
                 if auidOnly:
