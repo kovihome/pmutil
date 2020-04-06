@@ -21,7 +21,7 @@ import xmltodict
 import re
 import urllib
 
-from pmbase import printError, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
+from pmbase import printError, printInfo, printWarning, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
 
 
 class RefCat:
@@ -135,14 +135,20 @@ class RefCat:
             sra = deg2hexa(float(ra) / 15.0)
             sdec = deg2hexa(float(dec))
 
-        coords = sra + "+" + sdec
+        if not sdec.startswith('-') and not sdec.startswith('+'):
+            sdec = "+" + sdec
+        coords = sra + sdec
 
         vsxUrl = "https://www.aavso.org/vsx/index.php?view=query.votable&format=d&coords=%s&size=%d&unit=2&geom=b" % (coords, fov)
         # https://www.aavso.org/vsx/index.php?view=query.votable&coords=19:54:17+32:13:08&format=d&size=60&unit=2
         f = request.urlopen(vsxUrl)
         respVOTable = f.read().decode('UTF-8')
         votable = xmltodict.parse(respVOTable)
-        trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
+        tableData = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']
+        if tableData == None:
+            printWarning('No VSX data for this field')
+            return
+        trs = tableData['TR']
         nrUnknown = 1
         if not isinstance(trs, list):
             trs = [trs]
@@ -289,6 +295,7 @@ class RefCat:
 
         r = astResult.split('\n')
         sCoords = ["0.0", "0.0"]
+        sCoordsSexa = ["00:00:00", "+00:00:00"]
         for line in r:
             if line.startswith("Field center"):
                 if line.find("RA,Dec") > -1:
@@ -324,9 +331,11 @@ class RefCat:
         elif self.opt['stdFieldName'] != None:
             outFileName += self.opt['stdFieldName'].lower().replace(' ', '_') + '.cat'
         else:
-            if not self.opt['dec'].startswith('+') and not self.opt['dec'].startswith('-'):
-                self.opt['dec'] = '+' + self.opt['dec']
-            outFileName += self.opt['ra'].replace(':', '')[:4] + self.opt['dec'].replace(':', '')[:5] + '.cat'
+            s_ra = deg2hexa(float(self.opt['ra']) / 15.0)
+            s_dec = deg2hexa(float(self.opt['dec']))
+            if not s_dec.startswith('+') and not s_dec.startswith('-'):
+                s_dec = '+' + s_dec
+            outFileName += s_ra.replace(':', '')[:4] + s_dec.replace(':', '')[:5] + '.cat'
 
         if not exists(outFileName) or self.opt['overwrite']:
 

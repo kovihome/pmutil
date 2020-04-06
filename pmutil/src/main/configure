@@ -89,6 +89,11 @@ warn_version() {
 	echo "$3 version '$1' OK."
 }
 
+warn_py_module() {
+	local PY_VERSION=$(pip3 list 2> /dev/null | grep "$1" | sed 's/[^0-9\.]//g')
+	warn_version "$PY_VERSION" "$2" "python3/$1"
+}
+
 print_info "Checking external dependecies."
 
 # python3
@@ -97,29 +102,13 @@ PYTHON3_VERSION=$(python3 --version | head -n1 | cut -d" " -f2)
 PYTHON3_MINVERSION=3.6.0
 warn_version "$PYTHON3_VERSION" "$PYTHON3_MINVERSION" "python3"
 
-# python3 numpy
+# python3 modules
 
-NUMPY_VERSION=$(pip3 list 2> /dev/null | grep "numpy" | sed 's/[^0-9\.]//g')
-NUMPY_MINVERSION=1.16
-warn_version "$NUMPY_VERSION" "$NUMPY_MINVERSION" "python3/numpy"
-
-# python3 xmltodict
-
-XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "xmltodict" | sed 's/[^0-9\.]//g')
-XMLTODICT_MINVERSION=0.12.0
-warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/xmltodict"
-
-# python3 astropy
-
-XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "astropy" | sed 's/[^0-9\.]//g')
-XMLTODICT_MINVERSION=4.0
-warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/astropy"
-
-# python3 matplotlib
-
-XMLTODICT_VERSION=$(pip3 list 2> /dev/null | grep "matplotlib" | sed 's/[^0-9\.]//g')
-XMLTODICT_MINVERSION=3.1
-warn_version "$XMLTODICT_VERSION" "$XMLTODICT_MINVERSION" "python3/matplotlib"
+warn_py_module "numpy" "1.16"
+warn_py_module "xmltodict" "0.12"
+warn_py_module "astropy" "4.0"
+warn_py_module "matplotlib" "3.1"
+warn_py_module "Pillow" "5.1"
 
 # FITSH
 
@@ -176,7 +165,7 @@ copy_source() {
 create_link() {
 	# $1 - src
 	# $2 - dest
-	ln -s "${DEST_FOLDER}"/S1 "${DEST_FOLDER}"/S2
+	ln -s "${DEST_FOLDER}"/$1 "${DEST_FOLDER}"/$2
 }
 
 if [ ! -e "$DEST_FOLDER" ]; then
@@ -206,7 +195,7 @@ create_link "pmrefcat.py" "ppl-refcat"
 create_link "pmclean.py" "ppl-clean"
 create_link "pmcolorize.py" "ppl-colorize"
 
-chmod 0755 "${DEST_FOLDER}/*"
+chmod 0755 ${DEST_FOLDER}/*
 
 #############################
 # copy external config files
@@ -223,8 +212,8 @@ if [ ! -d "$CONFIG_FOLDER" ]; then
 fi
 
 # sextractor files: sex.cfg, sex.param
-cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"
-cp "$CONFIG_BASE/sex.param" "$DEST_FOLDER"
-cp "$CONFIG_BASE/astrometry.cfg" "$DEST_FOLDER"
+cp "$CONFIG_BASE/sex.cfg" "$CONFIG_FOLDER"
+cp "$CONFIG_BASE/sex.param" "$CONFIG_FOLDER"
+cp "$CONFIG_BASE/astrometry.cfg" "$CONFIG_FOLDER"
 
 print_info "Configure pmutil successfully ended."
