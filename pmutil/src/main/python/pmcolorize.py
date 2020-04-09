@@ -44,17 +44,7 @@ class Colorize:
         if 'scaleMethod' in self.opt:
             self.SCALE_METHOD = self.opt['scaleMethod']
 
-    def createImage(self, baseFolder, colors):
-        rgb = []
-        seqFolder = self.pplSetup['SEQ_FOLDER_NAME']
-        # TODO: before addition, images should be reregistered with Gi as reference, for more exact alignment
-
-        for c in colors:
-            fitsFileName = "%s/%s/Combined-%s.fits" % (baseFolder, seqFolder, c)
-            print("%s color source image: %s" % (c, fitsFileName))
-            rgb.append(fits.open(fitsFileName)[0].data)
-
-        img = np.zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
+    def doScaling(self, img, rgb):
         for j in range(3):
             smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
             pxmax = max(rgb[j].flatten())
@@ -69,15 +59,63 @@ class Colorize:
             elif self.SCALE_METHOD == self.scaleMethods[3]:
                 img[:, :, j] = img_scale.asinh(rgb[j], scale_min = smin, scale_max = smax)
 
-        # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
-        # need som normalization
-
-        imgFileName = "%s/%s.jpg" % (baseFolder, baseFolder.split('/')[-1])
+    def saveImage(self, img, imgFileName):
         imsave(imgFileName, img)
         if self.opt['color'] == 'all':
             printInfo("Color image %s created." % (imgFileName))
         else:
             printInfo("Monochrome %s image %s created." % (self.opt['color'], imgFileName))
+
+    def createImage(self, baseFolder, colors):
+        rgb = []
+        seqFolder = self.pplSetup['SEQ_FOLDER_NAME']
+        # TODO: before addition, images should be reregistered with Gi as reference, for more exact alignment
+
+        imgFileName = "%s/%s.jpg" % (baseFolder, baseFolder.split('/')[-1])
+
+        for c in colors:
+            fitsFileName = "%s/%s/Combined-%s.fits" % (baseFolder, seqFolder, c)
+            print("%s color source image: %s" % (c, fitsFileName))
+            rgb.append(fits.open(fitsFileName)[0].data)
+
+        img = np.zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
+#        for j in range(3):
+#            smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
+#            pxmax = max(rgb[j].flatten())
+#            smax = int(self.wb[j] * (self.SCALE_RANGE / self.opt['scaling'] + smin))
+##            smax = int((self.SCALE_RANGE + smin) / self.wb[j])
+#            if self.SCALE_METHOD == self.scaleMethods[0]:
+#                img[:, :, j] = img_scale.linear(rgb[j], scale_min = smin, scale_max = smax)
+#            elif self.SCALE_METHOD == self.scaleMethods[1]:
+#                img[:, :, j] = img_scale.sqrt(rgb[j], scale_min = smin, scale_max = smax)
+#            elif self.SCALE_METHOD == self.scaleMethods[2]:
+#                img[:, :, j] = img_scale.log(rgb[j], scale_min = smin, scale_max = smax)
+#            elif self.SCALE_METHOD == self.scaleMethods[3]:
+#                img[:, :, j] = img_scale.asinh(rgb[j], scale_min = smin, scale_max = smax)
+
+        # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
+        # need some normalization
+
+        try:
+            self.doScaling(img, rgb)
+            self.saveImage(img, imgFileName)
+        except ValueError as e:
+            printError("creating color image with %s scaling mathod is failed: %s" % (self.SCALE_METHOD, str(e)))
+            if self.SCALE_METHOD != self.scaleMethods[0]:
+                self.SCALE_METHOD = self.scaleMethods[0]
+                try:
+                    self.doScaling(img, rgb)
+                    self.saveImage(img, imgFileName)
+                except ValueError as ex:
+                    printError("creating color image with alternative %s scaling mathod is failed: %s" % (self.SCALE_METHOD, str(ex)))
+                    return
+
+
+#        imsave(imgFileName, img)
+#        if self.opt['color'] == 'all':
+#            printInfo("Color image %s created." % (imgFileName))
+#        else:
+#            printInfo("Monochrome %s image %s created." % (self.opt['color'], imgFileName))
 
     def execute(self):
         self.pplSetup = loadPplSetup()

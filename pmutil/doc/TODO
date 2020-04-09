@@ -3,6 +3,10 @@ TODO
 
 NEW BUGS:
 
++ colorize: az ekvalizacio reszt try/except blokkba kell tenni, ha exception keletkezik, akkor helyette linear modban meghivni
+
+- calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
+
 - calib: 20200404: kalibracio hibas
 
 	ficalib: error: dark image size differs from the expected image size.
@@ -10,19 +14,6 @@ NEW BUGS:
 	A dark keppel lesz valami gond, a 20200331-i darkkal jo
 
 - !!! aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
-
-- refcat: elszall a 'ppl-refcat -i 20200331_atlas/Sequence/Combined-Gi.fits  20200331_atlas/' commandra
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-refcat", line 500, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-refcat", line 491, in run
-	    cat.execute()
-	  File "/home/kovi/bin/ppl-refcat", line 349, in execute
-	    self.loadVsxCatalogData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
-	  File "/home/kovi/bin/ppl-refcat", line 143, in loadVsxCatalogData
-	    trs = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']['TR']
-	TypeError: 'NoneType' object is not subscriptable
 
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
@@ -69,6 +60,8 @@ NEW BUGS:
 
 - !!! pmfilter: hmg szamitas felulvizsgalata
 
+(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
+
 NEW IDEAS:
 
 - colorize: astropy.visualization normalizalas
@@ -76,8 +69,6 @@ NEW IDEAS:
 - photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
 
 - refcat: astropy.io.votable - egyszerubb votable kezeles 
-
-(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
 - calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 
