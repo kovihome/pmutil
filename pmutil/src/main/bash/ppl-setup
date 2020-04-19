@@ -35,6 +35,11 @@ MASTER_BIAS_FILE="master-bias"
 MASTER_DARK_FILE="master-dark"
 MASTER_FLAT_FILE="master-flat"
 
+# standardization
+DEF_NAMECODE="KVI"
+DEF_CAMERA="Canon EOS 1100D"
+DEF_TELESCOPE="Skywatcher 250/1200"
+
 # setup marker: do not modify
 
 PPL_SETUP=OK

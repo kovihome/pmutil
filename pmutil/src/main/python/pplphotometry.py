@@ -13,6 +13,7 @@ from datetime import datetime
 from glob import glob
 from os import getcwd, mkdir
 from os.path import exists, basename
+from astropy.table import Table
 
 from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, discoverFolders
 from pmphot import Photometry
@@ -31,6 +32,65 @@ class Pipeline:
 
     def __init__(self, opt):
         self.opt = opt
+
+    def inspectRefCat(self, baseFolder):
+
+        colors = ''
+        if 'Bi' in self.opt['color']:
+            colors += 'b'
+        if 'Gi' in self.opt['color'] or 'Vi' in self.opt['color']:
+            colors += 'v'
+        if 'Ri' in self.opt['color']:
+            colors += 'r'
+
+        refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
+        if not exists(refcatFileName):
+            printWarning("Reference catalog %s is missing." % (refcatFileName))
+            return False
+        rc = Table.read(refcatFileName, format='ascii')
+        varCount = 0
+        compCount = 0
+        compColorCount = { 'bvr': 0, 'bv': 0, 'vr': 0, 'b': 0, 'v': 0, 'r': 0 }
+        for r in rc:
+            if r['ROLE'] == 'C':
+                compCount += 1
+                has_b = r['MAG_B'] != '-'
+                has_v = r['MAG_V'] != '-'
+                has_r = r['MAG_R'] != '-'
+                if has_b:
+                    compColorCount['b'] += 1
+                if has_v:
+                    compColorCount['v'] += 1
+                if has_r:
+                    compColorCount['r'] += 1
+                if has_b and has_v:
+                    compColorCount['bv'] += 1
+                if has_v and has_r:
+                    compColorCount['vr'] += 1
+                if has_b and has_v and has_r:
+                    compColorCount['bvr'] += 1
+            elif r['ROLE'] == 'V':
+                varCount += 1
+        
+        if varCount == 0:
+            printWarning('No variable star in reference catalog %s' % (refcatFileName))
+            return False
+        if compCount == 0:
+            printWarning('No comp star in reference catalog %s' % (refcatFileName))
+            return False
+        if compColorCount[colors] == 0:
+            printWarning('No comp stars to achieve %s photometry with reference catalog %s' % (colors.upper(), refcatFileName))
+            return False
+        elif compColorCount[colors] == 1:
+            printWarning('Only 1 comp star found to achieve %s photometry with reference catalog %s ; only the comp star method is possible' % (colors.upper(), refcatFileName))
+            return False
+        elif compColorCount[colors] < 5:
+            printWarning('Only %d comp star found to achieve %s photometry with reference catalog %s; do ensemble or ad-hoc standardization carefully' % (colors.upper(), refcatFileName))
+            return false
+
+        # TODO: downgrade colors, if it is better
+
+        return True
 
     def photometry(self, seqFolder, photFolder, refcatFileName, color):
 
@@ -166,6 +226,10 @@ class Pipeline:
         # SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
         self.SOLVE_ARGS = "-O --config %s --use-sextractor --sextractor-path sextractor -r -y -p" % (self.AST_CFG)
 
+#        baseFolders = glob('*' + self.opt['baseFolder'] + '*/')
+#        for bf in baseFolders:
+#            self.inspectRefCat(bf)
+
         ####################################
         # step 1. do photometry for all file
         ####################################
@@ -218,6 +282,8 @@ class MainApp:
         'adhocStd' : False,  # make and use std coeffs for this image only
         'showGraphs': False, # show standard coefficient graphs
         'method'   : 'gcx',  # mg calculation method: comp, gcx, lfit
+        'camera'   : None,   # camera name
+        'telescope': None,   # telescope name
         'overwrite': False,  # force to overwrite existing results, optional
         'files': None,
         'baseFolder': None,  # base folder, optional
@@ -256,6 +322,8 @@ class MainApp:
         print("  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
         print("  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
         print("       --show-graph       show ensemble or standard coefficient graphs for diagnostic or illustration purpose")
+        print("       --camera           set camera name ; this overrides DEF_CAMERA settings in ppl-setup, but does not override the INSTRUME FITS header value")
+        print("       --telescope        set telescope name ; this overrides DEF_TELESCOPE settings in ppl-setup, but does not override the TELESCOP FITS header value")
         print()
         print("Available filter color codes are:")
         print("  Gi | G | gi | g         green channel")
@@ -293,6 +361,10 @@ class MainApp:
                 self.opt['adhocStd'] = True
             elif o == '--show-graph':
                 self.opt['showGraphs'] = True
+            elif o == '--camera':
+                self.opt['camera'] = a
+            elif o == '--telescope':
+                self.opt['telescope'] = a
             elif o == '-t' or o == '--method':
                 if not a in self.mgCalcMethods.keys():
                     printWarning('Invalid mg calculation method %s ; use gcx instead.')

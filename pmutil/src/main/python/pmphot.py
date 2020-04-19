@@ -15,7 +15,7 @@ from os.path import exists
 
 import matplotlib.pyplot as plt
 
-from pmbase import jd, getFitsHeader, printError, loadPplSetup
+from pmbase import jd, getFitsHeaders, printError, loadPplSetup, quad
 
 
 def loadCatalog(refFileName):
@@ -75,14 +75,14 @@ fieldRole = 'ROLE'
 MAG_ERR_DEFAULT = 0.2
 
 
-def getDateObs(fileName):
-    '''
-    fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
-    '''
-    astFileName = fileName.split('.')[0]
-    astFileName = astFileName + '.ast.fits'
-
-    return getFitsHeader(astFileName, 'DATE-OBS')
+#def getDateObs(fileName):
+#    '''
+#    fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
+#    '''
+#    astFileName = fileName.split('.')[0]
+#    astFileName = astFileName + '.ast.fits'
+#
+#    return getFitsHeader(astFileName, 'DATE-OBS')
 
 
 class StdCoeffs:
@@ -160,13 +160,13 @@ class StdCoeffs:
             return rows[0]
         else:
             jdnow = jd(self.date)
-            delta = jdnow - jd(rows[0]['DATE'])
+            delta = abs(jdnow - jd(rows[0]['DATE']))
             ix = 0
             for j in range(len(rows) - 1):
-                d = jdnow - jd(rows[j + 1]['DATE'])
+                d = abs(jdnow - jd(rows[j + 1]['DATE']))
                 if d < delta:
                     delta = d
-                    ix = j
+                    ix = j + 1
             return rows[ix]
 
     def getAvgCoeffs(self):
@@ -185,10 +185,37 @@ class Photometry:
     pos = None  # catalog header positions
     imageProps = {}  # image properties from FITS header
     coeffTable = None
+    fits = {}
 
     def __init__(self, opt, ppl):
         self.opt = opt
         self.ppl = ppl
+
+    def loadFitsHeaders(self, fileName):
+        '''
+        fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
+        '''
+        astFileName = fileName.split('.')[0]
+        astFileName = astFileName + '.ast.fits'
+        self.fits = getFitsHeaders(astFileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
+
+    def getCamera(self):
+        if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
+            return self.fits['INSTRUME']
+        if self.opt['camera'] and len(self.opt['camera']) > 0:
+            return self.opt['camera']
+        if 'DEF_CAMERA' in self.ppl.keys() and self.ppl['DEF_CAMERA'] and len(self.ppl['DEF_CAMERA']) > 0:
+            return self.ppl['DEF_CAMERA']
+        return 'Generic Camera'
+
+    def getTelescope(self):
+        if 'TELESCOP' in self.fits.keys() and self.fits['TELESCOP'] and len(self.fits['TELESCOP']) > 0:
+            return self.fits['TELESCOP']
+        if self.opt['telescope'] and len(self.opt['telescope']) > 0:
+            return self.opt['telescope']
+        if 'DEF_TELESCOPE' in self.ppl.keys() and self.ppl['DEF_TELESCOPE'] and len(self.ppl['DEF_TELESCOPE']) > 0:
+            return self.ppl['DEF_TELESCOPE']
+        return 'Generic Telescope'
 
     def transformMgs(self, refCat, stdcolor, p, err):
         mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
@@ -203,7 +230,7 @@ class Photometry:
                 mv = p[0] * float(pm[miPos]) + p[1]
                 pm[mvPos] = mv
                 if err and pm[rolePos] != 'VF':
-                    pm[evPos] = float(pm[eiPos]) + err
+                    pm[evPos] = quad(float(pm[eiPos]), err)
                 result.append(pm)
 #        print (result)
         return result
@@ -359,43 +386,43 @@ class Photometry:
         stdcolor = self.stdColor(color)
 
         idPos = getHeaderPos(refCat, fieldAuid)
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        # miPos = getHeaderPos(refCat, fieldMgInstrumental)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
         eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
         rolePos = getHeaderPos(refCat, fieldRole)
 
-        # p = [1.0, 0.0]
+        mvPosList = {}
+        evPosList = {}
+        for c in self.opt['color']:
+            mvPosList[c] = getHeaderPos(refCat, 'MAG_' + self.stdColor(c))
+            evPosList[c] = getHeaderPos(refCat, 'ERR_' + self.stdColor(c))
+
         emin = 1.0
-        # ep = 0.0
-        # compId = None
         bestComp = None
         for pm in refCat['cat']:
-            if pm[rolePos] == 'C' and pm[mvPos] != '-' and pm[evPos] != '-' and pm[evPos] != '0.0':
+            mvs = pm[mvPosList[color]]
+            evs = pm[evPosList[color]]
+            if pm[rolePos] == 'C' and mvs != '-' and evs != '-' and evs != '0.0':
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
-                ev = float(pm[evPos])
+                ev = float(evs)
                 e = ei * ei + ev * ev
+                #print("id:%s, ei:%s, ev:%s e:%7.4f" % (pm[idPos], pm[eiPos], evs, sqrt(e)))
                 if e < emin:
                     haveAllMags = True
                     for c in self.opt['color']:
                        if c != color:
-                           r = self.findRow(allCatalogs[color]['cat'], pm[idPos])
-                           if r[mvPos] == '-' or r[evPos] == '-':
+                           #print("  %s mv:%s ev:%s" % (c, pm[mvPosList[c]], pm[evPosList[c]]))
+                           if pm[mvPosList[c]] == '-' or pm[evPosList[c]] == '-':
                                haveAllMags = False
                                break
                     if not haveAllMags:
                         continue
                     emin = e
                     bestComp = pm
-                    # p[1] = float(pm[mvPos]) - float(pm[miPos])
-                    # ep = ev + ei
-                    # compId = pm[idPos]
 
-        ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
-        ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
-        e = sqrt(ei * ei + ev * ev)
+        ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
+        ev = float(bestComp[evPosList[color]]) if bestComp[evPosList[color]] != '-' else MAG_ERR_DEFAULT
+        e = quad(ei, ev)
         bestComp[rolePos] = 'K'
-        print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPos], e))
+        print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPosList[color]], e))
         return bestComp[idPos]
 
     def calculateMgsComparision(self, refCat, color, bestCompId):
@@ -416,7 +443,7 @@ class Photometry:
         p = [ 1.0, zp ]
         ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
         ev = float(bestComp[evPos]) if bestComp[evPos] != '-' else MAG_ERR_DEFAULT
-        ep = sqrt(ei * ei + ev * ev)
+        ep = quad(ei, ev)
 
         if self.opt['showGraphs']:
             mi = []
@@ -666,7 +693,7 @@ class Photometry:
         if not self.coeffTable:
             configFolder = self.ppl['CONFIG_FOLDER'].rstrip('/')
             coeffFile = configFolder + '/stdcoeffs.cat'
-            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, 'Canon EOS 1100D'.replace(' ', '_'), '250/1200 T'.replace(' ', '_'))
+            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, self.getCamera().replace(' ', '_'), self.getTelescope().replace(' ', '_'))
             self.coeffTable.open()
 
     def saveCoeffs(self, coeffs, obsDate):
@@ -676,9 +703,11 @@ class Photometry:
 
     def loadCoeffs(self, obsDate):
         self.openCoeffs(obsDate)
-        bestCoeffs = self.coeffTable.readBestCoeffs()
+        bestCoeffs = self.coeffTable.getBestCoeffs()
         if not bestCoeffs:
+            printWarning ('standard coeffs not found')
             return None
+        print ('standard coeffs: Tv =', bestCoeffs['TV'], 'Tvr =', bestCoeffs['TVR'], 'Tbv = ', bestCoeffs['TBV'])
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
     def calculateStdMgs(self, coeffs, allCatalogs, bestComp):
@@ -777,7 +806,9 @@ class Photometry:
         # find best comp star in Gi frame
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         indexGi = self.opt['color'].index(color)
-        dateObs = getDateObs(self.opt['files'][indexGi])
+        #dateObs = getDateObs(self.opt['files'][indexGi])
+        self.loadFitsHeaders(self.opt['files'][indexGi])
+        dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
         bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
 
@@ -845,6 +876,8 @@ class MainApp:
         'saveCoeffs': False,  # save std coeffs
         'showGraphs': False,  # show standard coefficient graphs
         'observer': 'XXX',  # observer code
+        'camera'   : None,   # camera name
+        'telescope': None,   # telescope name
         'files': None,
         }
 

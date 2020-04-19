@@ -13,6 +13,7 @@ from os.path import isfile
 from datetime import datetime
 from glob import glob
 from astropy.io import fits
+from astropy.time import Time
 from math import sqrt
 import subprocess
 
@@ -151,27 +152,8 @@ def deg2hexa(d):
 
 
 def jd(dateObs):
-    # d = datetime.fromisoformat(dateObs) # python 3.7+
-    dt = dateObs.split('T')
-    dd = dt[0].split('-')
-    tt = dt[1].split(':')
-    d = datetime(int(dd[0]), int(dd[1]), int(dd[2]), int(tt[0]), int(tt[1]), int(tt[2]))
-
-    if d.month == 1 or d.month == 2:
-        d.year -= 1
-        d.month += 12
-    if d.month > 2:
-        year = d.year
-        month = d.month
-    if year >= 1582:
-        a = int(year / 100)
-        b = 2 - a + int(a / 4)
-    else:
-        b = 0
-
-    day = d.day + d.hour / 24 + d.minute / (24 * 60) + d.second / (24 * 3600)
-    jd = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + day + b - 1524.5
-    return jd
+    t = Time(dateObs, format='isot')
+    return t.jd
 
 
 def getPair(s, delim = ','):
@@ -303,7 +285,7 @@ def findInFile(fileName, s):
     f.close()
     return None
 
-def quad(a ,b):
+def quad(a, b):
     return sqrt(a*a + b*b)
 
 # end pmbase.

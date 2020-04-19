@@ -1,17 +1,33 @@
 TODO
 ----
 
-NEW BUGS:
+NEW CALIBRATION BUGS:
 
-+ colorize: az ekvalizacio reszt try/except blokkba kell tenni, ha exception keletkezik, akkor helyette linear modban meghivni
+- ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
 
-- calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
+(533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
 
-- calib: 20200404: kalibracio hibas
+(527) calib: 20200404: kalibracio hibas
 
 	ficalib: error: dark image size differs from the expected image size.
 
 	A dark keppel lesz valami gond, a 20200331-i darkkal jo
+
+- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
+
+
+NEW PHOTOMETRY BUGS:
+
+- !!! ppl-refcat elszall coord lekerdezesre:
+
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-refcat", line 512, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-refcat", line 503, in run
+	    cat.execute()
+	  File "/home/kovi/bin/ppl-refcat", line 334, in execute
+	    s_ra = deg2hexa(float(self.opt['ra']) / 15.0)
+	ValueError: could not convert string to float: '08:51:18'
 
 - !!! aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
 
@@ -56,7 +72,7 @@ NEW BUGS:
 	ValueError: could not convert string to float: '-'
 
 
-- !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
+(529) !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
 
 - !!! pmfilter: hmg szamitas felulvizsgalata
 
@@ -64,36 +80,68 @@ NEW BUGS:
 
 NEW IDEAS:
 
+-NEW: OSBERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
+
+- colorize: ha vilagos a hatter, pl. hold vilagit, akkor a kep osszerakasnal kell egy hatter modellezes, es azt levonni
+
+- calib: kell valami eszkoz a kalibracios kepek minosegenek ellenorzesere, es ezt ki is kell iratni, 
+	es ha nem olyan jo a minoseg, akkor jelezni
+
+(530) a ppl-setup keruljon be a .pmlib-be, es legyen altalanos formatumu
+
+- pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
+
+- more standard areas:
+
+	https://www.aavso.org/apps/vsd/stdfields
+
+	https://www.aavso.org/apps/vsp/chart/?title=NGC%201252&ra=47.704167&dec=-57.766667&fov=120&maglimit=14.5&special=std_field&B=on&Rc=on&Ic=on&north=down&east=right
+
+	https://www.aavso.org/apps/vsp/photometry/?fov=15&B=on&north=down&maglimit=16&title=M11&ra=282.77292&Rc=on&Ic=on&east=right&dec=-6.266667&special=std_field
+
+	AAVSO VSP:
+
+	Table 6.1 – Standard clusters
+	Name              RA       Dec       Mag Range Diameter(arc min)	Comps
+	/NGC 1252          03:10:49 -57:46:00 8 – 15    300+			36
+	M67               08:51:18 +11:48:00 7 – 16    74			211
+	/NGC 3532          11:05:39 -58:45:12 8 – 13.5  30			288
+	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450			92	Melotte 111
+	M11               18:51:05 -06:16:12 8.5 – 17  20			416
+	NGC 7790          23:58:23 +61:12:25 10 – 20   7			218
+
+	SA20		  01	   +45			40			23
+	SA23		  04	   +45			30			16
+	SA26		  07	   +45               	30			16
+	SA29		  10	   +45			60			15
+	SA32		  13	   +45			60			22
+	SA35		  16	   +45			40			18
+	SA38		  19	   +45			20			16
+	SA41		  22	   +45			30			13
+
+- cosmetic: less output from photometry (sextractor) apps
+
+- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
+	a kep koordinataja alapjan keszitsen refcat-ot
+	a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
+		vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
+	feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
+
+- kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
+
+TECH UPGRADE:
+
 - colorize: astropy.visualization normalizalas
 
 - photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
 
 - refcat: astropy.io.votable - egyszerubb votable kezeles 
 
-- calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
-
-- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
-
-- autoclean: lehetne egy kapcsolo, hogy a feldolgozas vegen tol egy clean-t, es csak az eredmeny file-ok maradnak meg
-
-- pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
-
-- more standard areas:
-
-	AAVSO VSP:
-
-	Table 6.1 – Standard clusters
-	Name              RA       Dec       Mag Range Diameter(arc min)
-	NGC 1252          03:10:49 -57:46:00 8 – 15    300+
-	M67               08:51:18 +11:48:00 7 – 16    74
-	NGC 3532          11:05:39 -58:45:12 8 – 13.5  30
-	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450
-	M11               18:51:05 -06:16:12 8.5 – 17  20
-	NGC 7790          23:58:23 +61:12:25 10 – 20   7
-
 - Katalogus kezeles astropy.table.Table segitsegevel
 
 	pmphot, pmresult
+
+- SCAMP: grmatch helyett
 
 - fiphot: sextractor helyett
 
@@ -114,18 +162,6 @@ NEW IDEAS:
 	done
 
 	grcollect ${TEMPDIR}/${SEQ_FILE_PREFIX}*.phot --col-base 2 --prefix ${TEMPDIR}/ --extension lc --max-memory 256m
-
-- SCAMP: grmatch helyett
-
-- cosmetic: less output from photometry (sextractor) apps
-
-- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
-	a kep koordinataja alapjan keszitsen refcat-ot
-	a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
-		vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
-	feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
-
-- kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
 
 
 === V 1.1 ==================================================
@@ -152,19 +188,30 @@ NEW IDEAS:
 
 (450) !!! standardization (s15n)
 
+	- !!! a comp star szamolast es a std keszitest szet kell valasztani:
+
+		1. hatarozza meg a polinomot comp/gcx/lfit modszerrel
+
+		2. szamoljon comp mC, eC ertekeket
+
+		3. szamoljon var mC, eC ertekeket instr/std modszerrel
+
 	- ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
 
-	- best comp star kepernyo kiiratasnal rossz a hiba erteke: 0.2
+	+ best comp star kepernyo kiiratasnal rossz a hiba erteke: 0.2
 
 	- az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 		az std rendben van, a tobbit kell megnezni
 
-	- mentes coeff file-ba
+	- !!! mentes coeff file-ba
 
 		- ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
 		  overwrite modban update-elje az ertekeket
 
-		- hianyzo adatok: +observer, +image date, camera, telescope, field
+		- hianyzo adatok: +observer, +image date, +camera, +telescope, field
+
+			+ a kamera/tavcso adatok keruljenek defaultban a ppl-setup-ba, de legzen opcio a felulirasara.
+			  a feldolgozas nezze meg, hogy benne van-e a fits-ben, ha ott van, akkor azt hasznalja
 
 		- calculate coeff errors
 
@@ -172,6 +219,8 @@ NEW IDEAS:
 
 		? ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
 			vagy atlagoljuk oket? utobbi esetben el kell tarolni, hogy hany adatbol keszult, azzel lehet atlagolni
+
+
 
 	- average coeff szamolasa
 
@@ -191,6 +240,8 @@ NEW IDEAS:
 
 --- calibration --------------------------------------------
 
+(528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
+
 --- photometry ---------------------------------------------
 
 (522) kappa-sigma iteracio egyenes illesztesnel
@@ -208,6 +259,8 @@ NEW IDEAS:
 (451) whole frame photometry
 
 === V 2.0 ==================================================
+
+(532) autoclean: lehetne egy kapcsolo, hogy a feldolgozas vegen tol egy clean-t, es csak az eredmeny file-ok maradnak meg
 
 (493) Szűrő nélküli CCD képek kezelése
 
@@ -272,6 +325,12 @@ NEW IDEAS:
 
 === NOT VERSIONED  ==================================================
 
+(535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
+
+	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
+
+(534) ppl-refcat: ha coord volt megadva, akkor nézze meg, hogy a változók között van-e olyan, ami elég közel esik a kép közepéhez, és inkább ez legyen a catalog neve.
+
 (525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
 	- ezt a colorize csinalja? ez lenne a legjobb
 	- csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
@@ -280,6 +339,8 @@ NEW IDEAS:
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
+
+(531) calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 
 (492) Szintetikus bias, dark és flat képek használata
 
