@@ -108,6 +108,7 @@ warn_py_module "numpy" "1.16"
 warn_py_module "xmltodict" "0.12"
 warn_py_module "astropy" "4.0"
 warn_py_module "matplotlib" "3.1"
+warn_py_module "photutils" "0.7"
 warn_py_module "Pillow" "5.1"
 
 # FITSH
@@ -195,14 +196,14 @@ create_link "pmrefcat.py" "ppl-refcat"
 create_link "pmclean.py" "ppl-clean"
 create_link "pmcolorize.py" "ppl-colorize"
 
-chmod 0755 ${DEST_FOLDER}/*
+chmod 0755 "${DEST_FOLDER}/*"
 
 #############################
 # copy external config files
 #############################
 
 CONFIG_FOLDER="$HOME/.pmlib"
-print_info "Copy config files to $CONFIG_FOLDER."
+print_info "Copy config files to $DEST_FOLDER."
 
 CONFIG_BASE=${BASE_FOLDER%/src/main}
 CONFIG_BASE="$CONFIG_BASE/etc"
@@ -212,8 +213,8 @@ if [ ! -d "$CONFIG_FOLDER" ]; then
 fi
 
 # sextractor files: sex.cfg, sex.param
-cp "$CONFIG_BASE/sex.cfg" "$CONFIG_FOLDER"
-cp "$CONFIG_BASE/sex.param" "$CONFIG_FOLDER"
-cp "$CONFIG_BASE/astrometry.cfg" "$CONFIG_FOLDER"
+cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"
+cp "$CONFIG_BASE/sex.param" "$DEST_FOLDER"
+cp "$CONFIG_BASE/astrometry.cfg" "$DEST_FOLDER"
 
 print_info "Configure pmutil successfully ended."

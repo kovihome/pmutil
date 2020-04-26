@@ -5,7 +5,13 @@ NEW CALIBRATION BUGS:
 
 - ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
 
+	- photutils le tudja vonnia hatteret
+
+	>>> sudo pip3 install photutils
+
 (533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
+
+	- ugy tunik, hogy a background levonas megoldja
 
 (527) calib: 20200404: kalibracio hibas
 
@@ -17,6 +23,8 @@ NEW CALIBRATION BUGS:
 
 
 NEW PHOTOMETRY BUGS:
+
+- !!! 20200404_bc_uma eseteben hmg-re 20.2 mg-t adott, hibara 4.195-ot
 
 - !!! ppl-refcat elszall coord lekerdezesre:
 
@@ -30,6 +38,8 @@ NEW PHOTOMETRY BUGS:
 	ValueError: could not convert string to float: '08:51:18'
 
 - !!! aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
+
+	a .pm file-okban is igy van
 
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
@@ -195,6 +205,17 @@ TECH UPGRADE:
 		2. szamoljon comp mC, eC ertekeket
 
 		3. szamoljon var mC, eC ertekeket instr/std modszerrel
+
+		method		std		result
+
+		comp		none		normal inst mg			kevés comp esetén
+
+				use		normal std mg			kevés comp és létező coeffs esetén, adhoc nem lehetséges
+				
+		gcx/lfit	none		ensemble inst mg		sok comp esetén
+
+				use		ensemble std mg			sok comp és létező coeffs esetén
+
 
 	- ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
 

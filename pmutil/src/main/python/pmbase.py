@@ -12,10 +12,15 @@ from os import getenv, makedirs
 from os.path import isfile
 from datetime import datetime
 from glob import glob
-from astropy.io import fits
-from astropy.time import Time
 from math import sqrt
 import subprocess
+
+import numpy as np
+from astropy.io import fits
+from astropy.time import Time
+from astropy.stats import SigmaClip
+from photutils import Background2D, MedianBackground
+
 
 Color_Off = '\033[0m'  # Text Reset
 BRed = "\033[1;31m"  # Red
@@ -272,6 +277,18 @@ def setFitsHeaders(fitsFileName, headers):
     h = hdul[0].header
     for key in headers.keys():
         h[key] = headers[key]
+    hdul.flush()
+    hdul.close()
+
+
+def subtractFitsBackground(fitsFileName):
+    hdul = fits.open(fitsFileName, mode='update')
+    data = hdul[0].data
+    sigma_clip = SigmaClip(sigma = 3.0)
+    bkg_estimator = MedianBackground()
+    bkg = Background2D(data, (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
+    #print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+    data -= bkg.background
     hdul.flush()
     hdul.close()
 

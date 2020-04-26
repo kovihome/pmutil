@@ -18,7 +18,7 @@ from os.path import isdir, exists, basename
 from shutil import copyfile
 import time
 
-from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile
+from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
 from pmdisco import Discovery
 
 
@@ -29,8 +29,10 @@ class Pipeline:
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
-    FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
-    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,magnitude,power=2 --triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 3 --comment"
+    FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux --sort flux"
+#   FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux"
+#    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation maxnumber=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 3 --comment"
+    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation delaunay,level=1,maxnumber=10,conformable,auto,unitarity=0.002 --order 1 --max-distance 2 --comment"
     FICOMBINE_ARGS = "-m sum -n"
 
     TEMPDIR = "temp"
@@ -88,6 +90,16 @@ class Pipeline:
         d = datetime(*time.gmtime(m_avg)[:6])
         setFitsHeaders(targetFile, { 'EXPTIME': e_sum, 'DATE-MID': (d.isoformat(), 'Effective center of time of observation')  })
         print('observation center time:', d.isoformat(), 'cumulated exptime:', str(e_sum), 'sec')
+
+    def invoked(self, cmd):
+        if self.opt['debug']:
+            print(cmd)
+        result = invoke(cmd)
+        if result.startswith('ERROR:'):
+            printError(result[len('ERROR: '):])
+        elif self.opt['debug']:
+            print(result)
+        return result
 
     def raw2fitsFile(self, rawfile, color):
         FITS_NAME = "%s-%s.fits" % (rawfile[:rawfile.rfind('.')], color)
@@ -247,7 +259,12 @@ class Pipeline:
         R_IOBJLIST = list(map(lambda x: calibFolder + '/' + basename(x), IOBJLIST))
 
         # The calibration of the object images:
-        invoke("ficalib -i %s %s %s -o %s --input-master-bias %s --input-master-dark %s --input-master-flat %s" % (' '.join(IOBJLIST), self.COMMON_ARGS, self.imSizeArg(IOBJLIST[0]), ' '.join(R_IOBJLIST), MB, MD, MF))
+        self.invoked("ficalib -i %s %s %s -o %s --input-master-bias %s --input-master-dark %s --input-master-flat %s" % (' '.join(IOBJLIST), self.COMMON_ARGS, self.imSizeArg(IOBJLIST[0]), ' '.join(R_IOBJLIST), MB, MD, MF))
+
+        # subtract background
+        print("Subtract background for %s" % (CALIB_PATTERN))
+        for fitsFileName in R_IOBJLIST:
+            subtractFitsBackground(fitsFileName)
 
         return 0
 
@@ -267,7 +284,7 @@ class Pipeline:
         # make reference image from the first one
         print("set reference image: " + COBJLIST[0])
         REF = "%s/ref-%s.stars" % (self.TEMPDIR, color)
-        invoke("fistar %s %s -o %s" % (COBJLIST[0], self.FISTAR_ARGS, REF))
+        self.invoked("fistar %s %s -o %s" % (COBJLIST[0], self.FISTAR_ARGS, REF))
         copyfile(COBJLIST[0], "%s/%s" % (self.TEMPDIR, basename(COBJLIST[0])))
 
         # Registration of the source images:
@@ -280,10 +297,14 @@ class Pipeline:
             fstars = pbn + ".stars"
             ftrans = pbn + ".trans"
 
-            invoke("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
+#            ftrans = ftrans.replace(color, 'Gi')
+#            matchFailed = 0
+#            if not exists(ftrans):
+
+            self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
 
             matchFailed = 0
-            answer = invoke("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
+            answer = self.invoked("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
             if answer.startswith('ERROR'):
                 matchFailed = 1
             else:
@@ -298,7 +319,7 @@ class Pipeline:
                     self.exitOnError()
 
             if matchFailed == 0  or self.opt['onError'] == "noop":
-                invoke("fitrans %s --input-transformation %s --reverse -k -o %s" % (f, ftrans, pbn))
+                self.invoked("fitrans %s --input-transformation %s --reverse -k -o %s" % (f, ftrans, pbn))
 
         # list of transformed frames
         TR_PATTERN = "%s/%s*-%s.fits" % (self.TEMPDIR, self.pplSetup['LIGHT_FILE_PREFIX'], color)
@@ -312,22 +333,23 @@ class Pipeline:
                 fi = "%03d" % (a / cc)
                 combined = "%s/%s%s-%s.fits" % (seqFolder, self.pplSetup['SEQ_FILE_PREFIX'], fi, color)
                 print("combine " + combined)
-                invoke("ficombine %s %s -o %s" % (' '.join(TROBJLIST[a:a + cc]), self.FICOMBINE_ARGS, combined))
+                self.invoked("ficombine %s %s -o %s" % (' '.join(TROBJLIST[a:a + cc]), self.FICOMBINE_ARGS, combined))
                 self.sumDateObs(combined, TROBJLIST[a:a + cc])
 
         # create a combined frame of all images
         print("combine %s -> %s" % (TR_PATTERN, COMBINED_FILE))
-        invoke("ficombine %s %s -o %s" % (' '.join(TROBJLIST), self.FICOMBINE_ARGS, COMBINED_FILE))
+        self.invoked("ficombine %s %s -o %s" % (' '.join(TROBJLIST), self.FICOMBINE_ARGS, COMBINED_FILE))
         self.sumDateObs(COMBINED_FILE, TROBJLIST)
 
         # cleanup - remove temp files
         for f in TROBJLIST:
             os.remove(f)
         os.remove(REF)
-        for f in glob.glob(self.TEMPDIR + '/*.stars'):
-            os.remove(f)
-        for f in glob.glob(self.TEMPDIR + '/*.trans'):
-            os.remove(f)
+        if not self.opt['debug']:
+            for f in glob.glob(self.TEMPDIR + '/*.stars'):
+                os.remove(f)
+            for f in glob.glob(self.TEMPDIR + '/*.trans'):
+                os.remove(f)
 
     def mastersExist(self, folder, prefix):
         for color in self.opt['color']:
@@ -501,6 +523,7 @@ class MainApp:
         'overwrite': False,  # force to overwrite existing results, optional
         'baseFolder': None,  # base folder, optional
         'calibFolder': None,  # optional folder for calibration frames (bias, dark, flat)
+        'debug': False, # debug mode
         }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
@@ -528,6 +551,7 @@ class MainApp:
         print("       --calib-folder folder     alternative folder for calibration frames (bias, dark, flat)")
         print("  -w,  --overwrite               force to overwrite existing results")
         print("  -e,  --on-error noop|skip|stop specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all")
+        print("       --debug                   print useful debugging informations ; reserve temp folder content")
         print("  -h,  --help                    print this page")
         print()
         print("Available filter color codes are:")
@@ -539,7 +563,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder='])
+            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'debug'])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -553,7 +577,7 @@ class MainApp:
                     printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % (a))
                     exit(1)
                 if color == 'all':
-                    self.opt['color'] = ['Ri', 'Gi', 'Bi']
+                    self.opt['color'] = ['Gi', 'Ri', 'Bi']
                 else:
                     self.opt['color'] = [a]
             elif o == '-f' or o == '--flat':
@@ -580,6 +604,8 @@ class MainApp:
                     self.opt['calibFolder'] = a
             elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
+            elif o == '--debug':
+                self.opt['debug'] = True
             elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)

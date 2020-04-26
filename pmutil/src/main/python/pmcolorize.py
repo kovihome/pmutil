@@ -12,7 +12,10 @@ from sys import argv
 from glob import glob
 from os.path import isdir, exists
 from matplotlib.image import imsave
+from matplotlib.pyplot import imshow
 from astropy.io import fits
+from astropy.stats import SigmaClip
+from photutils import Background2D, MedianBackground
 import numpy as np
 
 from pmbase import printError, printInfo, loadPplSetup, Blue, Color_Off, BGreen
@@ -43,6 +46,15 @@ class Colorize:
         self.opt = opt
         if 'scaleMethod' in self.opt:
             self.SCALE_METHOD = self.opt['scaleMethod']
+
+    def doSubtractBackground(self, rgb):
+        sigma_clip = SigmaClip(sigma = 3.0)
+        bkg_estimator = MedianBackground()
+        for j in range(3):
+            bkg = Background2D(rgb[j], (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
+            #print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+            rgb[j] -= bkg.background
+            imshow(bkg.background, origin='lower', cmap='Greys_r')
 
     def doScaling(self, img, rgb):
         for j in range(3):
@@ -87,6 +99,7 @@ class Colorize:
         # need some normalization
 
         try:
+            self.doSubtractBackground(rgb)
             self.doScaling(img, rgb)
             self.saveImage(img, imgFileName)
         except ValueError as e:

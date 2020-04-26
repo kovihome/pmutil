@@ -80,9 +80,7 @@ class CatalogMatcher:
         '''
 
         # 1. convert refCat to fits format
-        # TODO: move this part into pmrefcat, do this when the reference catalog is created
-
-        refFitsFile = refCatFile + '.fits'  # 'ref_cat.fits'
+        refFitsFile = refCatFile + '.fits'
         table = Table.read(refCatFile, format = 'ascii')
         if not exists(refFitsFile):
             table.write(refFitsFile)
@@ -90,12 +88,11 @@ class CatalogMatcher:
         # 2. calculate ref objects' frame xy points
         wcsFile = pmCatFile.replace('.cat', '.wcs')
         axyFile = pmCatFile.replace('.cat', '.ref.axy')
-        invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG -f " % (wcsFile, refFitsFile, axyFile))
+        invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG" % (wcsFile, refFitsFile, axyFile))  # -f option need argument
 
         remove(refFitsFile)
 
         # 3. merge frame xy point to refCat
-#        refCatExFile = pmCatFile.replace('.cat', '.axy.cat')
         tlen = len(table)
         table['X'] = [0.0] * tlen
         table['Y'] = [0.0] * tlen
@@ -145,8 +142,9 @@ class CatalogMatcher:
                 d = sqrt(dx * dx + dy * dy)
 
             if onFrameStatus == '' and matched:
-                print('AUID: %s, ID:%d, d:%f, OK, on-frame and mathed' % (table[j]['AUID'], pmid, d))
+                # print('AUID: %s, ID:%d, d:%f, OK, on-frame and mathed' % (table[j]['AUID'], pmid, d))
                 if d > 2.0:
+                    print('AUID: %s, ID:%d, d:%f, OK, on-frame and mathed' % (table[j]['AUID'], pmid, d))
                     print('   and too large distance')
                 if table[j]['ROLE'] == 'V' and float(pmrow['MAG_BEST']) > hmgs[1]:
                     print('   and under limit, mi:%7.3f, hmg:%7.3f' % (float(pmrow['MAG_BEST']), hmgs[1]))
@@ -193,7 +191,6 @@ class CatalogMatcher:
             outf.write(h.ljust(30))
         outf.write('\n')
 
-#        rlen = len(refCat['header'])
         goodRoles = [ 'C', 'V', 'VF' ]
         for ref in refTable:
             if ref['ROLE_'] not in goodRoles:

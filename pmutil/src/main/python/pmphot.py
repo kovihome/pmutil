@@ -418,12 +418,16 @@ class Photometry:
                     emin = e
                     bestComp = pm
 
-        ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
-        ev = float(bestComp[evPosList[color]]) if bestComp[evPosList[color]] != '-' else MAG_ERR_DEFAULT
-        e = quad(ei, ev)
-        bestComp[rolePos] = 'K'
-        print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPosList[color]], e))
-        return bestComp[idPos]
+        if bestComp:
+            ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
+            ev = float(bestComp[evPosList[color]]) if bestComp[evPosList[color]] != '-' else MAG_ERR_DEFAULT
+            e = quad(ei, ev)
+            bestComp[rolePos] = 'K'
+            print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPosList[color]], e))
+            return bestComp[idPos]
+        else:
+            printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
+            return None
 
     def calculateMgsComparision(self, refCat, color, bestCompId):
         stdcolor = self.stdColor(color)
@@ -811,6 +815,8 @@ class Photometry:
         dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
         bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
+        if not bestComp:
+            return False
 
         # calculate instrumental mgs
         allResults = {}
@@ -862,6 +868,8 @@ class Photometry:
             color = self.opt['color'][j]
 
             self.reportResult(allResults[color], allCatalogs[color], fileName + '.pm', color, dateObs)
+
+        return True
 
 
 class MainApp:
