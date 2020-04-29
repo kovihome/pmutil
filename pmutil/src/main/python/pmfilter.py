@@ -32,7 +32,7 @@ class CatalogMatcher:
 
     refTrailerHeaders = [ 'LABEL']
 
-    HMG_MAX_ERR = 0.4
+    HMG_MAX_ERR = 0.15
     HMG_SIGMA = 3.0
 
     IMAGE_BORDER_SIZE = 10  # pixels

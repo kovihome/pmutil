@@ -202,7 +202,7 @@ class Photometry:
     def getCamera(self):
         if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
             return self.fits['INSTRUME']
-        if self.opt['camera'] and len(self.opt['camera']) > 0:
+        if 'camera' in self.opt and self.opt['camera'] and len(self.opt['camera']) > 0:
             return self.opt['camera']
         if 'DEF_CAMERA' in self.ppl.keys() and self.ppl['DEF_CAMERA'] and len(self.ppl['DEF_CAMERA']) > 0:
             return self.ppl['DEF_CAMERA']
@@ -211,7 +211,7 @@ class Photometry:
     def getTelescope(self):
         if 'TELESCOP' in self.fits.keys() and self.fits['TELESCOP'] and len(self.fits['TELESCOP']) > 0:
             return self.fits['TELESCOP']
-        if self.opt['telescope'] and len(self.opt['telescope']) > 0:
+        if 'telescope' in self.opt and self.opt['telescope'] and len(self.opt['telescope']) > 0:
             return self.opt['telescope']
         if 'DEF_TELESCOPE' in self.ppl.keys() and self.ppl['DEF_TELESCOPE'] and len(self.ppl['DEF_TELESCOPE']) > 0:
             return self.ppl['DEF_TELESCOPE']
@@ -231,8 +231,10 @@ class Photometry:
                 pm[mvPos] = mv
                 if err and pm[rolePos] != 'VF':
                     pm[evPos] = quad(float(pm[eiPos]), err)
+                    print("c:",stdcolor,"ei:",pm[eiPos],"err:",err,"ev:",pm[evPos])
+                else:
+                    pm[evPos] = 0.0
                 result.append(pm)
-#        print (result)
         return result
 
     def stdColor(self, color):
@@ -297,23 +299,24 @@ class Photometry:
             alpha = 1.0
             for k in range(len(y)):
                 r[k] = y[k] - z
-                r_k = (y[k] - z) * sqrt(w[k])
                 w_k = w[k] / (1 + (r[k] / alpha) ** beta)
                 w_[k] = w_k
-                r_[k] = r_k
-                zsum = zsum + (y[k]) * w_k
+                zsum = zsum + y[k] * w_k
                 wsum = wsum + w_k
             z = zsum / wsum
         # iteration ends
 
         su = 0.0
         sl = 0.0
+        se2 = 0.0
         for k in range(len(y)):
             su = su + r[k] * r[k] * w_[k]
             sl = sl + w_[k]
+            se2 = se2 + 1.0 / (w_[k] * w_[k])
         ez_2 = su / sl
         mel_2 = su / float(len(y) - 1)
-        print ("zp:", z, "mel^2:", mel_2, "ez^2:", ez_2, "ez:", sqrt(ez_2), "len y:", len(y))
+        err = sqrt(se2 / len(y))
+        print ("c: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, sqrt(ez_2), len(y), err))
 
         if self.opt['showGraphs']:
             plotcolor = color[0].lower()
@@ -324,7 +327,7 @@ class Photometry:
             plt.ylabel(stdcolor)
 
         # apply result to variables
-        result = self.transformMgs(refCat, stdcolor, [1.0, z], sqrt(ez_2))
+        result = self.transformMgs(refCat, stdcolor, [1.0, z], err)
         return result
 
     def calculateMgsLinearFit(self, refCat, color, bestCompId):
@@ -358,13 +361,13 @@ class Photometry:
                 ei = float(pm[eiPos])
                 ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
                 e2 = ei * ei + ev * ev
-                ep = ep + sqrt(e2)
+                ep = ep + e2
                 N = N + 1
                 er.append(1.0 / e2)
 
 #        p = Polynomial.fit(mi, mv, 1, w = er)
         coef = self.linfit(mi, mv, er)
-        ep = ep / sqrt(float(N * N * N))
+        ep = sqrt(ep / float(N))
 
         print ('polyfit result:', coef, 'error:', ep)
 
@@ -495,7 +498,7 @@ class Photometry:
         labelPos = getHeaderPos(refCat, 'LABEL')
         astIdPos = getHeaderPos(refCat, 'NUMBER')
         mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        evPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
         raPos = getHeaderPos(refCat, 'RA')
         decPos = getHeaderPos(refCat, 'DEC')
         rolePos = getHeaderPos(refCat, fieldRole)
@@ -541,7 +544,7 @@ class Photometry:
             r.write(("%6.3f" % (float(res[mvPos]))).ljust(20))
             c = stdcolor if self.opt['useCoeffs'] else color
             r.write(c.ljust(5))
-            r.write(("%5.3f" % (float(res[evPos])) if res[evPos] != '-' else '-').ljust(20))
+            r.write(("%5.3f" % (float(res[evPos])) if res[evPos] != '-' and flag != 'F' else '-').ljust(20))
             r.write('\n')
 
         r.close()
@@ -703,7 +706,8 @@ class Photometry:
     def saveCoeffs(self, coeffs, obsDate):
         self.openCoeffs(obsDate)
         self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, 'SA104'.replace(' ', '_'))
-        self.coeffTable.save(overwrite=True)
+#        self.coeffTable.save(overwrite=True)
+        self.coeffTable.save()
 
     def loadCoeffs(self, obsDate):
         self.openCoeffs(obsDate)

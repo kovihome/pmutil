@@ -11,7 +11,7 @@ NEW CALIBRATION BUGS:
 
 (533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
 
-	- ugy tunik, hogy a background levonas megoldja
+	- ugy tunik, hogy a background levonas megoldja, de megsem
 
 (527) calib: 20200404: kalibracio hibas
 
@@ -24,7 +24,7 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
-- !!! 20200404_bc_uma eseteben hmg-re 20.2 mg-t adott, hibara 4.195-ot
+- !!! negativ eszlelesnel ne akarjon std-t csinalni
 
 - !!! ppl-refcat elszall coord lekerdezesre:
 
@@ -36,10 +36,6 @@ NEW PHOTOMETRY BUGS:
 	  File "/home/kovi/bin/ppl-refcat", line 334, in execute
 	    s_ra = deg2hexa(float(self.opt['ra']) / 15.0)
 	ValueError: could not convert string to float: '08:51:18'
-
-- !!! aavso result: mintha az osszes ERR_x ugyan az az ertek lenne
-
-	a .pm file-okban is igy van
 
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
@@ -84,15 +80,23 @@ NEW PHOTOMETRY BUGS:
 
 (529) !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
 
-- !!! pmfilter: hmg szamitas felulvizsgalata
-
 (526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
 NEW IDEAS:
 
--NEW: OSBERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
+-NEW: refcat: legyen egy -g --guess opcio, aminel a folder nevbol probalja kitalalni, hogy mi a csillag neve
 
-- colorize: ha vilagos a hatter, pl. hold vilagit, akkor a kep osszerakasnal kell egy hatter modellezes, es azt levonni
+	- a folder nev elejerol vegye el a szamokat, ha az datumnak nez ki
+
+	- keressen a letoltott refcat-k kozott olyat, ami a folder nevvel kezdodik
+
+	- ha ilyen nincs, keressen a VSX-ben ezzel kezdodot
+
+	- ha ilyen sincs, akkor a folder/Sequence/Combined-Gi.fits alapjan keressen
+
+-NEW: OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
+
++ colorize: ha vilagos a hatter, pl. hold vilagit, akkor a kep osszerakasnal kell egy hatter modellezes, es azt levonni
 
 - calib: kell valami eszkoz a kalibracios kepek minosegenek ellenorzesere, es ezt ki is kell iratni, 
 	es ha nem olyan jo a minoseg, akkor jelezni

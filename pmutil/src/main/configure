@@ -104,12 +104,13 @@ warn_version "$PYTHON3_VERSION" "$PYTHON3_MINVERSION" "python3"
 
 # python3 modules
 
-warn_py_module "numpy" "1.16"
-warn_py_module "xmltodict" "0.12"
 warn_py_module "astropy" "4.0"
 warn_py_module "matplotlib" "3.1"
+warn_py_module "numpy" "1.16"
 warn_py_module "photutils" "0.7"
 warn_py_module "Pillow" "5.1"
+warn_py_module "scipy" "1.4"
+warn_py_module "xmltodict" "0.12"
 
 # FITSH
 
