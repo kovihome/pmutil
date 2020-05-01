@@ -36,8 +36,6 @@ def loadCatalog(refFileName):
         ref.close()
 
         print (("Photometric result catalog: %s") % refFileName)
-        # print (("%d reference object loaded." % len(refCat['cat'])))
-        # print (refCat)
         return refCat
 
     else:
@@ -231,7 +229,6 @@ class Photometry:
                 pm[mvPos] = mv
                 if err and pm[rolePos] != 'VF':
                     pm[evPos] = quad(float(pm[eiPos]), err)
-                    print("c:",stdcolor,"ei:",pm[eiPos],"err:",err,"ev:",pm[evPos])
                 else:
                     pm[evPos] = 0.0
                 result.append(pm)
@@ -316,7 +313,7 @@ class Photometry:
         ez_2 = su / sl
         mel_2 = su / float(len(y) - 1)
         err = sqrt(se2 / len(y))
-        print ("c: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, sqrt(ez_2), len(y), err))
+        print ("(gcx) color: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, sqrt(ez_2), len(y), err))
 
         if self.opt['showGraphs']:
             plotcolor = color[0].lower()
@@ -407,12 +404,10 @@ class Photometry:
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
                 ev = float(evs)
                 e = ei * ei + ev * ev
-                #print("id:%s, ei:%s, ev:%s e:%7.4f" % (pm[idPos], pm[eiPos], evs, sqrt(e)))
                 if e < emin:
                     haveAllMags = True
                     for c in self.opt['color']:
                        if c != color:
-                           #print("  %s mv:%s ev:%s" % (c, pm[mvPosList[c]], pm[evPosList[c]]))
                            if pm[mvPosList[c]] == '-' or pm[evPosList[c]] == '-':
                                haveAllMags = False
                                break
@@ -491,7 +486,6 @@ class Photometry:
 
     def reportResult(self, result, refCat, outFileName, color, dateObs):
 
-        # print(allResults)
         stdcolor = self.stdColor(color)
 
         idPos = getHeaderPos(refCat, fieldAuid)
@@ -660,9 +654,6 @@ class Photometry:
             w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
             w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
 
-        #print(V_R)
-        #print(V_vi)
-        #print(w_Tv)
         coef = self.linfit(V_R, V_vi, w_Tv)
         Tv = coef[0]
         Bv = coef[1]  # ##
@@ -768,13 +759,13 @@ class Photometry:
                 r_row[self.pos['MAG_R']] = R
 
                 if role != 'VF':
-                    err_v0 = float(g_row[self.pos[fieldMgInstrumental]])
-                    err_b0 = float(b_row[self.pos[fieldMgInstrumental]])
-                    err_r0 = float(r_row[self.pos[fieldMgInstrumental]])
+                    err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]])
+                    err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]])
+                    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]])
 
-                    errV = err_v0 + err_Vc + err_vc
-                    errB = err_b0 + err_Bc + err_bc
-                    errR = err_r0 + err_Rc + err_rc
+                    errV = sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
+                    errB = sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
+                    errR = sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
 
                     g_row[self.pos['ERR_V']] = errV
                     b_row[self.pos['ERR_B']] = errB

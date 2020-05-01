@@ -44,19 +44,21 @@ class Pipeline:
             colors += 'r'
 
         refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
+        print('Inspect refcat %s' % (refcatFileName))
         if not exists(refcatFileName):
             printWarning("Reference catalog %s is missing." % (refcatFileName))
             return False
         rc = Table.read(refcatFileName, format='ascii')
+        #print(rc)
         varCount = 0
         compCount = 0
         compColorCount = { 'bvr': 0, 'bv': 0, 'vr': 0, 'b': 0, 'v': 0, 'r': 0 }
         for r in rc:
             if r['ROLE'] == 'C':
                 compCount += 1
-                has_b = r['MAG_B'] != '-'
-                has_v = r['MAG_V'] != '-'
-                has_r = r['MAG_R'] != '-'
+                has_b = r['MAG_B'] != -1.0
+                has_v = r['MAG_V'] != -1.0
+                has_r = r['MAG_R'] != -1.0
                 if has_b:
                     compColorCount['b'] += 1
                 if has_v:
@@ -79,16 +81,34 @@ class Pipeline:
             printWarning('No comp star in reference catalog %s' % (refcatFileName))
             return False
         if compColorCount[colors] == 0:
+            if colors == 'bvr':
+                if compColorCount['bv'] > 0:
+                    self.opt['color'].remove('Ri')
+                    self.opt['useStd'] = False
+                    printWarning('No R comp stars ; downgrade colors to BV and disable std photometry.')
+                    return True
+                elif compColorCount['vr'] > 0:
+                    self.opt['color'].remove('Bi')
+                    self.opt['useStd'] = False
+                    printWarning('No B comp stars ; downgrade colors to VR and disable std photometry.')
+                    return True
+                elif compColorCount['v'] > 0:
+                    self.opt['color'].remove('Bi')
+                    self.opt['color'].remove('Ri')
+                    self.opt['useStd'] = False
+                    printWarning('No B and R comp stars ; downgrade colors to V and disable std photometry.')
+                    return True
             printWarning('No comp stars to achieve %s photometry with reference catalog %s' % (colors.upper(), refcatFileName))
+            # TODO: more color downgrade rule
             return False
         elif compColorCount[colors] == 1:
             printWarning('Only 1 comp star found to achieve %s photometry with reference catalog %s ; only the comp star method is possible' % (colors.upper(), refcatFileName))
-            return False
+            self.opt['method'] = 'comp'
+            printWarning('Downgrade method to best comp star.')
+            return True
         elif compColorCount[colors] < 5:
             printWarning('Only %d comp star found to achieve %s photometry with reference catalog %s; do ensemble or ad-hoc standardization carefully' % (colors.upper(), refcatFileName))
             return false
-
-        # TODO: downgrade colors, if it is better
 
         return True
 
@@ -226,16 +246,19 @@ class Pipeline:
         # SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
         self.SOLVE_ARGS = "-O --config %s --use-sextractor --sextractor-path sextractor -r -y -p" % (self.AST_CFG)
 
-#        baseFolders = glob('*' + self.opt['baseFolder'] + '*/')
-#        for bf in baseFolders:
-#            self.inspectRefCat(bf)
-
         ####################################
         # step 1. do photometry for all file
         ####################################
 
         PMERROR = False
+        requestedColors = self.opt['color']
+        requestedStd = self.opt['useStd']
         for sf in seqFolders:
+
+            baseFolder = sf.replace('/' + self.pplSetup['SEQ_FOLDER_NAME'], '')
+            self.opt['color'] = requestedColors
+            self.opt['useStd'] = requestedStd
+            self.inspectRefCat(baseFolder)
 
             pf = sf.replace(self.pplSetup['SEQ_FOLDER_NAME'], self.pplSetup['PHOT_FOLDER_NAME'])
 
@@ -380,9 +403,6 @@ class MainApp:
         if self.opt['adhocStd'] and (self.opt['makeStd'] or self.opt['useStd']):
             printWarning('Both -a and either -m or -s option cannot be used at once.')
             exit(0)
-
-        if self.opt['showGraphs'] and (not self.opt['adhocStd'] and not self.opt['makeStd']):
-            printWarning('--show-coeff option can be used together with -a or -m option.')
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]

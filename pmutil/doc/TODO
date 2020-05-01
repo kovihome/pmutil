@@ -3,15 +3,15 @@ TODO
 
 NEW CALIBRATION BUGS:
 
-- ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
++ ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
 
-	- photutils le tudja vonnia hatteret
+	+ photutils le tudja vonnia hatteret
 
 	>>> sudo pip3 install photutils
 
 (533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
 
-	- ugy tunik, hogy a background levonas megoldja, de megsem
+	- ugy tunik, hogy a background levonas megoldja, de megsem, csak pszichedelikus abrak helyett szines pottyok lettek
 
 (527) calib: 20200404: kalibracio hibas
 
@@ -19,23 +19,8 @@ NEW CALIBRATION BUGS:
 
 	A dark keppel lesz valami gond, a 20200331-i darkkal jo
 
-- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
-
 
 NEW PHOTOMETRY BUGS:
-
-- !!! negativ eszlelesnel ne akarjon std-t csinalni
-
-- !!! ppl-refcat elszall coord lekerdezesre:
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-refcat", line 512, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-refcat", line 503, in run
-	    cat.execute()
-	  File "/home/kovi/bin/ppl-refcat", line 334, in execute
-	    s_ra = deg2hexa(float(self.opt['ra']) / 15.0)
-	ValueError: could not convert string to float: '08:51:18'
 
 (521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
 
@@ -56,52 +41,15 @@ NEW PHOTOMETRY BUGS:
 	    bestComp[rolePos] = 'K'
 	TypeError: 'NoneType' object does not support item assignment
 
-
-(520) !!! pmphot: elszall, ha nincs R mg. Kellene valami vizsgalat, hogy ha all color lett megadva, hogy az oh-k jok-e ehhez. 
-	Ha hianyzik mondjuk az R mag, akkor vagy kapcsoljon at ketszin fotometriara, vagy irjon ki hibauzenetet
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-photometry", line 341, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-photometry", line 332, in run
-	    ppl.execute()
-	  File "/home/kovi/bin/ppl-photometry", line 176, in execute
-	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
-	  File "/home/kovi/bin/ppl-photometry", line 142, in process_photometry
-	    self.calculateMags(photFolder, self.opt['color'])
-	  File "/home/kovi/bin/ppl-photometry", line 118, in calculateMags
-	    phot.process()
-	  File "/home/kovi/bin/pmphot.py", line 792, in process
-	    coeffs = self.calculateCoeffs(mergedCat)
-	  File "/home/kovi/bin/pmphot.py", line 612, in calculateCoeffs
-	    V_R.append(float(row[2]) - float(row[3]))
-	ValueError: could not convert string to float: '-'
-
-
 (529) !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
-
-(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
 NEW IDEAS:
 
--NEW: refcat: legyen egy -g --guess opcio, aminel a folder nevbol probalja kitalalni, hogy mi a csillag neve
-
-	- a folder nev elejerol vegye el a szamokat, ha az datumnak nez ki
-
-	- keressen a letoltott refcat-k kozott olyat, ami a folder nevvel kezdodik
-
-	- ha ilyen nincs, keressen a VSX-ben ezzel kezdodot
-
-	- ha ilyen sincs, akkor a folder/Sequence/Combined-Gi.fits alapjan keressen
+-NEW: lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
 -NEW: OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
 
-+ colorize: ha vilagos a hatter, pl. hold vilagit, akkor a kep osszerakasnal kell egy hatter modellezes, es azt levonni
-
-- calib: kell valami eszkoz a kalibracios kepek minosegenek ellenorzesere, es ezt ki is kell iratni, 
-	es ha nem olyan jo a minoseg, akkor jelezni
-
-(530) a ppl-setup keruljon be a .pmlib-be, es legyen altalanos formatumu
+- amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
 
 - pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
 
@@ -134,12 +82,6 @@ NEW IDEAS:
 	SA41		  22	   +45			30			13
 
 - cosmetic: less output from photometry (sextractor) apps
-
-- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
-	a kep koordinataja alapjan keszitsen refcat-ot
-	a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
-		vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
-	feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
 
 - kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
 
@@ -180,23 +122,15 @@ TECH UPGRADE:
 
 === V 1.1 ==================================================
 
-(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
-
-	- printDebug()
-
-	- esetleg Print/Log class, Print.info(), etc. metodusokkal, init-ben log mode
-
-	- normalis esetben file-ba os logolhatna, akkor megmaradna a hiba is
-
-	- invoke hiba eseten, a valaszt is logolni kellene
+(530) a ppl-setup keruljon be a .pmlib-be, es legyen altalanos formatumu
 
 --- calibration --------------------------------------------
 
-(490) Flat library
-
-(459) Dark library kezelés
+(449) hot and dead pixel removing with fiign
 
 --- photometry ---------------------------------------------
+
+(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
 (518) pmphot: ha keves a comp star a refcat-ban, es adhoc std, make-std vagy ensemble lenne, irjon figyelmeztetest, hogy ehelyett comp mg kellene
 
@@ -209,6 +143,8 @@ TECH UPGRADE:
 		2. szamoljon comp mC, eC ertekeket
 
 		3. szamoljon var mC, eC ertekeket instr/std modszerrel
+		
+			- az instr modszer megegyezik az std-vel, Tv = 0, Tvr = Tbv = 1 esetben
 
 		method		std		result
 
@@ -221,7 +157,7 @@ TECH UPGRADE:
 				use		ensemble std mg			sok comp és létező coeffs esetén
 
 
-	- ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
+	- (526) ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
 
 	+ best comp star kepernyo kiiratasnal rossz a hiba erteke: 0.2
 
@@ -245,8 +181,6 @@ TECH UPGRADE:
 		? ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
 			vagy atlagoljuk oket? utobbi esetben el kell tarolni, hogy hany adatbol keszult, azzel lehet atlagolni
 
-
-
 	- average coeff szamolasa
 
 	- fits es cat/pm tartalmazza a coeff infokat
@@ -254,9 +188,6 @@ TECH UPGRADE:
 	+ SA catalogs
 
 	+ refcat kezelje a SA nevu objektumokat
-
-
-(449) hot and dead pixel removing with fiign
 
 
 === V 1.2 ==================================================
@@ -267,7 +198,31 @@ TECH UPGRADE:
 
 (528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
 
+(501) Utility: regisztráció és stackelés
+
+(490) Flat library
+
+(459) Dark library kezelés
+
 --- photometry ---------------------------------------------
+
+(535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
+
+	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
+
+	- a folder nev elejerol vegye el a szamokat, ha az datumnak nez ki
+
+	- keressen a letoltott refcat-k kozott olyat, ami a folder nevvel kezdodik
+
+	- ha ilyen nincs, keressen a VSX-ben ezzel kezdodot
+
+	- ha ilyen sincs, akkor a folder/Sequence/Combined-Gi.fits alapjan keressen (opcionalis)
+
+	- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
+		a kep koordinataja alapjan keszitsen refcat-ot
+		a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
+			vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
+		feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
 
 (522) kappa-sigma iteracio egyenes illesztesnel
 
@@ -288,6 +243,16 @@ TECH UPGRADE:
 (532) autoclean: lehetne egy kapcsolo, hogy a feldolgozas vegen tol egy clean-t, es csak az eredmeny file-ok maradnak meg
 
 (493) Szűrő nélküli CCD képek kezelése
+
+(476) output control arguments: -v | --verbose, -d | --debug, -q | --quiet
+
+	- printDebug()
+
+	- esetleg Print/Log class, Print.info(), etc. metodusokkal, init-ben log mode
+
+	- normalis esetben file-ba os logolhatna, akkor megmaradna a hiba is
+
+	- invoke hiba eseten, a valaszt is logolni kellene
 
 (469) config: tetszoleges parameter megadhato legyen command line-ban
 
@@ -334,8 +299,6 @@ TECH UPGRADE:
 	elcsuszik, es a szinek is elcsusznak egymashoz kepes
 	A pythonos verzioban a szekvencia szamolaskor ezt figyelembe kell venni, a szekvenciabol kihagyni
 
-(501) Utility: regisztráció és stackelés
-
 (448) Create/use 3D/4D FITS
 
 (472) A RAW -> FITS konverziónál ne csak CR2 file-okat tudjon konvertálni
@@ -349,10 +312,6 @@ TECH UPGRADE:
 (461) Fénygörbe készítése
 
 === NOT VERSIONED  ==================================================
-
-(535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
-
-	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
 
 (534) ppl-refcat: ha coord volt megadva, akkor nézze meg, hogy a változók között van-e olyan, ami elég közel esik a kép közepéhez, és inkább ez legyen a catalog neve.
 
@@ -369,7 +328,10 @@ TECH UPGRADE:
 
 (492) Szintetikus bias, dark és flat képek használata
 
-(473) Master flat kép analízis
+(473) Master kép analízis
+
+	- calib: kell valami eszkoz a kalibracios kepek minosegenek ellenorzesere, es ezt ki is kell iratni, 
+		es ha nem olyan jo a minoseg, akkor jelezni
 
 (471) Gi csatornák összegzése átlagolás helyett
 
