@@ -56,9 +56,9 @@ class Pipeline:
         for r in rc:
             if r['ROLE'] == 'C':
                 compCount += 1
-                has_b = r['MAG_B'] != -1.0
-                has_v = r['MAG_V'] != -1.0
-                has_r = r['MAG_R'] != -1.0
+                has_b = r['MAG_B'] != -1.0 and r['MAG_B'] != '-'
+                has_v = r['MAG_V'] != -1.0 and r['MAG_V'] != '-'
+                has_r = r['MAG_R'] != -1.0 and r['MAG_R'] != '-'
                 if has_b:
                     compColorCount['b'] += 1
                 if has_v:
@@ -107,8 +107,8 @@ class Pipeline:
             printWarning('Downgrade method to best comp star.')
             return True
         elif compColorCount[colors] < 5:
-            printWarning('Only %d comp star found to achieve %s photometry with reference catalog %s; do ensemble or ad-hoc standardization carefully' % (colors.upper(), refcatFileName))
-            return false
+            printWarning('Only %d comp star found to achieve %s photometry with reference catalog %s; do ensemble or ad-hoc standardization carefully' % (compColorCount[colors], colors.upper(), refcatFileName))
+            return False
 
         return True
 
