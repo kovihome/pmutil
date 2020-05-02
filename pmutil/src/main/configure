@@ -43,6 +43,7 @@ echo
 
 a="$(pwd)/$0"
 BASE_FOLDER=${a%/configure}
+BASE_FOLDER=${BASE_FOLDER%/.}
 DEST_FOLDER="$HOME/bin"
 
 # process command line parameters
@@ -167,7 +168,9 @@ copy_source() {
 create_link() {
 	# $1 - src
 	# $2 - dest
-	ln -s "${DEST_FOLDER}"/$1 "${DEST_FOLDER}"/$2
+	if [ ! -L "${DEST_FOLDER}"/$2 ]; then
+		ln -s "${DEST_FOLDER}"/$1 "${DEST_FOLDER}"/$2
+	fi
 }
 
 if [ ! -e "$DEST_FOLDER" ]; then
@@ -204,18 +207,25 @@ chmod 0755 "${DEST_FOLDER}/*"
 #############################
 
 CONFIG_FOLDER="$HOME/.pmlib"
-print_info "Copy config files to $DEST_FOLDER."
+print_info "Copy config files to $CONFIG_FOLDER."
 
-CONFIG_BASE=${BASE_FOLDER%/src/main}
-CONFIG_BASE="$CONFIG_BASE/etc"
+CONFIG_BASE=${BASE_FOLDER/src\/main/etc}
+
+copy_config() {
+	# $1 - config file name
+	if [ ! -f "$CONFIG_FOLDER/$1" ]; then
+		cp "$CONFIG_BASE/$1" "$CONFIG_FOLDER"
+	fi
+}
 
 if [ ! -d "$CONFIG_FOLDER" ]; then
 	mkdir "$CONFIG_FOLDER"
 fi
 
 # sextractor files: sex.cfg, sex.param
-cp "$CONFIG_BASE/sex.cfg" "$DEST_FOLDER"
-cp "$CONFIG_BASE/sex.param" "$DEST_FOLDER"
-cp "$CONFIG_BASE/astrometry.cfg" "$DEST_FOLDER"
+copy_config "sex.cfg"
+copy_config "sex.param"
+copy_config "astrometry.cfg"
 
 print_info "Configure pmutil successfully ended."
+
