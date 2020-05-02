@@ -70,7 +70,7 @@ fieldMgErrTrue = 'ERR_V'
 fieldAuid = 'AUID'
 fieldRole = 'ROLE'
 
-MAG_ERR_DEFAULT = 0.2
+MAG_ERR_DEFAULT = 0.15
 
 
 #def getDateObs(fileName):
@@ -273,10 +273,7 @@ class Photometry:
                 mis.append(mi)
                 mvs.append(mv)
                 ei = float(pm[eiPos])
-                if pm[evPos][0].isdigit():
-                    ev = float(pm[evPos])
-                else:
-                    ev = MAG_ERR_DEFAULT  # TODO: what to do, if no mg error value?
+                ev = float(pm[evPos]) if pm[evPos][0].isdigit() and pm[evPos] != '0.0' else ei
                 y.append(mv - mi)
                 ek2 = ei * ei + ev * ev
                 e2.append(ek2)
@@ -356,11 +353,15 @@ class Photometry:
                 mi.append(float(pm[miPos]))
                 mv.append(float(pm[mvPos]))
                 ei = float(pm[eiPos])
-                ev = float(pm[evPos]) if pm[evPos] != '-' else MAG_ERR_DEFAULT
+                ev = float(pm[evPos]) if pm[evPos] != '-' and pm[evPos] != '0.0' else ei
                 e2 = ei * ei + ev * ev
                 ep = ep + e2
                 N = N + 1
                 er.append(1.0 / e2)
+
+	if len(mi) < 2:
+            printError("Not enough comp stars for linear fit ensemble")
+            return []
 
 #        p = Polynomial.fit(mi, mv, 1, w = er)
         coef = self.linfit(mi, mv, er)
@@ -400,9 +401,9 @@ class Photometry:
         for pm in refCat['cat']:
             mvs = pm[mvPosList[color]]
             evs = pm[evPosList[color]]
-            if pm[rolePos] == 'C' and mvs != '-' and evs != '-' and evs != '0.0':
+            if pm[rolePos] == 'C' and mvs != '-':
                 ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
-                ev = float(evs)
+                ev = float(evs) if evs != '-' and evs != '0.0' else ei
                 e = ei * ei + ev * ev
                 if e < emin:
                     haveAllMags = True
@@ -444,7 +445,7 @@ class Photometry:
         zp = float(bestComp[mvPos]) - float(bestComp[miPos])
         p = [ 1.0, zp ]
         ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
-        ev = float(bestComp[evPos]) if bestComp[evPos] != '-' else MAG_ERR_DEFAULT
+        ev = float(bestComp[evPos]) if bestComp[evPos] != '-' and bestComp[evPos] != '0.0' else ei
         ep = quad(ei, ev)
 
         if self.opt['showGraphs']:
@@ -643,8 +644,8 @@ class Photometry:
             B_V.append(float(row[1]) - float(row[2]))
 
             for p in range(7, 12):
-                if row[p] == '-':
-                    row[p] = "0.1"
+                if row[p] == '-' or row[p] == '0.0':
+                    row[p] = str(MAG_ERR_DEFAULT)
             e_V_vi = float(row[8]) + float(row[11])
             e_V_R = float(row[8]) + float(row[9])
             e_vi_ri = float(row[11]) + float(row[12])

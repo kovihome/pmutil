@@ -22,28 +22,9 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
-(521) !!! pmphot: elszall, ha az osszes V oh hibaja 0.0 (20090717_v443_lyr)
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-photometry", line 341, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-photometry", line 332, in run
-	    ppl.execute()
-	  File "/home/kovi/bin/ppl-photometry", line 176, in execute
-	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
-	  File "/home/kovi/bin/ppl-photometry", line 142, in process_photometry
-	    self.calculateMags(photFolder, self.opt['color'])
-	  File "/home/kovi/bin/ppl-photometry", line 118, in calculateMags
-	    phot.process()
-	  File "/home/kovi/bin/pmphot.py", line 781, in process
-	    bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
-	  File "/home/kovi/bin/pmphot.py", line 397, in findBestCompStar
-	    bestComp[rolePos] = 'K'
-	TypeError: 'NoneType' object does not support item assignment
-
-(529) !!! pmphot: linfit elszall, ha 1 vagy 0 elem van a listakban
-
 NEW IDEAS:
+
+-NEW: sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
 
 -NEW: lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
