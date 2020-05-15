@@ -20,12 +20,14 @@ import time
 
 from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
 from pmdisco import Discovery
+from pmhotpix import BadPixelDetector, BadPixelEliminator
 
 
 class Pipeline:
 
     opt = {}  # command line options
     pplSetup = {}  # PPL setup from ppl-setup config file
+    badPixels = {}
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
@@ -378,6 +380,7 @@ class Pipeline:
             self.raw2fits(darkFolder)
 
             printInfo(title + ": Create master dark file(s).")
+            
             for color in self.opt['color']:
                 self.makeMasterDark(darkFolder, biasFolder, color)
         else:

@@ -180,8 +180,6 @@ fi
 
 print_info "Copy scripts to $DEST_FOLDER."
 
-copy_source "bash/ppl-setup" "ppl-setup"
-
 copy_source "python/pplcalibration.py" "pplcalibration.py"
 copy_source "python/pplphotometry.py" "pplphotometry.py"
 copy_source "python/pmrefcat.py" "pmrefcat.py" 
@@ -223,6 +221,7 @@ if [ ! -d "$CONFIG_FOLDER" ]; then
 fi
 
 # sextractor files: sex.cfg, sex.param
+copy_config "ppl.cfg"
 copy_config "sex.cfg"
 copy_config "sex.param"
 copy_config "astrometry.cfg"

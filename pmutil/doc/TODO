@@ -3,6 +3,8 @@ TODO
 
 NEW CALIBRATION BUGS:
 
+- BUG: a rawfit tukrozi a kepet
+
 + ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
 
 	+ photutils le tudja vonnia hatteret
@@ -103,11 +105,7 @@ TECH UPGRADE:
 
 === V 1.1 ==================================================
 
-(530) a ppl-setup keruljon be a .pmlib-be, es legyen altalanos formatumu
-
 --- calibration --------------------------------------------
-
-(449) hot and dead pixel removing with fiign
 
 --- photometry ---------------------------------------------
 
@@ -140,8 +138,6 @@ TECH UPGRADE:
 
 	- (526) ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
 
-	+ best comp star kepernyo kiiratasnal rossz a hiba erteke: 0.2
-
 	- az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 		az std rendben van, a tobbit kell megnezni
 
@@ -150,14 +146,9 @@ TECH UPGRADE:
 		- ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
 		  overwrite modban update-elje az ertekeket
 
-		- hianyzo adatok: +observer, +image date, +camera, +telescope, field
-
-			+ a kamera/tavcso adatok keruljenek defaultban a ppl-setup-ba, de legzen opcio a felulirasara.
-			  a feldolgozas nezze meg, hogy benne van-e a fits-ben, ha ott van, akkor azt hasznalja
+		- hianyzo adatok: field
 
 		- calculate coeff errors
-
-		+ kellene az eszlelo nevet is tarolni, ha a pplserver felhasznalast nezzuk
 
 		? ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
 			vagy atlagoljuk oket? utobbi esetben el kell tarolni, hogy hany adatbol keszult, azzel lehet atlagolni
@@ -165,10 +156,6 @@ TECH UPGRADE:
 	- average coeff szamolasa
 
 	- fits es cat/pm tartalmazza a coeff infokat
-
-	+ SA catalogs
-
-	+ refcat kezelje a SA nevu objektumokat
 
 
 === V 1.2 ==================================================
@@ -186,6 +173,11 @@ TECH UPGRADE:
 (459) Dark library kezelés
 
 --- photometry ---------------------------------------------
+
+(538) riport szures: ha a refcat-ban nem csak AUID-es valtozok vannak (kesobb tranziens field stars is), a riport a pm-bol csak az AUID-es valtozokat tegye a riport file-ba
+	esetleg lehetne opcio a szures erossegere (auid, whitelist, all)
+
+(537) refcat -u --update opcio, ami nem felulirja a refcat file-t, hanem letolti es merge-eli, hogy a refcat-ba csinalt modositasok megmaradjanak
 
 (535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
 

@@ -94,7 +94,8 @@ def printInfo(s):
 def loadPplSetup():
     pplSetup = {}
     userhome = getenv("HOME")
-    f = open(userhome + "/bin/ppl-setup")
+#    f = open(userhome + "/bin/ppl-setup")
+    f = open(userhome + "/.pmlib/ppl.cfg")
     pplSetup['HOME'] = userhome
     for line in f:
         if not line.startswith('#') and line.strip() != "":
@@ -282,15 +283,16 @@ def setFitsHeaders(fitsFileName, headers):
 
 
 def subtractFitsBackground(fitsFileName):
-    hdul = fits.open(fitsFileName, mode='update')
-    data = hdul[0].data
-    sigma_clip = SigmaClip(sigma = 3.0)
-    bkg_estimator = MedianBackground()
-    bkg = Background2D(data, (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
-    #print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
-    data -= bkg.background
-    hdul.flush()
-    hdul.close()
+    if exists(fitsFileName):
+        hdul = fits.open(fitsFileName, mode='update')
+        data = hdul[0].data
+        sigma_clip = SigmaClip(sigma = 3.0)
+        bkg_estimator = MedianBackground()
+        bkg = Background2D(data, (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
+        #print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+        data -= bkg.background
+        hdul.flush()
+        hdul.close()
 
 
 def findInFile(fileName, s):

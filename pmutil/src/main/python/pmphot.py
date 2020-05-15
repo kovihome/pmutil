@@ -359,7 +359,7 @@ class Photometry:
                 N = N + 1
                 er.append(1.0 / e2)
 
-	if len(mi) < 2:
+        if len(mi) < 2:
             printError("Not enough comp stars for linear fit ensemble")
             return []
 
