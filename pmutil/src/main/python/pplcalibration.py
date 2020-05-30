@@ -299,7 +299,7 @@ class Pipeline:
         REF = None
         REF_IMG = None
         for f in COBJLIST:
-            fstars = self.TEMPDIR + '/' + bn = basename(f) + ".stars"
+            fstars = self.TEMPDIR + '/' + basename(f) + ".stars"
 
             self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
 
