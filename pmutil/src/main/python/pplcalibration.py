@@ -47,6 +47,8 @@ class Pipeline:
     FLAT_DARK_FOLDER = None
     LIGHT_FOLDERS = None
 
+    REF = None
+
     def __init__(self, opt):
         self.opt = opt
 
@@ -303,17 +305,24 @@ class Pipeline:
 
             self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
 
-            fwhm = self.calculateAvgFwhm(fstars)
-            # printDebug("FWHM: %7.4f - %s" % (fwhm, f))
+            if not self.REF:
+                fwhm = self.calculateAvgFwhm(fstars)
+                # printDebug("FWHM: %7.4f - %s" % (fwhm, f))
 
-            if fwhm < bestFwhm:
-                bestFwhm = fwhm
-                REF = fstars
-                REF_IMG = f
+                if fwhm < bestFwhm:
+                    bestFwhm = fwhm
+                    REF = fstars
+                    REF_IMG = f
 
-        print("set reference image: " + REF_IMG)
-        if self.opt['debug']:
-            printDebug("Average FWHM: %7.4f" % (bestFwhm))
+        if not self.REF:
+            self.REF = REF_IMG.replace(color, '{color}')
+            if self.opt['debug']:
+                printDebug("Reference image average FWHM: %7.4f" % (bestFwhm))
+        else:
+            REF_IMG = self.REF.replace("{color}", color)
+            REF = self.TEMPDIR + '/' + basename(REF_IMG) + ".stars"
+
+        print("Set reference image: " + REF_IMG)
         copyfile(REF_IMG, "%s/%s" % (self.TEMPDIR, basename(REF_IMG)))
 
         # Registration of the source images:
@@ -439,6 +448,8 @@ class Pipeline:
         # Create the sequence dir, if not exists
         if not exists(seqFolder):
             makedirs(seqFolder)
+
+        self.REF = None
 
         for color in self.opt['color']:
             self.registrate(calibFolder, seqFolder, color)
