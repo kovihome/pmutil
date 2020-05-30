@@ -191,6 +191,7 @@ copy_source "python/pmphot.py" "pmphot.py"
 copy_source "python/pmfilter.py" "pmfilter.py"
 copy_source "python/pmresult.py" "pmresult.py" 
 copy_source "python/img_scale.py" "img_scale.py"
+copy_source "python/pmhotpix.py" "pmhotpix.py"
 
 create_link "pplphotometry.py" "ppl-photometry"
 create_link "pplcalibration.py" "ppl-calibration"

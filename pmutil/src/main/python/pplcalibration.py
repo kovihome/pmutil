@@ -18,7 +18,10 @@ from os.path import isdir, exists, basename
 from shutil import copyfile
 import time
 
-from pmbase import printError, printWarning, printInfo, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
+import numpy as np
+from astropy.table import Table
+
+from pmbase import printError, printWarning, printInfo, printDebug, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
 from pmdisco import Discovery
 from pmhotpix import BadPixelDetector, BadPixelEliminator
 
@@ -31,10 +34,8 @@ class Pipeline:
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
-    FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux --sort flux"
-#   FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux"
-#    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation maxnumber=100,conformable,auto,unitarity=0.002 --order 2 --max-distance 3 --comment"
-    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation delaunay,level=1,maxnumber=10,conformable,auto,unitarity=0.002 --order 1 --max-distance 2 --comment"
+    FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux,sigma,fwhm"
+    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation maxnumber=100,conformable,auto,unitarity=0.002 --order 1 --max-distance 3 --comment"
     FICOMBINE_ARGS = "-m sum -n"
 
     TEMPDIR = "temp"
@@ -95,12 +96,12 @@ class Pipeline:
 
     def invoked(self, cmd):
         if self.opt['debug']:
-            print(cmd)
+            printDebug(cmd)
         result = invoke(cmd)
         if result.startswith('ERROR:'):
             printError(result[len('ERROR: '):])
         elif self.opt['debug']:
-            print(result)
+            printDebug(result)
         return result
 
     def raw2fitsFile(self, rawfile, color):
@@ -263,12 +264,24 @@ class Pipeline:
         # The calibration of the object images:
         self.invoked("ficalib -i %s %s %s -o %s --input-master-bias %s --input-master-dark %s --input-master-flat %s" % (' '.join(IOBJLIST), self.COMMON_ARGS, self.imSizeArg(IOBJLIST[0]), ' '.join(R_IOBJLIST), MB, MD, MF))
 
-        # subtract background
+        # post process calibrated images
         print("Subtract background for %s" % (CALIB_PATTERN))
+        bpe = BadPixelEliminator()
+        bpe.loadBadPixelsForDark(MD, color)
+
         for fitsFileName in R_IOBJLIST:
+
+            # subtract background
             subtractFitsBackground(fitsFileName)
 
+            # remove bad pixels
+            bpe.process(fitsFileName)
+
         return 0
+
+    def calculateAvgFwhm(self, fstars):
+        t = Table.read(fstars, format = 'ascii')
+        return np.average(t['col10']) # fwhm
 
     def registrate(self, calibFolder, seqFolder, color):
         # Names of the individual files storing the raw bias, dark, flat and object frames:
@@ -281,16 +294,32 @@ class Pipeline:
         COMBINED_FILE = "%s/Combined-%s.fits" % (seqFolder, color)
         print("%s -> %s" % (CALIB_PATTERN, COMBINED_FILE))
 
-        # ------------------------------------
+        # search for reference image by the best average FWHM
+        bestFwhm = 999.9
+        REF = None
+        REF_IMG = None
+        for f in COBJLIST:
+            fstars = self.TEMPDIR + '/' + bn = basename(f) + ".stars"
 
-        # make reference image from the first one
-        print("set reference image: " + COBJLIST[0])
-        REF = "%s/ref-%s.stars" % (self.TEMPDIR, color)
-        self.invoked("fistar %s %s -o %s" % (COBJLIST[0], self.FISTAR_ARGS, REF))
-        copyfile(COBJLIST[0], "%s/%s" % (self.TEMPDIR, basename(COBJLIST[0])))
+            self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
+
+            fwhm = self.calculateAvgFwhm(fstars)
+            # printDebug("FWHM: %7.4f - %s" % (fwhm, f))
+
+            if fwhm < bestFwhm:
+                bestFwhm = fwhm
+                REF = fstars
+                REF_IMG = f
+
+        print("set reference image: " + REF_IMG)
+        if self.opt['debug']:
+            printDebug("Average FWHM: %7.4f" % (bestFwhm))
+        copyfile(REF_IMG, "%s/%s" % (self.TEMPDIR, basename(REF_IMG)))
 
         # Registration of the source images:
-        for f in COBJLIST[1:]:
+        for f in COBJLIST:
+            if f == REF_IMG:
+                continue
 
             bn = basename(f)
             pbn = self.TEMPDIR + '/' + bn
@@ -298,12 +327,6 @@ class Pipeline:
             print("transform %s -> %s" % (f, pbn))
             fstars = pbn + ".stars"
             ftrans = pbn + ".trans"
-
-#            ftrans = ftrans.replace(color, 'Gi')
-#            matchFailed = 0
-#            if not exists(ftrans):
-
-            self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
 
             matchFailed = 0
             answer = self.invoked("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))

@@ -3,17 +3,15 @@ TODO
 
 NEW CALIBRATION BUGS:
 
-- BUG: a rawfit tukrozi a kepet
+(541) NEW: best fhwm fits as reference
 
-+ ha vilagos a hatter, pl. hold bevilagit, akkor a kalibracio furan vonja le a flat-et
-
-	+ photutils le tudja vonnia hatteret
-
-	>>> sudo pip3 install photutils
+	- arra kellene figyelni, hogy a referenciakep mindharom szinben ugyan az legyen, eleg lenne csak az elso szinben megkeresni
 
 (533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
 
 	- ugy tunik, hogy a background levonas megoldja, de megsem, csak pszichedelikus abrak helyett szines pottyok lettek
+
+	- most ugy tunik, hogy a legjobb referenciakep keresese oldotta meg
 
 (527) calib: 20200404: kalibracio hibas
 
@@ -115,13 +113,13 @@ TECH UPGRADE:
 
 (450) !!! standardization (s15n)
 
-	- !!! a comp star szamolast es a std keszitest szet kell valasztani:
+	+ a comp star szamolast es a std keszitest szet kell valasztani:
 
-		1. hatarozza meg a polinomot comp/gcx/lfit modszerrel
+		+1. hatarozza meg a polinomot comp/gcx/lfit modszerrel
 
-		2. szamoljon comp mC, eC ertekeket
+		+2. szamoljon comp mC, eC ertekeket
 
-		3. szamoljon var mC, eC ertekeket instr/std modszerrel
+		+3. szamoljon var mC, eC ertekeket instr/std modszerrel
 		
 			- az instr modszer megegyezik az std-vel, Tv = 0, Tvr = Tbv = 1 esetben
 
@@ -296,6 +294,8 @@ TECH UPGRADE:
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
+
+(540) BUG: a rawfit tukrozi a kepet
 
 (531) calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 

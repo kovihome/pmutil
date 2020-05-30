@@ -9,7 +9,7 @@ Created on Jan 1, 2020
 '''
 
 from os import getenv, makedirs
-from os.path import isfile
+from os.path import isfile, exists
 from datetime import datetime
 from glob import glob
 from math import sqrt
@@ -27,6 +27,7 @@ BRed = "\033[1;31m"  # Red
 BGreen = '\033[1;32m'  # Green
 Blue = '\033[0;34m'  # Blue
 BCyan = '\033[1;36m'  # Cyan
+Color_Yellow = '\033[0;93m' # Light yellow
 
 pmlog = None
 
@@ -71,9 +72,10 @@ class Logger:
         self.write(s)
 
     def debug(self, text):
+        s = Color_Yellow + text + Color_Off
         if self.logMode >= self.LOG_MODE_DEBUG:
-            print(text)
-        self.write(text)
+            print(s)
+        self.write(s)
 
     def print(self, text):
         print(text)
@@ -89,6 +91,10 @@ def printWarning(s):
 
 def printInfo(s):
     print(BCyan + s + Color_Off)
+
+
+def printDebug(s):
+    print(Color_Yellow + s + Color_Off)
 
 
 def loadPplSetup():
@@ -307,6 +313,20 @@ def findInFile(fileName, s):
 def quad(a, b):
     return sqrt(a*a + b*b)
 
-# end pmbase.
+def guess(path):
+    '''
+    try to identify some data from folder or file name: target object, observation date, observer, filter
+    '''
+
+    # guess target
+    f = path.strip('/').split('/')[-1]
+    target_s = f.split('_', 1)[1]
+    cats = glob('/home/kovi/.pmlib/cat/' + target_s + '*')
+    if len(cats) > 0:
+        cat = min(cats, key=len) if len(cats) > 1 else cats[0]
+        target_s = cat.rsplit('/', 1)[1].split('.')[0]
+    target = target_s.replace('_', ' ')
+    return {'target': target }
+
 
 # end pmbase.

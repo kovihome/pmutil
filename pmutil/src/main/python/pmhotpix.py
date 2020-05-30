@@ -23,25 +23,27 @@ class BadPixelDetector:
 
     SKY_SIGMA = 3.0
 
-    def __init__(self):
-        pass
+    debug = False
+
+    def __init__(self, debug = False):
+        self.debug = debug
 
     def detectBadPixels(self, fileName):
         hdu = fits.open(fileName)[0]
-        print("image size: %d x %d" % (hdu.header['NAXIS1'], hdu.header['NAXIS2']))
+        #print("image size: %d x %d" % (hdu.header['NAXIS1'], hdu.header['NAXIS2']))
         
         image = hdu.data
 
-        #TODO: ez nem lesz jo flat-nel, oda komolyabb bg estimation kell
         mean,median,std = sigma_clipped_stats(image, sigma=self.SKY_SIGMA)
-        print("mean: %4.1f, median: %4.1f, std: %4.1f" % (mean, median, std))
+        pthre = mean + 16 * std
+        nthre = mean - 16 * std
+        maxpx = 2**14-1
+        if self.debug:
+            printDebug("mean: %4.1f, median: %4.1f, std: %4.1f" % (mean, median, std))
+            print("thre [16 * std + mean]: %4.1f / %4.1f" % (pthre, nthre))
 
         blurredImage = gaussian_filter(image, sigma=2)
         diff = image - blurredImage
-        pthre = mean + 16 * std
-        nthre = mean - 16 * std
-        print("thre [16 * std + mean]: %4.1f / %4.1f" % (pthre, nthre))
-        maxpx = 2**14-1
         hotPixels = np.nonzero((diff>pthre) | (diff<nthre))
         #print('hot pixels:')
         #print('    X      Y      ADU      SNR   Level  Type')
@@ -58,7 +60,6 @@ class BadPixelDetector:
                 #print("%5d  %5d  %7.1f  %7.1f  %5.1f%%  dead" % (hotPixels[1][j], hotPixels[0][j], v, (mean-v)/std, -100*v/maxpx))
                 badPixels.append({'x': hotPixels[1][j], 'y': hotPixels[0][j], 'adu': v, 'snr': (mean-v)/std, 'level': -100*v/maxpx, 'type': 'dead'})
                 countDead += 1
-        print()
         print("Hot pxs: %d, dead pixels: %d" % (countHot, countDead))
         return badPixels
 
@@ -80,10 +81,19 @@ class BadPixelDetector:
 class BadPixelEliminator:
 
     badPixels = []
+    debug = False
 
-    def __init__(self, badPixelFileName = None):
+    def __init__(self, badPixelFileName = None, debug = False):
+        self.debug = debug
         if badPixelFileName:
             self.loadBadPixels(badPixelFileName)
+
+    def loadBadPixelsForDark(self, masterDarkFileName, color):
+        cosmeticFileName = masterDarkFileName[:masterDarkFileName.rindex('/')] + '/bad_pixels-' + color
+        if not exists(cosmeticFileName):
+            bpxDetector = BadPixelDetector(debug = self.debug)
+            bpxDetector.execute(masterDarkFileName, color)
+        self.loadBadPixels(cosmeticFileName)
 
     def loadBadPixels(self, badPixelFileName):
         table = Table.read(badPixelFileName, format = 'ascii')
@@ -94,9 +104,9 @@ class BadPixelEliminator:
         if exists(fitsFileName):
             hdul = fits.open(fitsFileName, mode='update')
             data = hdul[0].data
-            print('data size',data.shape)
+            #print('data size',data.shape)
             median = median_filter(data, 3)
-            print('median size',median.shape)
+            #print('median size',median.shape)
             for px in self.badPixels:
                 #print(px['x'],px['y'])
                 data[px['y'], px['x']] = median[px['y'], px['x']]
