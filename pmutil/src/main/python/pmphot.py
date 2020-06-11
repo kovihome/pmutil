@@ -73,16 +73,6 @@ fieldRole = 'ROLE'
 MAG_ERR_DEFAULT = 0.15
 
 
-#def getDateObs(fileName):
-#    '''
-#    fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
-#    '''
-#    astFileName = fileName.split('.')[0]
-#    astFileName = astFileName + '.ast.fits'
-#
-#    return getFitsHeader(astFileName, 'DATE-OBS')
-
-
 class StdCoeffs:
 
     coeffs = None  # astropy.table.Table of std coeffs
@@ -215,24 +205,24 @@ class Photometry:
             return self.ppl['DEF_TELESCOPE']
         return 'Generic Telescope'
 
-    def transformMgs(self, refCat, stdcolor, p, err):
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        miPos = getHeaderPos(refCat, fieldMgInstrumental)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-        rolePos = getHeaderPos(refCat, fieldRole)
+#    def transformMgs(self, refCat, stdcolor, p, err):
+#        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
+#        miPos = getHeaderPos(refCat, fieldMgInstrumental)
+#        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
+#        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
+#        rolePos = getHeaderPos(refCat, fieldRole)
 
-        result = []
-        for pm in refCat['cat']:
-            if pm[rolePos] == 'V' or pm[rolePos] == 'VF' or pm[rolePos] == 'K':
-                mv = p[0] * float(pm[miPos]) + p[1]
-                pm[mvPos] = mv
-                if err and pm[rolePos] != 'VF':
-                    pm[evPos] = quad(float(pm[eiPos]), err)
-                else:
-                    pm[evPos] = 0.0
-                result.append(pm)
-        return result
+#        result = []
+#        for pm in refCat['cat']:
+#            if pm[rolePos] == 'V' or pm[rolePos] == 'VF' or pm[rolePos] == 'K':
+#                mv = p[0] * float(pm[miPos]) + p[1]
+#                pm[mvPos] = mv
+#                if err and pm[rolePos] != 'VF':
+#                    pm[evPos] = quad(float(pm[eiPos]), err)
+#                else:
+#                    pm[evPos] = 0.0
+#                result.append(pm)
+#        return result
 
     def stdColor(self, color):
         stdcolor = color[:1].upper()
@@ -321,8 +311,9 @@ class Photometry:
             plt.ylabel(stdcolor)
 
         # apply result to variables
-        result = self.transformMgs(refCat, stdcolor, [1.0, z], err)
-        return result
+#        result = self.transformMgs(refCat, stdcolor, [1.0, z], err)
+#        return result
+        return [1.0, z], err
 
     def calculateMgsLinearFit(self, refCat, color, bestCompId):
         '''
@@ -378,8 +369,9 @@ class Photometry:
             plt.ylabel(stdcolor)
 
         # apply result to variables
-        result = self.transformMgs(refCat, stdcolor, coef, ep)
-        return result
+#        result = self.transformMgs(refCat, stdcolor, coef, ep)
+#        return result
+        return coef, ep
 
     def findBestCompStar(self, allCatalogs, color):
 
@@ -464,8 +456,9 @@ class Photometry:
             plt.ylabel(stdcolor)
 
         # apply result to variables
-        result = self.transformMgs(refCat, stdcolor, p, ep)
-        return result
+#        result = self.transformMgs(refCat, stdcolor, p, ep)
+#        return result
+        return p, ep
 
     def getHeaderPositions(self, refCat):
         pos = {}
@@ -710,33 +703,100 @@ class Photometry:
         print ('standard coeffs: Tv =', bestCoeffs['TV'], 'Tvr =', bestCoeffs['TVR'], 'Tbv = ', bestCoeffs['TBV'])
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
-    def calculateStdMgs(self, coeffs, allCatalogs, bestComp):
-        '''
-        allResults: dict of results, key is th color
-        '''
-        Tv = coeffs[0]
-        Tvr = coeffs[1]
-        Tbv = coeffs[2]
+    def calcVComp(self, allCatalogs, bestComp, p_a, err_a):
+        vcomp = {}
         cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
         cg_row[self.pos['ROLE']] = 'K'
         cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
         cb_row[self.pos['ROLE']] = 'K'
         cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
         cr_row[self.pos['ROLE']] = 'K'
-        vc = float(cg_row[self.pos[fieldMgInstrumental]])
-        bc = float(cb_row[self.pos[fieldMgInstrumental]])
-        rc = float(cr_row[self.pos[fieldMgInstrumental]])
-        Vc = float(cg_row[self.pos['MAG_V']])
-        Bc = float(cb_row[self.pos['MAG_B']])
-        Rc = float(cr_row[self.pos['MAG_R']])
+        vcomp['vc'] = float(cg_row[self.pos[fieldMgInstrumental]])
+        vcomp['bc'] = float(cb_row[self.pos[fieldMgInstrumental]])
+        vcomp['rc'] = float(cr_row[self.pos[fieldMgInstrumental]])
+#        vcomp['Vc'] = float(cg_row[self.pos['MAG_V']])
+#        vcomp['Bc'] = float(cb_row[self.pos['MAG_B']])
+#        vcomp['Rc'] = float(cr_row[self.pos['MAG_R']])
+
+        vcomp['err_vc'] = float(cg_row[self.pos[fieldMgErrInstrumental]])
+        vcomp['err_bc'] = float(cb_row[self.pos[fieldMgErrInstrumental]])
+        vcomp['err_rc'] = float(cr_row[self.pos[fieldMgErrInstrumental]])
+#        vcomp['err_Vc'] = float(cg_row[self.pos['ERR_V']])
+#        vcomp['err_Bc'] = float(cb_row[self.pos['ERR_B']])
+#        vcomp['err_Rc'] = float(cr_row[self.pos['ERR_R']])
+
+        vcomp['Vc'] = p_a['Gi'][0] * vcomp['vc'] + p_a['Gi'][1]
+        vcomp['err_Vc'] = quad(vcomp['err_vc'], err_a['Gi']) if err_a['Gi'] else vcomp['err_vc'] * sqrt(2.0)
+        vcomp['Bc'] = p_a['Bi'][0] * vcomp['bc'] + p_a['Bi'][1]
+        vcomp['err_Bc'] = quad(vcomp['err_bc'], err_a['Bi']) if err_a['Bi'] else vcomp['err_bc'] * sqrt(2.0)
+        vcomp['Rc'] = p_a['Ri'][0] * vcomp['rc'] + p_a['Ri'][1]
+        vcomp['err_Rc'] = quad(vcomp['err_rc'], err_a['Ri']) if err_a['Ri'] else vcomp['err_rc'] * sqrt(2.0)
+
+        return vcomp
+
+#    def calcStdVComp(self, allCatalogs, bestComp):
+#        vcomp = {}
+#        cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
+#        cg_row[self.pos['ROLE']] = 'K'
+#        cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
+#        cb_row[self.pos['ROLE']] = 'K'
+#        cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
+#        cr_row[self.pos['ROLE']] = 'K'
+#        vcomp['vc'] = float(cg_row[self.pos[fieldMgInstrumental]])
+#        vcomp['bc'] = float(cb_row[self.pos[fieldMgInstrumental]])
+#        vcomp['rc'] = float(cr_row[self.pos[fieldMgInstrumental]])
+#        vcomp['Vc'] = float(cg_row[self.pos['MAG_V']])
+#        vcomp['Bc'] = float(cb_row[self.pos['MAG_B']])
+#        vcomp['Rc'] = float(cr_row[self.pos['MAG_R']])
+
+#        vcomp['err_vc'] = float(cg_row[self.pos[fieldMgErrInstrumental]])
+#        vcomp['err_bc'] = float(cb_row[self.pos[fieldMgErrInstrumental]])
+#        vcomp['err_rc'] = float(cr_row[self.pos[fieldMgErrInstrumental]])
+#        vcomp['err_Vc'] = float(cg_row[self.pos['ERR_V']])
+#        vcomp['err_Bc'] = float(cb_row[self.pos['ERR_B']])
+#        vcomp['err_Rc'] = float(cr_row[self.pos['ERR_R']])
+
+#        return vcomp
+
+    def calculateStdMgs(self, coeffs, allCatalogs, vcomp):
+        '''
+        allResults: dict of results, key is th color
+        '''
+        Tv = coeffs[0]
+        Tvr = coeffs[1]
+        Tbv = coeffs[2]
+#        cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
+#        cg_row[self.pos['ROLE']] = 'K'
+#        cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
+#        cb_row[self.pos['ROLE']] = 'K'
+#        cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
+#        cr_row[self.pos['ROLE']] = 'K'
+#        vc = float(cg_row[self.pos[fieldMgInstrumental]])
+#        bc = float(cb_row[self.pos[fieldMgInstrumental]])
+#        rc = float(cr_row[self.pos[fieldMgInstrumental]])
+#        Vc = float(cg_row[self.pos['MAG_V']])
+#        Bc = float(cb_row[self.pos['MAG_B']])
+#        Rc = float(cr_row[self.pos['MAG_R']])
+        vc = vcomp['vc']
+        bc = vcomp['bc']
+        rc = vcomp['rc']
+        Vc = vcomp['Vc']
+        Bc = vcomp['Bc']
+        Rc = vcomp['Rc']
         Vc_Rc = Vc - Rc
 
-        err_vc = float(cg_row[self.pos[fieldMgErrInstrumental]])
-        err_bc = float(cb_row[self.pos[fieldMgErrInstrumental]])
-        err_rc = float(cr_row[self.pos[fieldMgErrInstrumental]])
-        err_Vc = float(cg_row[self.pos['ERR_V']])
-        err_Bc = float(cb_row[self.pos['ERR_B']])
-        err_Rc = float(cr_row[self.pos['ERR_R']])
+#        err_vc = float(cg_row[self.pos[fieldMgErrInstrumental]])
+#        err_bc = float(cb_row[self.pos[fieldMgErrInstrumental]])
+#        err_rc = float(cr_row[self.pos[fieldMgErrInstrumental]])
+#        err_Vc = float(cg_row[self.pos['ERR_V']])
+#        err_Bc = float(cb_row[self.pos['ERR_B']])
+#        err_Rc = float(cr_row[self.pos['ERR_R']])
+        err_vc = vcomp['err_vc']
+        err_bc = vcomp['err_bc']
+        err_rc = vcomp['err_rc']
+        err_Vc = vcomp['err_Vc']
+        err_Bc = vcomp['err_Bc']
+        err_Rc = vcomp['err_Rc']
 
         allResults = { 'Gi': [], 'Bi': [], 'Ri': [] }
         for g_row in allCatalogs['Gi']['cat']:
@@ -778,6 +838,31 @@ class Photometry:
 
         return allResults
 
+    def calculateEnsembleParams(self, refcat, bestComp):
+        if self.opt['showGraphs']:
+            plt.figure()
+
+        p_a = {}
+        err_a = {}
+        for color in self.opt['color']:
+
+            if self.opt['method'] == 'comp':
+                p, ep = self.calculateMgsComparision(refcat[color], color, bestComp)
+            elif self.opt['method'] == 'lfit':
+                p, ep = self.calculateMgsLinearFit(refcat[color], color, bestComp)
+            else:
+                p, ep = self.calculateMgsRobustAveraging(refcat[color], color, bestComp)
+
+            p_a[color] = p
+            err_a[color] = ep
+
+#            allResults[color] = self.transformMgs(refCat, self.stdColor(color), p, ep)
+
+        if self.opt['showGraphs']:
+            plt.show()
+
+        return p_a, err_a
+
     def process(self):
         if not self.opt['files']:
             printError('No input files are given.')
@@ -816,6 +901,12 @@ class Photometry:
 
         # calculate instrumental mgs
         allResults = {}
+
+        # calculate virtual comp star
+        p_a, err_a = self.calculateEnsembleParams(allCatalogs, bestComp)
+        vcomp = self.calcVComp(allCatalogs, bestComp, p_a, err_a)
+
+        # calculate or load std coeffs
         if self.opt['useCoeffs'] or self.opt['makeCoeffs']:
             # standardization
             coeffs = None
@@ -834,28 +925,42 @@ class Photometry:
 
             if not coeffs:
                 printError('No std coefficients for transformation ; use Tv = 0, Tvr = -1, Tbv = 1 for comp star method.')
-                coeffs = [ 0.0, -1.0, 1.0 ]  # this is for comp star method
+                coeffs = [ 0.0, 1.0, 1.0 ]  # this is for comp star method
 
-            allResults = self.calculateStdMgs(coeffs, allCatalogs, bestComp)
+#            vcomp = self.calcVComp(allCatalogs, bestComp, p_a, err_a)
+#            allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
 
         else:
 
-            if self.opt['showGraphs']:
-                plt.figure()
+            # calculate ensemble
+#            if self.opt['showGraphs']:
+#                plt.figure()
 
-            for color in self.opt['color']:
+#            p_a = {}
+#            err_a = {}
+#            for color in self.opt['color']:
 
-                if self.opt['method'] == 'comp':
-                    allResults[color] = self.calculateMgsComparision(refCat, color, bestComp)
+#                if self.opt['method'] == 'comp':
+#                    p, ep = self.calculateMgsComparision(refCat, color, bestComp)
+#                elif self.opt['method'] == 'lfit':
+#                    p, ep = self.calculateMgsLinearFit(refCat, color, bestComp)
+#                else:
+#                    p, ep = self.calculateMgsRobustAveraging(refCat, color, bestComp)
 
-                elif self.opt['method'] == 'lfit':
-                    allResults[color] = self.calculateMgsLinearFit(refCat, color, bestComp)
+#                p_a[color] = p
+#                err_a[color] = err
 
-                else:
-                    allResults[color] = self.calculateMgsRobustAveraging(refCat, color, bestComp)
+##                allResults[color] = self.transformMgs(refCat, self.stdColor(color), p, ep)
 
-            if self.opt['showGraphs']:
-                plt.show()
+#            if self.opt['showGraphs']:
+#                plt.show()
+            # end: calculate ensemble
+#            p_a, err_a = self.calculateEnsembleParams()
+
+            coeffs = [ 0.0, 1.0, 1.0 ]
+
+        # apply virtual comp and std coeffs to calculate magnitudes
+        allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
 
         # save results
         for j in range(len(self.opt['color'])):
