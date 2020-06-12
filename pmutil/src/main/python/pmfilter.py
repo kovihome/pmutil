@@ -158,12 +158,12 @@ class CatalogMatcher:
                 if d > 2.0:
                     print('AUID: %s, ID:%d, d:%f, OK, on-frame and mathed' % (table[j]['AUID'], pmid, d))
                     print('   and too large distance')
-                    table[j]['ROLE_'] = 'VF'
+                    table[j]['ROLE_'] = table[j]['ROLE'] + 'F'
                 if table[j]['ROLE'] == 'V' and float(pmrow['MAG_BEST']) > hmgs[1]:
                     if d <= 2.0:
                         print('AUID: %s, ID:%d, OK, on-frame and mathed' % (table[j]['AUID'], pmid))
                     print('   and under limit, mi:%7.3f, hmg:%7.3f' % (float(pmrow['MAG_BEST']), hmgs[1]))
-                    table[j]['ROLE_'] = 'VF'
+                    table[j]['ROLE_'] = table[j]['ROLE'] + 'F'
                 elif d <= 2.0:
                     table[j]['ROLE_'] = table[j]['ROLE']
             elif onFrameStatus == 'B' and matched:
@@ -171,9 +171,10 @@ class CatalogMatcher:
                 print('AUID: %s, ID:%d, d:%f, OK, on-frame-border and mathed' % (table[j]['AUID'], pmid, d))
                 if d > 2.0:
                     print('   and too large distance')
+                    table[j]['ROLE_'] = table[j]['ROLE'] + 'F'
                 if table[j]['ROLE'] == 'VB' and float(pmrow['MAG_BEST']) > hmgs[1]:
                     print('   and under limit, mi:%7.3f, hmg:%7.3f' % (float(pmrow['MAG_BEST']), hmgs[1]))
-                    table[j]['ROLE_'] = 'VF'
+                    table[j]['ROLE_'] = table[j]['ROLE'] + 'F'
             elif onFrameStatus == 'O' and matched:
                 table[j]['ROLE_'] = table[j]['ROLE'] + 'O'
                 print('AUID: %s, ID:%d, d:%f, BAD-MATCH, out-of-frame and mathed' % (table[j]['AUID'], pmid, d))
