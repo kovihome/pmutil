@@ -752,6 +752,7 @@ class Photometry:
                 r_row[self.pos['MAG_R']] = R
 
                 if role != 'VF':
+
                     err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]]) if g_row[self.pos[fieldMgErrInstrumental]] != '-' and g_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_vc
                     err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]]) if b_row[self.pos[fieldMgErrInstrumental]] != '-' and b_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_bc
                     err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]]) if r_row[self.pos[fieldMgErrInstrumental]] != '-' and r_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_rc
@@ -763,6 +764,12 @@ class Photometry:
                     g_row[self.pos['ERR_V']] = errV
                     b_row[self.pos['ERR_B']] = errB
                     r_row[self.pos['ERR_R']] = errR
+
+                else:
+
+                    print('vcomp:', vcomp)
+                    print('var:',v0,b0,r0,V,B,R)
+                    print('coeffs:', coeffs)
 
                 allResults['Gi'].append(g_row)
                 allResults['Bi'].append(b_row)

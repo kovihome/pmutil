@@ -159,6 +159,8 @@ class CatalogMatcher:
                     print('AUID: %s, ID:%d, d:%f, OK, on-frame and mathed' % (table[j]['AUID'], pmid, d))
                     print('   and too large distance')
                 if table[j]['ROLE'] == 'V' and float(pmrow['MAG_BEST']) > hmgs[1]:
+                    if d <= 2.0:
+                        print('AUID: %s, ID:%d, OK, on-frame and mathed' % (table[j]['AUID'], pmid))
                     print('   and under limit, mi:%7.3f, hmg:%7.3f' % (float(pmrow['MAG_BEST']), hmgs[1]))
                     table[j]['ROLE_'] = 'VF'
                 else:
@@ -208,6 +210,9 @@ class CatalogMatcher:
             pm = None
             if ref['ID'] != 0:
                 pm = pmTable[ref['ID'] - 1]
+                if ref['ROLE_'] == 'VF':
+                    pm['MAG_ISOCOR'] = "%7.4f" % (hmgs[0])
+                    pm['MAG_BEST'] = "%7.4f" % (hmgs[1])
             else:
                 pm = { 'NUMBER':'-', 'MAG_ISOCOR': "%7.4f" % (hmgs[0]), 'MAGERR_ISOCOR':'-', 'MAG_BEST': "%7.4f" % (hmgs[1]), 'MAGERR_BEST':'-', 'ALPHA_J2000':'-', 'DELTA_J2000':'-' }
 

@@ -1,11 +1,17 @@
 TODO
 ----
 
+-NEW: configure error:
+
+	chmod: cannot access '/home/kovi/bin/*': No such file or directory
+
 NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
--NEW: 20200426/ll_lyr elszall:
++NEW: filter: a .cat file-ba Fainter esetben ugyan azt a HMG erteket irja be az isocorr meg a best mg helyere is
+
++NEW: 20200426/ll_lyr elszall:
 
 	Traceback (most recent call last):
 	  File "/home/kovi/bin/ppl-photometry", line 435, in <module>
