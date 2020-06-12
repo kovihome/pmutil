@@ -5,11 +5,31 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
+-NEW: 20200426/ll_lyr elszall:
+
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-photometry", line 435, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-photometry", line 426, in run
+	    ppl.execute()
+	  File "/home/kovi/bin/ppl-photometry", line 265, in execute
+	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
+	  File "/home/kovi/bin/ppl-photometry", line 224, in process_photometry
+	    self.calculateMags(photFolder, self.opt['color'])
+	  File "/home/kovi/bin/ppl-photometry", line 200, in calculateMags
+	    phot.process()
+	  File "/home/kovi/bin/pmphot.py", line 863, in process
+	    allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
+	  File "/home/kovi/bin/pmphot.py", line 757, in calculateStdMgs
+	    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]])
+	ValueError: could not convert string to float: '-'
+
+
+-NEW: ha nincs refcat, vagy a refcat-ban nincs comp vagy var, akkor irjon ki hibat, es lepjen ki
+
 NEW IDEAS:
 
--NEW: CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
-
--NEW: sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
+-NEW: PHOT: ha egy csillag latszik, de HMG alatti, akkor valamelyik file-ban ezt megjegyzesben vagy valahogy bele kellene irni, real mg-t meg hibat
 
 -NEW: lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
@@ -102,6 +122,7 @@ TECH UPGRADE:
 (526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
 (518) pmphot: ha keves a comp star a refcat-ban, es adhoc std, make-std vagy ensemble lenne, irjon figyelmeztetest, hogy ehelyett comp mg kellene
+	- mar 2 comp-nal hibas a gcx/lfit at kell kapcsolni comp-ra
 
 (450) !!! standardization (s15n)
 
@@ -117,11 +138,11 @@ TECH UPGRADE:
 
 		method		std		result
 
-		comp		none		normal inst mg			kevés comp esetén
+		comp		none		normal inst mg			kevés comp esetén, < 3
 
 				use		normal std mg			kevés comp és létező coeffs esetén, adhoc nem lehetséges
 				
-		gcx/lfit	none		ensemble inst mg		sok comp esetén
+		gcx/lfit	none		ensemble inst mg		sok comp esetén, >= 3
 
 				use		ensemble std mg			sok comp és létező coeffs esetén
 
@@ -154,6 +175,8 @@ TECH UPGRADE:
 
 --- calibration --------------------------------------------
 
+(543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
+
 (528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
 
 (501) Utility: regisztráció és stackelés
@@ -163,6 +186,8 @@ TECH UPGRADE:
 (459) Dark library kezelés
 
 --- photometry ---------------------------------------------
+
+(544) Sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
 
 (538) riport szures: ha a refcat-ban nem csak AUID-es valtozok vannak (kesobb tranziens field stars is), a riport a pm-bol csak az AUID-es valtozokat tegye a riport file-ba
 	esetleg lehetne opcio a szures erossegere (auid, whitelist, all)

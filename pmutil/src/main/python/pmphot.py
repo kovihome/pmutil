@@ -14,7 +14,7 @@ from os.path import exists
 
 import matplotlib.pyplot as plt
 
-from pmbase import jd, getFitsHeaders, printError, loadPplSetup, quad
+from pmbase import jd, getFitsHeaders, printError, loadPplSetup, quad, linfit
 
 
 def loadCatalog(refFileName):
@@ -331,7 +331,7 @@ class Photometry:
             return []
 
 #        p = Polynomial.fit(mi, mv, 1, w = er)
-        coef = self.linfit(mi, mv, er)
+        coef = linfit(mi, mv, er)
         ep = sqrt(ep / float(N))
 
         print ('polyfit result:', coef, 'error:', ep)
@@ -568,23 +568,23 @@ class Photometry:
 
         return merged
 
-    def linfit(self, x, y, w = None):
-        N = len(x)
-        X = 0.0
-        Y = 0.0
-        XY = 0.0
-        X2 = 0.0
-        M = 0.0
-        for j in range(N):
-            wj = w[j] if w else 1.0
-            X += x[j] * wj
-            Y += y[j] * wj
-            XY += x[j] * y[j] * wj
-            X2 += x[j] * x[j] * wj
-            M += wj
-        m = (Y * X - M * XY) / (X * X - M * X2)
-        b = (Y - m * X) / M
-        return m, b
+#    def linfit(self, x, y, w = None):
+#        N = len(x)
+#        X = 0.0
+#        Y = 0.0
+#        XY = 0.0
+#        X2 = 0.0
+#        M = 0.0
+#        for j in range(N):
+#            wj = w[j] if w else 1.0
+#            X += x[j] * wj
+#            Y += y[j] * wj
+#            XY += x[j] * y[j] * wj
+#            X2 += x[j] * x[j] * wj
+#            M += wj
+#        m = (Y * X - M * XY) / (X * X - M * X2)
+#        b = (Y - m * X) / M
+#        return m, b
 
     def calculateCoeffs(self, mergedCat):
         # Tv:  slope of (V-v) -> (V-R)
@@ -617,13 +617,13 @@ class Photometry:
             w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
             w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
 
-        coef = self.linfit(V_R, V_vi, w_Tv)
+        coef = linfit(V_R, V_vi, w_Tv)
         Tv = coef[0]
         Bv = coef[1]  # ##
-        coef = self.linfit(V_R, vi_ri, w_Tvr)
+        coef = linfit(V_R, vi_ri, w_Tvr)
         Tvr = 1.0 / coef[0]
         Bvr = coef[1]  # ##
-        coef = self.linfit(B_V, bi_vi, w_Tbv)
+        coef = linfit(B_V, bi_vi, w_Tbv)
         Tbv = 1.0 / coef[0]
         Bbv = coef[1]  # ##
 
@@ -752,9 +752,9 @@ class Photometry:
                 r_row[self.pos['MAG_R']] = R
 
                 if role != 'VF':
-                    err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]])
-                    err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]])
-                    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]])
+                    err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]]) if g_row[self.pos[fieldMgErrInstrumental]] != '-' and g_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_vc
+                    err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]]) if b_row[self.pos[fieldMgErrInstrumental]] != '-' and b_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_bc
+                    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]]) if r_row[self.pos[fieldMgErrInstrumental]] != '-' and r_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_rc
 
                     errV = sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
                     errB = sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)

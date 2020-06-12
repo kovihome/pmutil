@@ -15,9 +15,12 @@ from astropy.table import Table
 from astropy.io import fits
 from os import remove
 from os.path import exists
-from math import sqrt
+from math import sqrt, log10
+from numpy import arange
 
-from pmbase import invoke, getFitsHeaders
+import matplotlib.pyplot as plt
+
+from pmbase import invoke, getFitsHeaders, linfit
 
 
 class CatalogMatcher:
@@ -33,7 +36,6 @@ class CatalogMatcher:
     refTrailerHeaders = [ 'LABEL']
 
     HMG_MAX_ERR = 0.15
-    HMG_SIGMA = 3.0
 
     IMAGE_BORDER_SIZE = 10  # pixels
 
@@ -41,24 +43,35 @@ class CatalogMatcher:
         self.opt = opt
 
     def hmg(self, pmTable):
-        hmg1 = -99.99
-        hmg2 = -99.99
-        hmg1Err = 99.99
-        hmg2Err = 99.99
-        for pm in pmTable:
-            mg1 = float(pm['MAG_ISOCOR'])
-            mg1Err = float(pm['MAGERR_ISOCOR'])
-            mg2 = float(pm['MAG_BEST'])
-            mg2Err = float(pm['MAGERR_BEST'])
-            if mg1Err < self.HMG_MAX_ERR and mg2 < self.HMG_MAX_ERR:
-                if mg1 - self.HMG_SIGMA * mg1Err > hmg1:
-                    hmg1 = mg1 - self.HMG_SIGMA * mg1Err
-                    hmg1Err = mg1Err
-                if mg2 - self.HMG_SIGMA * mg2Err > hmg2:
-                    hmg2 = mg2 - self.HMG_SIGMA * mg2Err
-                    hmg2Err = mg2Err
+        mgIsoCorrArr = pmTable['MAG_ISOCOR']
+        mgIsoCorrErrArr = pmTable['MAGERR_ISOCOR']
+        mgBestArr = pmTable['MAG_BEST']
+        mgBestErrArr = pmTable['MAGERR_BEST']
+        logm1 = []
+        loge1 = []
+        logm2 = []
+        loge2 = []
+        for j in range(len(pmTable)):
+            if mgIsoCorrArr[j] <= 0.0:
+                logm1.append(log10(-mgIsoCorrArr[j]))
+                loge1.append(log10(mgIsoCorrErrArr[j]))
+            if mgBestArr[j] <= 0.0:
+                logm2.append(log10(-mgBestArr[j]))
+                loge2.append(log10(mgBestErrArr[j]))
 
-#        return [hmg1 - self.HMG_SIGMA * hmg1Err, hmg2 - self.HMG_SIGMA * hmg2Err]
+        m1,b1 = linfit(logm1, loge1)
+        hmg1 = -1.0 * 10.0 ** ((log10(self.HMG_MAX_ERR) - b1) / m1);
+
+        m2,b2 = linfit(logm2, loge2)
+        hmg2 = -1.0 * 10.0 ** ((log10(self.HMG_MAX_ERR) - b2) / m2);
+
+#        plotcolor = 'b'
+#        xr = arange(min(logm), max(logm), 0.01)
+#        plt.plot(logm, loge, plotcolor + 'o', xr, m * xr + b, 'k')
+#        plt.xlabel('log mi')
+#        plt.ylabel('log ei')
+#        plt.show()
+
         return [hmg1, hmg2]
 
     def readFrameSize(self, fitsFileName):

@@ -328,5 +328,23 @@ def guess(path):
     target = target_s.replace('_', ' ')
     return {'target': target }
 
+def linfit(x, y, w = None):
+    N = len(x)
+    X = 0.0
+    Y = 0.0
+    XY = 0.0
+    X2 = 0.0
+    M = 0.0
+    for j in range(N):
+        wj = w[j] if w else 1.0
+        X += x[j] * wj
+        Y += y[j] * wj
+        XY += x[j] * y[j] * wj
+        X2 += x[j] * x[j] * wj
+        M += wj
+    m = (Y * X - M * XY) / (X * X - M * X2)
+    b = (Y - m * X) / M
+    return m, b
+
 
 # end pmbase.
