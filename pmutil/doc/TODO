@@ -3,26 +3,11 @@ TODO
 
 NEW CALIBRATION BUGS:
 
-(541) NEW: best fhwm fits as reference
-
-	- arra kellene figyelni, hogy a referenciakep mindharom szinben ugyan az legyen, eleg lenne csak az elso szinben megkeresni
-
-(533) !!! Hibás kalibráció, de nincs hibaüzenet, csak az eredmény képből derül ki, hogy rossz volt a regisztráció.
-
-	- ugy tunik, hogy a background levonas megoldja, de megsem, csak pszichedelikus abrak helyett szines pottyok lettek
-
-	- most ugy tunik, hogy a legjobb referenciakep keresese oldotta meg
-
-(527) calib: 20200404: kalibracio hibas
-
-	ficalib: error: dark image size differs from the expected image size.
-
-	A dark keppel lesz valami gond, a 20200331-i darkkal jo
-
-
 NEW PHOTOMETRY BUGS:
 
 NEW IDEAS:
+
+-NEW: CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
 
 -NEW: sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
 
@@ -105,6 +90,13 @@ TECH UPGRADE:
 
 --- calibration --------------------------------------------
 
+(527) calib: 20200404: kalibracio hibas
+
+	ficalib: error: dark image size differs from the expected image size.
+
+	A dark keppel lesz valami gond, a 20200331-i darkkal jo
+
+
 --- photometry ---------------------------------------------
 
 (526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
@@ -121,7 +113,7 @@ TECH UPGRADE:
 
 		+3. szamoljon var mC, eC ertekeket instr/std modszerrel
 		
-			- az instr modszer megegyezik az std-vel, Tv = 0, Tvr = Tbv = 1 esetben
+			+ az instr modszer megegyezik az std-vel, Tv = 0, Tvr = Tbv = 1 esetben
 
 		method		std		result
 
@@ -141,10 +133,10 @@ TECH UPGRADE:
 
 	- !!! mentes coeff file-ba
 
-		- ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
+		- !!! ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
 		  overwrite modban update-elje az ertekeket
 
-		- hianyzo adatok: field
+		- !!! hianyzo adatok: field
 
 		- calculate coeff errors
 

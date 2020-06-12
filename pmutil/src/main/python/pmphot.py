@@ -8,8 +8,7 @@ Created on Dec 28, 2019
 '''
 from numpy import median, sqrt, arange  # , polyfit
 from getopt import getopt, GetoptError
-from sys import argv  # , stdout
-# from glob import glob
+from sys import argv
 from astropy.table import Table, Column
 from os.path import exists
 
@@ -162,7 +161,6 @@ class StdCoeffs:
         return None
 
     def save(self):
-#        self.coeffs.write(stdout, format='ascii.fixed_width_two_line', delimiter=' ')
         self.coeffs.write(self.fileName, format = 'ascii.fixed_width_two_line', delimiter = ' ')
 
 
@@ -204,25 +202,6 @@ class Photometry:
         if 'DEF_TELESCOPE' in self.ppl.keys() and self.ppl['DEF_TELESCOPE'] and len(self.ppl['DEF_TELESCOPE']) > 0:
             return self.ppl['DEF_TELESCOPE']
         return 'Generic Telescope'
-
-#    def transformMgs(self, refCat, stdcolor, p, err):
-#        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-#        miPos = getHeaderPos(refCat, fieldMgInstrumental)
-#        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-#        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-#        rolePos = getHeaderPos(refCat, fieldRole)
-
-#        result = []
-#        for pm in refCat['cat']:
-#            if pm[rolePos] == 'V' or pm[rolePos] == 'VF' or pm[rolePos] == 'K':
-#                mv = p[0] * float(pm[miPos]) + p[1]
-#                pm[mvPos] = mv
-#                if err and pm[rolePos] != 'VF':
-#                    pm[evPos] = quad(float(pm[eiPos]), err)
-#                else:
-#                    pm[evPos] = 0.0
-#                result.append(pm)
-#        return result
 
     def stdColor(self, color):
         stdcolor = color[:1].upper()
@@ -310,9 +289,6 @@ class Photometry:
             plt.xlabel(color)
             plt.ylabel(stdcolor)
 
-        # apply result to variables
-#        result = self.transformMgs(refCat, stdcolor, [1.0, z], err)
-#        return result
         return [1.0, z], err
 
     def calculateMgsLinearFit(self, refCat, color, bestCompId):
@@ -368,9 +344,6 @@ class Photometry:
             plt.xlabel(color)
             plt.ylabel(stdcolor)
 
-        # apply result to variables
-#        result = self.transformMgs(refCat, stdcolor, coef, ep)
-#        return result
         return coef, ep
 
     def findBestCompStar(self, allCatalogs, color):
@@ -423,7 +396,6 @@ class Photometry:
     def calculateMgsComparision(self, refCat, color, bestCompId):
         stdcolor = self.stdColor(color)
 
-#        idPos = getHeaderPos(refCat, fieldAuid)
         mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
         miPos = getHeaderPos(refCat, fieldMgInstrumental)
         evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
@@ -455,9 +427,6 @@ class Photometry:
             plt.xlabel(color)
             plt.ylabel(stdcolor)
 
-        # apply result to variables
-#        result = self.transformMgs(refCat, stdcolor, p, ep)
-#        return result
         return p, ep
 
     def getHeaderPositions(self, refCat):
@@ -703,60 +672,41 @@ class Photometry:
         print ('standard coeffs: Tv =', bestCoeffs['TV'], 'Tvr =', bestCoeffs['TVR'], 'Tbv = ', bestCoeffs['TBV'])
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
-    def calcVComp(self, allCatalogs, bestComp, p_a, err_a):
+    def calcVComp(self, colors, allCatalogs, bestComp, p_a, err_a):
         vcomp = {}
-        cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
-        cg_row[self.pos['ROLE']] = 'K'
-        cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
-        cb_row[self.pos['ROLE']] = 'K'
-        cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
-        cr_row[self.pos['ROLE']] = 'K'
-        vcomp['vc'] = float(cg_row[self.pos[fieldMgInstrumental]])
-        vcomp['bc'] = float(cb_row[self.pos[fieldMgInstrumental]])
-        vcomp['rc'] = float(cr_row[self.pos[fieldMgInstrumental]])
-#        vcomp['Vc'] = float(cg_row[self.pos['MAG_V']])
-#        vcomp['Bc'] = float(cb_row[self.pos['MAG_B']])
-#        vcomp['Rc'] = float(cr_row[self.pos['MAG_R']])
-
-        vcomp['err_vc'] = float(cg_row[self.pos[fieldMgErrInstrumental]])
-        vcomp['err_bc'] = float(cb_row[self.pos[fieldMgErrInstrumental]])
-        vcomp['err_rc'] = float(cr_row[self.pos[fieldMgErrInstrumental]])
-#        vcomp['err_Vc'] = float(cg_row[self.pos['ERR_V']])
-#        vcomp['err_Bc'] = float(cb_row[self.pos['ERR_B']])
-#        vcomp['err_Rc'] = float(cr_row[self.pos['ERR_R']])
-
-        vcomp['Vc'] = p_a['Gi'][0] * vcomp['vc'] + p_a['Gi'][1]
-        vcomp['err_Vc'] = quad(vcomp['err_vc'], err_a['Gi']) if err_a['Gi'] else vcomp['err_vc'] * sqrt(2.0)
-        vcomp['Bc'] = p_a['Bi'][0] * vcomp['bc'] + p_a['Bi'][1]
-        vcomp['err_Bc'] = quad(vcomp['err_bc'], err_a['Bi']) if err_a['Bi'] else vcomp['err_bc'] * sqrt(2.0)
-        vcomp['Rc'] = p_a['Ri'][0] * vcomp['rc'] + p_a['Ri'][1]
-        vcomp['err_Rc'] = quad(vcomp['err_rc'], err_a['Ri']) if err_a['Ri'] else vcomp['err_rc'] * sqrt(2.0)
+        for c in colors:
+            c_row = self.findRow(allCatalogs[c]['cat'], bestComp)
+            c_row[self.pos['ROLE']] = 'K'
+            vcomp[c] = {}
+            vcomp[c]['mi'] = float(c_row[self.pos[fieldMgInstrumental]])
+            vcomp[c]['ei'] = float(c_row[self.pos[fieldMgErrInstrumental]])
+            vcomp[c]['mc'] = p_a[c][0] * vcomp[c]['mi'] + p_a[c][1]
+            vcomp[c]['ec'] = quad(vcomp[c]['ei'], err_a[c]) if err_a[c] else vcomp[c]['ei'] * sqrt(2.0)
 
         return vcomp
 
-#    def calcStdVComp(self, allCatalogs, bestComp):
-#        vcomp = {}
-#        cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
-#        cg_row[self.pos['ROLE']] = 'K'
-#        cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
-#        cb_row[self.pos['ROLE']] = 'K'
-#        cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
-#        cr_row[self.pos['ROLE']] = 'K'
-#        vcomp['vc'] = float(cg_row[self.pos[fieldMgInstrumental]])
-#        vcomp['bc'] = float(cb_row[self.pos[fieldMgInstrumental]])
-#        vcomp['rc'] = float(cr_row[self.pos[fieldMgInstrumental]])
-#        vcomp['Vc'] = float(cg_row[self.pos['MAG_V']])
-#        vcomp['Bc'] = float(cb_row[self.pos['MAG_B']])
-#        vcomp['Rc'] = float(cr_row[self.pos['MAG_R']])
+    def calculateSimpleMgs(self, colors, allCatalogs, vcomp):
+        allResults = {}
+        for c in colors:
+            stdc = self.stdColor(c)
+            allResults[c] = []
+            for row in allCatalogs[c]['cat']:
+                role = row[self.pos['ROLE']]
+                if role == 'V' or role == 'VF' or role == 'K':
 
-#        vcomp['err_vc'] = float(cg_row[self.pos[fieldMgErrInstrumental]])
-#        vcomp['err_bc'] = float(cb_row[self.pos[fieldMgErrInstrumental]])
-#        vcomp['err_rc'] = float(cr_row[self.pos[fieldMgErrInstrumental]])
-#        vcomp['err_Vc'] = float(cg_row[self.pos['ERR_V']])
-#        vcomp['err_Bc'] = float(cb_row[self.pos['ERR_B']])
-#        vcomp['err_Rc'] = float(cr_row[self.pos['ERR_R']])
+                    m0 = float(row[self.pos[fieldMgInstrumental]])
+                    M = m0 + vcomp[c]['mc'] - vcomp[c]['mi']
+                    row[self.pos['MAG_' + stdc]] = M
 
-#        return vcomp
+                    if role != 'VF':
+                        err_m0 = float(row[self.pos[fieldMgErrInstrumental]])
+                        errM = sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
+                        row[self.pos['ERR_' + stdc]] = errM
+
+                    allResults[c].append(row)
+
+        return allResults
+
 
     def calculateStdMgs(self, coeffs, allCatalogs, vcomp):
         '''
@@ -765,38 +715,20 @@ class Photometry:
         Tv = coeffs[0]
         Tvr = coeffs[1]
         Tbv = coeffs[2]
-#        cg_row = self.findRow(allCatalogs['Gi']['cat'], bestComp)
-#        cg_row[self.pos['ROLE']] = 'K'
-#        cb_row = self.findRow(allCatalogs['Bi']['cat'], bestComp)
-#        cb_row[self.pos['ROLE']] = 'K'
-#        cr_row = self.findRow(allCatalogs['Ri']['cat'], bestComp)
-#        cr_row[self.pos['ROLE']] = 'K'
-#        vc = float(cg_row[self.pos[fieldMgInstrumental]])
-#        bc = float(cb_row[self.pos[fieldMgInstrumental]])
-#        rc = float(cr_row[self.pos[fieldMgInstrumental]])
-#        Vc = float(cg_row[self.pos['MAG_V']])
-#        Bc = float(cb_row[self.pos['MAG_B']])
-#        Rc = float(cr_row[self.pos['MAG_R']])
-        vc = vcomp['vc']
-        bc = vcomp['bc']
-        rc = vcomp['rc']
-        Vc = vcomp['Vc']
-        Bc = vcomp['Bc']
-        Rc = vcomp['Rc']
+        vc = vcomp['Gi']['mi']
+        bc = vcomp['Bi']['mi']
+        rc = vcomp['Ri']['mi']
+        Vc = vcomp['Gi']['mc']
+        Bc = vcomp['Bi']['mc']
+        Rc = vcomp['Ri']['mc']
         Vc_Rc = Vc - Rc
 
-#        err_vc = float(cg_row[self.pos[fieldMgErrInstrumental]])
-#        err_bc = float(cb_row[self.pos[fieldMgErrInstrumental]])
-#        err_rc = float(cr_row[self.pos[fieldMgErrInstrumental]])
-#        err_Vc = float(cg_row[self.pos['ERR_V']])
-#        err_Bc = float(cb_row[self.pos['ERR_B']])
-#        err_Rc = float(cr_row[self.pos['ERR_R']])
-        err_vc = vcomp['err_vc']
-        err_bc = vcomp['err_bc']
-        err_rc = vcomp['err_rc']
-        err_Vc = vcomp['err_Vc']
-        err_Bc = vcomp['err_Bc']
-        err_Rc = vcomp['err_Rc']
+        err_vc = vcomp['Gi']['ei']
+        err_bc = vcomp['Bi']['ei']
+        err_rc = vcomp['Ri']['ei']
+        err_Vc = vcomp['Gi']['ec']
+        err_Bc = vcomp['Bi']['ec']
+        err_Rc = vcomp['Ri']['ec']
 
         allResults = { 'Gi': [], 'Bi': [], 'Ri': [] }
         for g_row in allCatalogs['Gi']['cat']:
@@ -856,8 +788,6 @@ class Photometry:
             p_a[color] = p
             err_a[color] = ep
 
-#            allResults[color] = self.transformMgs(refCat, self.stdColor(color), p, ep)
-
         if self.opt['showGraphs']:
             plt.show()
 
@@ -869,8 +799,6 @@ class Photometry:
             return
 
         allCatalogs = {}
-
-#        dateObs = None
 
         # load refcats
         for j in range(len(self.opt['color'])):
@@ -891,7 +819,6 @@ class Photometry:
         # find best comp star in Gi frame
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         indexGi = self.opt['color'].index(color)
-        #dateObs = getDateObs(self.opt['files'][indexGi])
         self.loadFitsHeaders(self.opt['files'][indexGi])
         dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
@@ -904,7 +831,7 @@ class Photometry:
 
         # calculate virtual comp star
         p_a, err_a = self.calculateEnsembleParams(allCatalogs, bestComp)
-        vcomp = self.calcVComp(allCatalogs, bestComp, p_a, err_a)
+        vcomp = self.calcVComp(self.opt['color'], allCatalogs, bestComp, p_a, err_a)
 
         # calculate or load std coeffs
         if self.opt['useCoeffs'] or self.opt['makeCoeffs']:
@@ -924,43 +851,18 @@ class Photometry:
                 coeffs = self.loadCoeffs(dateObsDate)
 
             if not coeffs:
-                printError('No std coefficients for transformation ; use Tv = 0, Tvr = -1, Tbv = 1 for comp star method.')
+                printError('No std coefficients for transformation ; use Tv = 0, Tvr = 1, Tbv = 1 for comp star method.')
                 coeffs = [ 0.0, 1.0, 1.0 ]  # this is for comp star method
 
-#            vcomp = self.calcVComp(allCatalogs, bestComp, p_a, err_a)
-#            allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
-
         else:
-
-            # calculate ensemble
-#            if self.opt['showGraphs']:
-#                plt.figure()
-
-#            p_a = {}
-#            err_a = {}
-#            for color in self.opt['color']:
-
-#                if self.opt['method'] == 'comp':
-#                    p, ep = self.calculateMgsComparision(refCat, color, bestComp)
-#                elif self.opt['method'] == 'lfit':
-#                    p, ep = self.calculateMgsLinearFit(refCat, color, bestComp)
-#                else:
-#                    p, ep = self.calculateMgsRobustAveraging(refCat, color, bestComp)
-
-#                p_a[color] = p
-#                err_a[color] = err
-
-##                allResults[color] = self.transformMgs(refCat, self.stdColor(color), p, ep)
-
-#            if self.opt['showGraphs']:
-#                plt.show()
-            # end: calculate ensemble
-#            p_a, err_a = self.calculateEnsembleParams()
 
             coeffs = [ 0.0, 1.0, 1.0 ]
 
         # apply virtual comp and std coeffs to calculate magnitudes
-        allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
+        if len(self.opt['color']) == 3:
+            allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
+        else:
+            allResults = self.calculateSimpleMgs(self.opt['color'], allCatalogs, vcomp)
 
         # save results
         for j in range(len(self.opt['color'])):
