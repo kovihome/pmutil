@@ -765,12 +765,6 @@ class Photometry:
                     b_row[self.pos['ERR_B']] = errB
                     r_row[self.pos['ERR_R']] = errR
 
-                else:
-
-                    print('vcomp:', vcomp)
-                    print('var:',v0,b0,r0,V,B,R)
-                    print('coeffs:', coeffs)
-
                 allResults['Gi'].append(g_row)
                 allResults['Bi'].append(b_row)
                 allResults['Ri'].append(r_row)
