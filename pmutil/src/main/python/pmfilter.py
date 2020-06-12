@@ -188,7 +188,7 @@ class CatalogMatcher:
         # save result
         self.dumpResult(table, pmTable, outFile, hmgs)
 
-    def dumpResult(self, refTable, pmTable, outFileNamem hmgs):
+    def dumpResult(self, refTable, pmTable, outFileName, hmgs):
 
         outf = open(outFileName, 'w')
         for h in self.refHeaders:
