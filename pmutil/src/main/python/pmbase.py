@@ -319,7 +319,11 @@ def guess(path):
     '''
 
     # guess target
-    f = path.strip('/').split('/')[-1]
+    r = path.strip('/').split('/')
+    f = None
+    for s in r:
+        if '_' in s:
+            f = s
     target_s = f.split('_', 1)[1]
     cats = glob('/home/kovi/.pmlib/cat/' + target_s + '*')
     if len(cats) > 0:

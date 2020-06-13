@@ -9,17 +9,22 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
--NEW: ha nincs refcat, vagy a refcat-ban nincs comp vagy var, akkor irjon ki hibat, es lepjen ki
-
 NEW IDEAS:
 
--NEW: PHOT: ha egy csillag latszik, de HMG alatti, akkor valamelyik file-ban ezt megjegyzesben vagy valahogy bele kellene irni, real mg-t meg hibat
+-NEW: STD: calculate coeff errors
+
+-NEW: STD: average coeff szamolasa
+
+	- kapcsolo legyen, hogy a best vagy az avg coeff-eket hasznalja, vagy fixen az avg-t?
+
+-NEW: STD: fits es cat/pm tartalmazza a coeff infokat
 
 -NEW: lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
 -NEW: OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
 
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
+	--debug modban
 
 - pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
 
@@ -103,30 +108,21 @@ TECH UPGRADE:
 
 --- photometry ---------------------------------------------
 
-(526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
-
 (450) !!! standardization (s15n)
 
-	- (526) ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
-
-	- az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
+	? az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 		az std rendben van, a tobbit kell megnezni
 
-	- !!! mentes coeff file-ba
+	+ !!! mentes coeff file-ba
 
-		- !!! ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
+		+ !!! ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
 		  overwrite modban update-elje az ertekeket
 
-		- !!! hianyzo adatok: field
+		+ !!! hianyzo adatok: field
 
-		- calculate coeff errors
-
-		? ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
+		+ ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
 			vagy atlagoljuk oket? utobbi esetben el kell tarolni, hogy hany adatbol keszult, azzel lehet atlagolni
-
-	- average coeff szamolasa
-
-	- fits es cat/pm tartalmazza a coeff infokat
+			nem irja felul, hibat ad, overwrite modban felulirja
 
 
 === V 1.2 ==================================================
@@ -136,6 +132,8 @@ TECH UPGRADE:
 --- calibration --------------------------------------------
 
 (543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
+
+	- ugy tunik, hogy az fwhm minden kepnel nagyjabol ugyan akkora, ez nem mondja meg, ha egy kep rossz
 
 (528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
 
@@ -286,6 +284,8 @@ TECH UPGRADE:
 (471) Gi csatornák összegzése átlagolás helyett
 
 --- photometry ---------------------------------------------
+
+(545) PHOT: ha egy csillag latszik, de HMG alatti, akkor valamelyik file-ban ezt megjegyzesben vagy valahogy bele kellene irni, real mg-t meg hibat
 
 (517) szaturalt csillagok kezelese, ha tul fenyes a csillag, akkor nem szabad fotometralni, se comp starnak hasznalni
 	ezt a kappa-sigma kimutatja?

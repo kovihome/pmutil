@@ -6,15 +6,16 @@ Created on Dec 28, 2019
 
 @author: kovi
 '''
-from numpy import median, sqrt, arange  # , polyfit
 from getopt import getopt, GetoptError
 from sys import argv
-from astropy.table import Table, Column
 from os.path import exists
+from copy import deepcopy
 
+import numpy as np
+from astropy.table import Table, Column
 import matplotlib.pyplot as plt
 
-from pmbase import jd, getFitsHeaders, printError, loadPplSetup, quad, linfit
+import pmbase as pm
 
 
 def loadCatalog(refFileName):
@@ -80,46 +81,68 @@ class StdCoeffs:
     date = None  # date of the current image
     camera = None  # camera using to crate current image
     telescope = None  # telescope using to create current image
+    std_area = None   # standard area or other field name
 
-    def __init__(self, coeffFileName, observer, date, camera, telescope):
+    fields = [
+                 {'name': 'OBSERVER', 'format': '%-10s', 'dtype': 'U5'},
+                 {'name': 'DATE', 'format': '%-14s', 'dtype': 'U10'},
+                 {'name': 'TV', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'ERR_TV', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'TVR', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'ERR_TVR', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'TBV', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'ERR_TBV', 'format': '%11.4f', 'dtype': 'f4'},
+                 {'name': 'CAMERA', 'format': '%-24s', 'dtype': 'U24'},
+                 {'name': 'TELESCOPE', 'format': '%-24s', 'dtype': 'U24'},
+                 {'name': 'FIELD', 'format': '%-24s', 'dtype': 'U24'},
+            ]
+
+    def __init__(self, coeffFileName, observer, date, camera, telescope, std_area):
         self.fileName = coeffFileName
         self.observer = observer
         self.date = date
         self.camera = camera
         self.telescope = telescope
+        self.std_area = std_area
 
     def open(self):
         if not exists(self.fileName):
             self.coeffs = Table()
-            self.coeffs.add_column(Column(name = 'OBSERVER', dtype = 'U5', format = '%-10s'))
-            self.coeffs.add_column(Column(name = 'DATE', dtype = 'U10', format = '%-14s'))
-            self.coeffs.add_column(Column(name = 'TV', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'ERR_TV', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'TVR', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'ERR_TVR', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'TBV', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'ERR_TBV', dtype = 'f4', format = '%11.4f'))
-            self.coeffs.add_column(Column(name = 'CAMERA', dtype = 'U24', format = '%-24s'))
-            self.coeffs.add_column(Column(name = 'TELESCOPE', dtype = 'U24', format = '%-24s'))
-            self.coeffs.add_column(Column(name = 'FIELD', dtype = 'U24', format = '%-24s'))
+            for field in self.fields:
+                self.coeffs.add_column(Column(name = field['name'], dtype = field['dtype'], format = field['format']))
+
+#            self.coeffs.add_column(Column(name = 'OBSERVER', dtype = 'U5', format = '%-10s'))
+#            self.coeffs.add_column(Column(name = 'DATE', dtype = 'U10', format = '%-14s'))
+#            self.coeffs.add_column(Column(name = 'TV', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'ERR_TV', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'TVR', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'ERR_TVR', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'TBV', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'ERR_TBV', dtype = 'f4', format = '%11.4f'))
+#            self.coeffs.add_column(Column(name = 'CAMERA', dtype = 'U24', format = '%-24s'))
+#            self.coeffs.add_column(Column(name = 'TELESCOPE', dtype = 'U24', format = '%-24s'))
+#            self.coeffs.add_column(Column(name = 'FIELD', dtype = 'U24', format = '%-24s'))
         else:
             self.coeffs = Table.read(self.fileName, format = 'ascii')
-            self.coeffs['OBSERVER'].format = '%-10s'
-            self.coeffs['DATE'].format = '%-14s'
-            self.coeffs['TV'].format = '%11.4f'
-            self.coeffs['ERR_TV'].format = '%11.4f'
-            self.coeffs['TVR'].format = '%11.4f'
-            self.coeffs['ERR_TVR'].format = '%11.4f'
-            self.coeffs['TBV'].format = '%11.4f'
-            self.coeffs['ERR_TBV'].format = '%11.4f'
-            self.coeffs['CAMERA'].format = '%-24s'
-            self.coeffs['TELESCOPE'].format = '%-24s'
-            self.coeffs['FIELD'].format = '%-24s'
+            for field in self.fields:
+                self.coeffs[field['name']].format = field['format']
 
-    def addCoeffs(self, Tv, Tvr, Tbv, errTv = None, errTvr = None, errTbv = None, field = None):
+#            self.coeffs['OBSERVER'].format = '%-10s'
+#            self.coeffs['DATE'].format = '%-14s'
+#            self.coeffs['TV'].format = '%11.4f'
+#            self.coeffs['ERR_TV'].format = '%11.4f'
+#            self.coeffs['TVR'].format = '%11.4f'
+#            self.coeffs['ERR_TVR'].format = '%11.4f'
+#            self.coeffs['TBV'].format = '%11.4f'
+#            self.coeffs['ERR_TBV'].format = '%11.4f'
+#            self.coeffs['CAMERA'].format = '%-24s'
+#            self.coeffs['TELESCOPE'].format = '%-24s'
+#            self.coeffs['FIELD'].format = '%-24s'
+
+    def addCoeffs(self, Tv, Tvr, Tbv, errTv = None, errTvr = None, errTbv = None):
         lastCoeffs = self.getCoeffs()
         if not lastCoeffs:
-            self.coeffs.add_row((self.observer, self.date, Tv, errTv, Tvr, errTvr, Tbv, errTbv, self.camera, self.telescope, field))
+            self.coeffs.add_row((self.observer, self.date, Tv, errTv, Tvr, errTvr, Tbv, errTbv, self.camera, self.telescope, self.std_area))
         else:
             lastCoeffs['TV'] = Tv
             lastCoeffs['ERR_TV'] = errTv
@@ -127,7 +150,7 @@ class StdCoeffs:
             lastCoeffs['ERR_TVR'] = errTvr
             lastCoeffs['TBV'] = Tbv
             lastCoeffs['ERR_TBV'] = errTbv
-            lastCoeffs['FIELD'] = field
+#            lastCoeffs['FIELD'] = field
 
     def getCoeffs(self):
         flt = (self.coeffs['OBSERVER'] == self.observer) & (self.coeffs['DATE'] == self.date) & (self.coeffs['CAMERA'] == self.camera) & (self.coeffs['TELESCOPE'] == self.telescope)
@@ -137,8 +160,10 @@ class StdCoeffs:
         else:
             return rows[0]
 
+    def exists(self):
+        return getCoeffs
+
     def getBestCoeffs(self):
-        # TODO:
         flt = (self.coeffs['OBSERVER'] == self.observer) & (self.coeffs['CAMERA'] == self.camera) & (self.coeffs['TELESCOPE'] == self.telescope)
         rows = self.coeffs[flt]
         if len(rows) == 0:
@@ -146,19 +171,29 @@ class StdCoeffs:
         elif len(rows) == 1:
             return rows[0]
         else:
-            jdnow = jd(self.date)
-            delta = abs(jdnow - jd(rows[0]['DATE']))
+            jdnow = pm.jd(self.date)
+            delta = abs(jdnow - pm.jd(rows[0]['DATE']))
             ix = 0
             for j in range(len(rows) - 1):
-                d = abs(jdnow - jd(rows[j + 1]['DATE']))
+                d = abs(jdnow - pm.jd(rows[j + 1]['DATE']))
                 if d < delta:
                     delta = d
                     ix = j + 1
             return rows[ix]
 
     def getAvgCoeffs(self):
-        # TODO:
-        return None
+        flt = (self.coeffs['OBSERVER'] == self.observer) & (self.coeffs['CAMERA'] == self.camera) & (self.coeffs['TELESCOPE'] == self.telescope)
+        rows = self.coeffs[flt]
+        if len(rows) == 0:
+            return None
+        avgc = deepcopy(rows[0])
+        avgc['TV'] = np.average(rows['TV'])
+        avgc['TVR'] = np.average(rows['TVR'])
+        avgc['TBV'] = np.average(rows['TBV'])
+
+        # TODO: calculate average errors
+        
+        return avgc
 
     def save(self):
         self.coeffs.write(self.fileName, format = 'ascii.fixed_width_two_line', delimiter = ' ')
@@ -183,7 +218,7 @@ class Photometry:
         '''
         astFileName = fileName.split('.')[0]
         astFileName = astFileName + '.ast.fits'
-        self.fits = getFitsHeaders(astFileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
+        self.fits = pm.getFitsHeaders(astFileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
 
     def getCamera(self):
         if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
@@ -248,7 +283,7 @@ class Photometry:
                 e2.append(ek2)
                 w.append(1.0 / ek2)
 
-        z = median(y)
+        z = np.median(y)
         r = [0.0] * len(y)
         r_ = [0.0] * len(y)
         w_ = [1.0] * len(y)
@@ -278,13 +313,13 @@ class Photometry:
             se2 = se2 + 1.0 / (w_[k] * w_[k])
         ez_2 = su / sl
         mel_2 = su / float(len(y) - 1)
-        err = sqrt(se2 / len(y))
-        print ("(gcx) color: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, sqrt(ez_2), len(y), err))
+        err = np.sqrt(se2 / len(y))
+        print ("(gcx) color: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, np.sqrt(ez_2), len(y), err))
 
         if self.opt['showGraphs']:
             plotcolor = color[0].lower()
             plt.subplot(311 + self.opt['color'].index(color))
-            xr = arange(min(mis), max(mis), 0.01)
+            xr = np.arange(min(mis), max(mis), 0.01)
             plt.plot(mis, mvs, plotcolor + 'o', xr, xr + z, 'k')
             plt.xlabel(color)
             plt.ylabel(stdcolor)
@@ -327,12 +362,12 @@ class Photometry:
                 er.append(1.0 / e2)
 
         if len(mi) < 2:
-            printError("Not enough comp stars for linear fit ensemble")
+            pm.printError("Not enough comp stars for linear fit ensemble")
             return []
 
 #        p = Polynomial.fit(mi, mv, 1, w = er)
-        coef = linfit(mi, mv, er)
-        ep = sqrt(ep / float(N))
+        coef = pm.linfit(mi, mv, er)
+        ep = np.sqrt(ep / float(N))
 
         print ('polyfit result:', coef, 'error:', ep)
 
@@ -363,34 +398,34 @@ class Photometry:
 
         emin = 1.0
         bestComp = None
-        for pm in refCat['cat']:
-            mvs = pm[mvPosList[color]]
-            evs = pm[evPosList[color]]
-            if pm[rolePos] == 'C' and mvs != '-':
-                ei = float(pm[eiPos]) if pm[eiPos] != '-' else MAG_ERR_DEFAULT
+        for pms in refCat['cat']:
+            mvs = pms[mvPosList[color]]
+            evs = pms[evPosList[color]]
+            if pms[rolePos] == 'C' and mvs != '-':
+                ei = float(pms[eiPos]) if pms[eiPos] != '-' else MAG_ERR_DEFAULT
                 ev = float(evs) if evs != '-' and evs != '0.0' else ei
                 e = ei * ei + ev * ev
                 if e < emin:
                     haveAllMags = True
                     for c in self.opt['color']:
                        if c != color:
-                           if pm[mvPosList[c]] == '-' or pm[evPosList[c]] == '-':
+                           if pms[mvPosList[c]] == '-' or pms[evPosList[c]] == '-':
                                haveAllMags = False
                                break
                     if not haveAllMags:
                         continue
                     emin = e
-                    bestComp = pm
+                    bestComp = pms
 
         if bestComp:
             ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
             ev = float(bestComp[evPosList[color]]) if bestComp[evPosList[color]] != '-' else MAG_ERR_DEFAULT
-            e = quad(ei, ev)
+            e = pm.quad(ei, ev)
             bestComp[rolePos] = 'K'
             print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPosList[color]], e))
             return bestComp[idPos]
         else:
-            printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
+            pm.printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
             return None
 
     def calculateMgsComparision(self, refCat, color, bestCompId):
@@ -410,7 +445,7 @@ class Photometry:
         p = [ 1.0, zp ]
         ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
         ev = float(bestComp[evPos]) if bestComp[evPos] != '-' and bestComp[evPos] != '0.0' else ei
-        ep = quad(ei, ev)
+        ep = pm.quad(ei, ev)
 
         if self.opt['showGraphs']:
             mi = []
@@ -459,6 +494,7 @@ class Photometry:
         raPos = getHeaderPos(refCat, 'RA')
         decPos = getHeaderPos(refCat, 'DEC')
         rolePos = getHeaderPos(refCat, fieldRole)
+        stdPos = len(refCat['header'])
 
         if outFileName == None:
             outFileName = 'result.pm'
@@ -481,7 +517,7 @@ class Photometry:
         r.write('\n')
 
         # write result data
-        jdObs = jd(dateObs)
+        jdObs = pm.jd(dateObs)
         jds = "%12.4f" % jdObs
         for res in result:
             r.write(res[idPos].ljust(15))
@@ -499,7 +535,8 @@ class Photometry:
                 flag = '-'
             r.write(flag.ljust(5))
             r.write(("%6.3f" % (float(res[mvPos]))).ljust(20))
-            c = stdcolor if self.opt['useCoeffs'] else color
+#            c = stdcolor if self.opt['useCoeffs'] else color
+            c = stdcolor if res[stdPos] == 'S' else color
             r.write(c.ljust(5))
             r.write(("%5.3f" % (float(res[evPos])) if res[evPos] != '-' and flag != 'F' else '-').ljust(20))
             r.write('\n')
@@ -568,24 +605,6 @@ class Photometry:
 
         return merged
 
-#    def linfit(self, x, y, w = None):
-#        N = len(x)
-#        X = 0.0
-#        Y = 0.0
-#        XY = 0.0
-#        X2 = 0.0
-#        M = 0.0
-#        for j in range(N):
-#            wj = w[j] if w else 1.0
-#            X += x[j] * wj
-#            Y += y[j] * wj
-#            XY += x[j] * y[j] * wj
-#            X2 += x[j] * x[j] * wj
-#            M += wj
-#        m = (Y * X - M * XY) / (X * X - M * X2)
-#        b = (Y - m * X) / M
-#        return m, b
-
     def calculateCoeffs(self, mergedCat):
         # Tv:  slope of (V-v) -> (V-R)
         # Tvr: 1/slope of (v-r) -> (V-R)
@@ -617,13 +636,13 @@ class Photometry:
             w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
             w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
 
-        coef = linfit(V_R, V_vi, w_Tv)
+        coef = pm.linfit(V_R, V_vi, w_Tv)
         Tv = coef[0]
         Bv = coef[1]  # ##
-        coef = linfit(V_R, vi_ri, w_Tvr)
+        coef = pm.linfit(V_R, vi_ri, w_Tvr)
         Tvr = 1.0 / coef[0]
         Bvr = coef[1]  # ##
-        coef = linfit(B_V, bi_vi, w_Tbv)
+        coef = pm.linfit(B_V, bi_vi, w_Tbv)
         Tbv = 1.0 / coef[0]
         Bbv = coef[1]  # ##
 
@@ -650,21 +669,24 @@ class Photometry:
         print ('standard coeffs: Tv =', Tv, 'Tvr =', Tvr, 'Tbv = ', Tbv)
         return [Tv, Tvr, Tbv]
 
-    def openCoeffs(self, obsDate):
+    def openCoeffs(self, obsDate, target):
         if not self.coeffTable:
             configFolder = self.ppl['CONFIG_FOLDER'].rstrip('/')
             coeffFile = configFolder + '/stdcoeffs.cat'
-            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, self.getCamera().replace(' ', '_'), self.getTelescope().replace(' ', '_'))
+            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, self.getCamera().replace(' ', '_'), self.getTelescope().replace(' ', '_'), target.replace(' ', '_').upper())
             self.coeffTable.open()
 
-    def saveCoeffs(self, coeffs, obsDate):
-        self.openCoeffs(obsDate)
-        self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, 'SA104'.replace(' ', '_'))
+    def saveCoeffs(self, coeffs, obsDate, target):
+        self.openCoeffs(obsDate, target)
+        if not self.opt['overwrite'] and self.coeffTable.exists():
+            printError('Standard coefficients for %s/%s/%s/%s is exists ; to overwrite it use -w option' % (self.coeffTable.observer, self.coeffTable.obsdate, self.coeffTable.camera, self.coeffTable.telescope))
+            return
+        self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, target.replace(' ', '_').upper())
 #        self.coeffTable.save(overwrite=True)
         self.coeffTable.save()
 
-    def loadCoeffs(self, obsDate):
-        self.openCoeffs(obsDate)
+    def loadCoeffs(self, obsDate, target):
+        self.openCoeffs(obsDate, target)
         bestCoeffs = self.coeffTable.getBestCoeffs()
         if not bestCoeffs:
             printWarning ('standard coeffs not found')
@@ -681,7 +703,7 @@ class Photometry:
             vcomp[c]['mi'] = float(c_row[self.pos[fieldMgInstrumental]])
             vcomp[c]['ei'] = float(c_row[self.pos[fieldMgErrInstrumental]])
             vcomp[c]['mc'] = p_a[c][0] * vcomp[c]['mi'] + p_a[c][1]
-            vcomp[c]['ec'] = quad(vcomp[c]['ei'], err_a[c]) if err_a[c] else vcomp[c]['ei'] * sqrt(2.0)
+            vcomp[c]['ec'] = pm.quad(vcomp[c]['ei'], err_a[c]) if err_a[c] else vcomp[c]['ei'] * np.sqrt(2.0)
 
         return vcomp
 
@@ -700,9 +722,10 @@ class Photometry:
 
                     if role != 'VF':
                         err_m0 = float(row[self.pos[fieldMgErrInstrumental]])
-                        errM = sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
+                        errM = np.sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
                         row[self.pos['ERR_' + stdc]] = errM
 
+                    row.append('I')
                     allResults[c].append(row)
 
         return allResults
@@ -712,9 +735,9 @@ class Photometry:
         '''
         allResults: dict of results, key is th color
         '''
-        Tv = coeffs[0]
-        Tvr = coeffs[1]
-        Tbv = coeffs[2]
+#        Tv = coeffs[0]
+#        Tvr = coeffs[1]
+#        Tbv = coeffs[2]
         vc = vcomp['Gi']['mi']
         bc = vcomp['Bi']['mi']
         rc = vcomp['Ri']['mi']
@@ -737,6 +760,12 @@ class Photometry:
                 auid = g_row[self.pos['AUID']]
                 b_row = self.findRow(allCatalogs['Bi']['cat'], auid)
                 r_row = self.findRow(allCatalogs['Ri']['cat'], auid)
+ 
+                isFainter = role == 'VF' or b_row[self.pos['ROLE']] == 'VF' or r_row[self.pos['ROLE']] == 'VF'
+
+                Tv = coeffs[0] if not isFainter else 0.0
+                Tvr = coeffs[1] if not isFainter else 1.0
+                Tbv = coeffs[2] if not isFainter else 1.0
 
                 v0 = float(g_row[self.pos[fieldMgInstrumental]])
                 b0 = float(b_row[self.pos[fieldMgInstrumental]])
@@ -751,20 +780,24 @@ class Photometry:
                 b_row[self.pos['MAG_B']] = B
                 r_row[self.pos['MAG_R']] = R
 
-                if role != 'VF':
+                if not isFainter:
 
                     err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]]) if g_row[self.pos[fieldMgErrInstrumental]] != '-' and g_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_vc
                     err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]]) if b_row[self.pos[fieldMgErrInstrumental]] != '-' and b_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_bc
                     err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]]) if r_row[self.pos[fieldMgErrInstrumental]] != '-' and r_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_rc
 
-                    errV = sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
-                    errB = sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
-                    errR = sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
+                    errV = np.sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
+                    errB = np.sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
+                    errR = np.sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
 
                     g_row[self.pos['ERR_V']] = errV
                     b_row[self.pos['ERR_B']] = errB
                     r_row[self.pos['ERR_R']] = errR
 
+                flagStd = 'S' if self.opt['useCoeffs'] and not isFainter else 'I'
+                g_row.append(flagStd)
+                b_row.append(flagStd)
+                r_row.append(flagStd)
                 allResults['Gi'].append(g_row)
                 allResults['Bi'].append(b_row)
                 allResults['Ri'].append(r_row)
@@ -796,7 +829,7 @@ class Photometry:
 
     def process(self):
         if not self.opt['files']:
-            printError('No input files are given.')
+            pm.printError('No input files are given.')
             return
 
         allCatalogs = {}
@@ -808,7 +841,7 @@ class Photometry:
             color = self.opt['color'][j]
 
             if not exists(fileName):
-                printError("File %s is not exists." % (fileName))
+                pm.printError("File %s is not exists." % (fileName))
                 return
 
             refCat = loadCatalog(fileName)
@@ -839,21 +872,23 @@ class Photometry:
             # standardization
             coeffs = None
 
+            target = pm.guess(self.opt['files'][0])['target']
+
             if self.opt['makeCoeffs']:
                 mergedCat = self.mergeCatalogs(allCatalogs)
 
                 coeffs = self.calculateCoeffs(mergedCat)
 
                 if self.opt['saveCoeffs']:
-                    self.saveCoeffs(coeffs, dateObsDate)
+                    self.saveCoeffs(coeffs, dateObsDate, target)
 
             elif self.opt['loadCoeffs']:
 
-                coeffs = self.loadCoeffs(dateObsDate)
+                coeffs = self.loadCoeffs(dateObsDate, target)
 
             if not coeffs:
-                printError('No std coefficients for transformation ; use Tv = 0, Tvr = 1, Tbv = 1 for comp star method.')
-                coeffs = [ 0.0, 1.0, 1.0 ]  # this is for comp star method
+                pm.printError('No std coefficients for transformation ; use Tv = 0, Tvr = 1, Tbv = 1 for comp star method.')
+                coeffs = [ 0.0, 1.0, 1.0 ]  # this is for non-std transformation
 
         else:
 
@@ -901,7 +936,7 @@ class MainApp:
         try:
             optlist, args = getopt (argv[1:], "c:smo:p:", ['color=', 'std', 'make-std', 'out=', 'comp='])
         except GetoptError:
-            printError('Invalid command line options')
+            pm.printError('Invalid command line options')
             return
 
         for o, a in optlist:
@@ -923,7 +958,7 @@ class MainApp:
     def run(self):
         self.processCommands()
 
-        ppl = loadPplSetup()
+        ppl = pm.loadPplSetup()
 
         phot = Photometry(self.opt, ppl)
         phot.process()

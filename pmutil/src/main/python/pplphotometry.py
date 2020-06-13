@@ -258,7 +258,10 @@ class Pipeline:
             baseFolder = sf.replace('/' + self.pplSetup['SEQ_FOLDER_NAME'], '')
             self.opt['color'] = requestedColors
             self.opt['useStd'] = requestedStd
-            self.inspectRefCat(baseFolder)
+            refcatAvailable = self.inspectRefCat(baseFolder)
+            if not refcatAvailable:
+                printError('Reference catalog is not usable for photometry ; skip folder %s' % (sf))
+                continue
 
             pf = sf.replace(self.pplSetup['SEQ_FOLDER_NAME'], self.pplSetup['PHOT_FOLDER_NAME'])
 
