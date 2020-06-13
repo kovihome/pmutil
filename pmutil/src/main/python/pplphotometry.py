@@ -101,12 +101,12 @@ class Pipeline:
             printWarning('No comp stars to achieve %s photometry with reference catalog %s' % (colors.upper(), refcatFileName))
             # TODO: more color downgrade rule
             return False
-        elif compColorCount[colors] == 1:
+        elif compColorCount[colors] < 3:
             printWarning('Only 1 comp star found to achieve %s photometry with reference catalog %s ; only the comp star method is possible' % (colors.upper(), refcatFileName))
             self.opt['method'] = 'comp'
             printWarning('Downgrade method to best comp star.')
             return True
-        elif compColorCount[colors] < 5:
+        elif compColorCount[colors] < 5 and (self.opt['method'] != 'comp' or self.opt['makeStd'] or self.opt['adhocStd']):
             printWarning('Only %d comp star found to achieve %s photometry with reference catalog %s; do ensemble or ad-hoc standardization carefully' % (compColorCount[colors], colors.upper(), refcatFileName))
             return False
 

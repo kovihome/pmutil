@@ -443,7 +443,7 @@ class Pipeline:
 
     def processRegistration(self, calibFolder, seqFolder, title):
 
-        printInfo(title + ": Create calibrated light file(s).")
+        printInfo(title + ": Register and stack calibrated light file(s).")
 
         # Create the sequence dir, if not exists
         if not exists(seqFolder):

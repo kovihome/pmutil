@@ -9,28 +9,6 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
-+NEW: filter: a .cat file-ba Fainter esetben ugyan azt a HMG erteket irja be az isocorr meg a best mg helyere is
-
-+NEW: 20200426/ll_lyr elszall:
-
-	Traceback (most recent call last):
-	  File "/home/kovi/bin/ppl-photometry", line 435, in <module>
-	    app.run()
-	  File "/home/kovi/bin/ppl-photometry", line 426, in run
-	    ppl.execute()
-	  File "/home/kovi/bin/ppl-photometry", line 265, in execute
-	    success = self.process_photometry(sf, pf, "PHOTOMETRY")
-	  File "/home/kovi/bin/ppl-photometry", line 224, in process_photometry
-	    self.calculateMags(photFolder, self.opt['color'])
-	  File "/home/kovi/bin/ppl-photometry", line 200, in calculateMags
-	    phot.process()
-	  File "/home/kovi/bin/pmphot.py", line 863, in process
-	    allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
-	  File "/home/kovi/bin/pmphot.py", line 757, in calculateStdMgs
-	    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]])
-	ValueError: could not convert string to float: '-'
-
-
 -NEW: ha nincs refcat, vagy a refcat-ban nincs comp vagy var, akkor irjon ki hibat, es lepjen ki
 
 NEW IDEAS:
@@ -127,31 +105,7 @@ TECH UPGRADE:
 
 (526) STD: ha valamelyik szinben fainter, akkor ne csinaljon std-t, legfeljebb 2 szinben
 
-(518) pmphot: ha keves a comp star a refcat-ban, es adhoc std, make-std vagy ensemble lenne, irjon figyelmeztetest, hogy ehelyett comp mg kellene
-	- mar 2 comp-nal hibas a gcx/lfit at kell kapcsolni comp-ra
-
 (450) !!! standardization (s15n)
-
-	+ a comp star szamolast es a std keszitest szet kell valasztani:
-
-		+1. hatarozza meg a polinomot comp/gcx/lfit modszerrel
-
-		+2. szamoljon comp mC, eC ertekeket
-
-		+3. szamoljon var mC, eC ertekeket instr/std modszerrel
-		
-			+ az instr modszer megegyezik az std-vel, Tv = 0, Tvr = Tbv = 1 esetben
-
-		method		std		result
-
-		comp		none		normal inst mg			kevés comp esetén, < 3
-
-				use		normal std mg			kevés comp és létező coeffs esetén, adhoc nem lehetséges
-				
-		gcx/lfit	none		ensemble inst mg		sok comp esetén, >= 3
-
-				use		ensemble std mg			sok comp és létező coeffs esetén
-
 
 	- (526) ha valamelyik szinben nem latszik, vagy tul nagy a hibaja, mert halvany, akkor lehet, hogy nem kellene std mg-t szamolni ra, csak sima comp TG/TB/TR erteket
 
