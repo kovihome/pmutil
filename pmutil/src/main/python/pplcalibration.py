@@ -116,7 +116,7 @@ class Pipeline:
 
             # convert raw image to fits
             # TODO: use invoke, parse options with ' or " correctly, or use preparsed options
-            os.system("rawtran -c %s -o %s -B 16 -C '-4 -D' -X '-q 3 -w' %s" % (color, FITS_NAME, rawfile))
+            os.system("rawtran -c %s -o %s -B 16 -C '-4 -D -t 0' -X '-q 3 -w' %s" % (color, FITS_NAME, rawfile))
 
             # read image temperature from raw file
             exif = invoke("exiftool -s -g %s" % (rawfile))

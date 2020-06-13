@@ -99,13 +99,6 @@ TECH UPGRADE:
 
 --- calibration --------------------------------------------
 
-(527) calib: 20200404: kalibracio hibas
-
-	ficalib: error: dark image size differs from the expected image size.
-
-	A dark keppel lesz valami gond, a 20200331-i darkkal jo
-
-
 --- photometry ---------------------------------------------
 
 (450) !!! standardization (s15n)
@@ -271,6 +264,8 @@ TECH UPGRADE:
 --- calibration --------------------------------------------
 
 (540) BUG: a rawfit tukrozi a kepet
+
+	valszeg a dcraw -t 0 opcio megoldja
 
 (531) calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 
