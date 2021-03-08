@@ -9,52 +9,15 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
+-NEW: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
+	az std rendben van, a tobbit kell megnezni
+
 NEW IDEAS:
 
--NEW: STD: calculate coeff errors
-
--NEW: STD: average coeff szamolasa
-
-	- kapcsolo legyen, hogy a best vagy az avg coeff-eket hasznalja, vagy fixen az avg-t?
-
--NEW: STD: fits es cat/pm tartalmazza a coeff infokat
-
--NEW: lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
-
--NEW: OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
+-NEW: astropy/astroalign: image registration w/o astrometry
 
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
 	--debug modban
-
-- pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
-
-- more standard areas:
-
-	https://www.aavso.org/apps/vsd/stdfields
-
-	https://www.aavso.org/apps/vsp/chart/?title=NGC%201252&ra=47.704167&dec=-57.766667&fov=120&maglimit=14.5&special=std_field&B=on&Rc=on&Ic=on&north=down&east=right
-
-	https://www.aavso.org/apps/vsp/photometry/?fov=15&B=on&north=down&maglimit=16&title=M11&ra=282.77292&Rc=on&Ic=on&east=right&dec=-6.266667&special=std_field
-
-	AAVSO VSP:
-
-	Table 6.1 – Standard clusters
-	Name              RA       Dec       Mag Range Diameter(arc min)	Comps
-	/NGC 1252          03:10:49 -57:46:00 8 – 15    300+			36
-	M67               08:51:18 +11:48:00 7 – 16    74			211
-	/NGC 3532          11:05:39 -58:45:12 8 – 13.5  30			288
-	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450			92	Melotte 111
-	M11               18:51:05 -06:16:12 8.5 – 17  20			416
-	NGC 7790          23:58:23 +61:12:25 10 – 20   7			218
-
-	SA20		  01	   +45			40			23
-	SA23		  04	   +45			30			16
-	SA26		  07	   +45               	30			16
-	SA29		  10	   +45			60			15
-	SA32		  13	   +45			60			22
-	SA35		  16	   +45			40			18
-	SA38		  19	   +45			20			16
-	SA41		  22	   +45			30			13
 
 - cosmetic: less output from photometry (sextractor) apps
 
@@ -62,11 +25,7 @@ NEW IDEAS:
 
 TECH UPGRADE:
 
-- colorize: astropy.visualization normalizalas
-
 - photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
-
-- refcat: astropy.io.votable - egyszerubb votable kezeles 
 
 - Katalogus kezeles astropy.table.Table segitsegevel
 
@@ -101,10 +60,7 @@ TECH UPGRADE:
 
 --- photometry ---------------------------------------------
 
-(450) !!! standardization (s15n)
-
-	? az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
-		az std rendben van, a tobbit kell megnezni
++(450) !!! standardization (s15n)
 
 	+ !!! mentes coeff file-ba
 
@@ -119,6 +75,11 @@ TECH UPGRADE:
 
 
 === V 1.2 ==================================================
+	Sorrend:
+		High: 489, 451, 548, 549, 550, (488), 491
+		Med : 547, 544, 490, 459
+		Low : 539, 528, 546
+---
 
 (465) RAW képek és eredmény archiválása
 
@@ -171,7 +132,34 @@ TECH UPGRADE:
 
 (510) PSF fotometria ködös objektumok esetén
 
-(489) Referencia katalógus tartalmazzon mezőcsillagokat is
++++(489) Referencia katalógus tartalmazzon mezőcsillagokat is
+
+	+ TODO:
+		+1. comp + var koordinatak listaba (Table: ra, dec)
+                +2. astroquery.xmatch UCAC4 xref lista lekerdezese
+		+3. UCAC4 mezocsillagok lekerdezese
+		+4. xref talalatok kikommentezese a listaban (auid felul is irhato, mert ki van kommentezve)
+
+	+ mg limit
+
+	+ CONFIGURE: astroquery dependency check (v0.4+)
+
+	+ Doc: If you use astroquery, please cite the paper Ginsburg, Sipőcz, Brasseur et al 2019.	
+
+		- https://arxiv.org/pdf/1901.04520.pdf
+
+		- https://github.com/astropy/astroquery/blob/master/astroquery/CITATION
+
+	+ az astroquery az 1. importnal letoltott sok mindent, de elszallt valami kulcs hianyan, ezt fel kellene terkepezni, documentalni, 
+		es valami eszkozt csinalni, ami nem futas kozben szall el, hanem install idoben megoldja
+
+		ModuleNotFoundError: No module named 'keyring.util.escape'
+
+		pip3 install --upgrade keyrings.alt
+
+	+ setup: mg limit for field stars
+
+		DEF_FIELD_STAR_MG_LIMIT = 17.0
 
 (488) Tranziens detektálás
 
@@ -252,6 +240,10 @@ TECH UPGRADE:
 
 === NOT VERSIONED  ==================================================
 
+(558) colorize: astropy.visualization normalizalas
+
+(559) refcat: astropy.io.votable - egyszerubb votable kezeles 
+
 (534) ppl-refcat: ha coord volt megadva, akkor nézze meg, hogy a változók között van-e olyan, ami elég közel esik a kép közepéhez, és inkább ez legyen a catalog neve.
 
 (525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
@@ -279,6 +271,48 @@ TECH UPGRADE:
 (471) Gi csatornák összegzése átlagolás helyett
 
 --- photometry ---------------------------------------------
+
+(557) more standard areas:
+
+	https://www.aavso.org/apps/vsd/stdfields
+
+	https://www.aavso.org/apps/vsp/chart/?title=NGC%201252&ra=47.704167&dec=-57.766667&fov=120&maglimit=14.5&special=std_field&B=on&Rc=on&Ic=on&north=down&east=right
+
+	https://www.aavso.org/apps/vsp/photometry/?fov=15&B=on&north=down&maglimit=16&title=M11&ra=282.77292&Rc=on&Ic=on&east=right&dec=-6.266667&special=std_field
+
+	AAVSO VSP:
+
+	Table 6.1 – Standard clusters
+	Name              RA       Dec       Mag Range Diameter(arc min)	Comps
+	/NGC 1252          03:10:49 -57:46:00 8 – 15    300+			36
+	M67               08:51:18 +11:48:00 7 – 16    74			211
+	/NGC 3532          11:05:39 -58:45:12 8 – 13.5  30			288
+	Coma Star Cluster 12:22:30 +25:51:00 5 – 10    450			92	Melotte 111
+	M11               18:51:05 -06:16:12 8.5 – 17  20			416
+	NGC 7790          23:58:23 +61:12:25 10 – 20   7			218
+
+	SA20		  01	   +45			40			23
+	SA23		  04	   +45			30			16
+	SA26		  07	   +45               	30			16
+	SA29		  10	   +45			60			15
+	SA32		  13	   +45			60			22
+	SA35		  16	   +45			40			18
+	SA38		  19	   +45			20			16
+	SA41		  22	   +45			30			13
+
+(556) pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
+
+(555) OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
+
+(554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
+
+(553) STD: fits es cat/pm tartalmazza a coeff infokat
+
+(552) STD: average coeff szamolasa
+
+	- kapcsolo legyen, hogy a best vagy az avg coeff-eket hasznalja, vagy fixen az avg-t?
+
+(551) STD: calculate coeff errors
 
 (545) PHOT: ha egy csillag latszik, de HMG alatti, akkor valamelyik file-ban ezt megjegyzesben vagy valahogy bele kellene irni, real mg-t meg hibat
 

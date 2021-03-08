@@ -16,12 +16,16 @@ from os import makedirs, symlink, remove
 from os.path import isdir, exists
 from glob import glob
 from astropy.table import Table
+from astropy.coordinates import SkyCoord
+import astropy.units as u
 import json
 import xmltodict
 import re
 import urllib
 
+
 from pmbase import printError, printInfo, printWarning, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
+from pmviz import VizUCAC4
 
 
 class RefCat:
@@ -35,6 +39,8 @@ class RefCat:
     chartId = None
 
     cache = []
+
+    xmatchTable = Table(names=['AUID', 'RA_DEG', 'DEC_DEG', 'LABEL'], dtype=['U16','U16','U16','str'])
 
     def __init__(self, opt):
         self.opt = opt
@@ -51,7 +57,7 @@ class RefCat:
         if objectName != None:
             ids = "star=%s" % (urllib.parse.quote_plus(objectName))
         else:
-            ids = "ra=%s&dec=%s" % (ra, dec)
+            ids = "ra=%s&dec=%s" % (deg2hexa(ra/15.0), deg2hexa(dec))
         vspUrl = "https://www.aavso.org/apps/vsp/api/chart/?format=json&%s&fov=%d&maglimit=%4.1f&other=all" % (ids, fov, self.defMgLimit)
         f = request.urlopen(vspUrl)
         respJson = f.read().decode('UTF-8')
@@ -101,7 +107,10 @@ class RefCat:
                 mgerrR = "-"
             label = str(pm['label']).replace(' ', '_')
 
+
             self.writeRecord(auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
+
+            self.xmatchTable.add_row([auid, raDeg, decDeg, label])
 
         print("%d comparision stars were found in VSP database" % (len(resp['photometry'])))
 
@@ -132,8 +141,8 @@ class RefCat:
             sra = deg2hexa(float(resp['VSXObject']['RA2000']) / 15.0)
             sdec = deg2hexa(float(resp['VSXObject']['Declination2000']))
         else:
-            sra = deg2hexa(float(ra) / 15.0)
-            sdec = deg2hexa(float(dec))
+            sra = deg2hexa(ra / 15.0)
+            sdec = deg2hexa(dec)
 
         if not sdec.startswith('-') and not sdec.startswith('+'):
             sdec = "+" + sdec
@@ -173,6 +182,8 @@ class RefCat:
             self.dismissSameAUID(auid)
 
             self.writeRecord(auid, role, ra, raDeg, dec, decDeg, '-', '-', '-', '-', '-', '-', label)
+
+            self.xmatchTable.add_row([auid, raDeg, decDeg, label])
 
         nrUnknown = 1
         count = 0
@@ -266,11 +277,37 @@ class RefCat:
 
             self.writeRecord(auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label)
 
+            self.xmatchTable.add_row([auid, raDeg, decDeg, label])
+
         print("%d standard star found for standard area %s" % (len(stars), saName))
         return None
 
+
+    def loadFieldStars(self, target, fieldSize, mgLimit):
+        v = VizUCAC4(mgLimit)
+        t = v.query(target, fieldSize)
+
+        xt = v.xmatch(self.xmatchTable, 'RA_DEG', 'DEC_DEG')
+
+        matchCount = 0
+        for row in t:
+            auid = row['AUID']
+            label = row['LABEL']
+            mask = xt[v.cs['LABEL']] == row['LABEL'][6:]
+            f = xt[mask]
+            if len(f) > 0:
+                auid = '#' + f[0]['AUID']
+                label = label + '(' + f[0]['LABEL'] + ')'
+                matchCount += 1
+
+            self.writeRecord(auid, row['ROLE'], row['RA'], row['RA_DEG'], row['DEC'], row['DEC_DEG'],
+                             row['MAG_B'], row['ERR_B'], row['MAG_V'], row['ERR_V'], row['MAG_R'], row['ERR_R'], label)
+
+        print("%d field stars found in the %s catalog ; %d matched with comps and vars" % (len(t), v.catName, matchCount))
+
     def writeRecord(self, auid, role, ra, raDeg, dec, decDeg, magB, errB, magV, errV, magR, errR, label):
-        s = auid.ljust(13) + role.ljust(5) + ra.ljust(15) + raDeg.ljust(15) + dec.ljust(15) + decDeg.ljust(15) + magB.ljust(10) + errB.ljust(10) + magV.ljust(10) + errV.ljust(10) + magR.ljust(10) + errR.ljust(10) + label
+        s = auid.ljust(13) + role.ljust(5) + ra.ljust(15) + raDeg.ljust(15) + dec.ljust(15) + decDeg.ljust(15) + \
+            magB.ljust(10) + errB.ljust(10) + magV.ljust(10) + errV.ljust(10) + magR.ljust(10) + errR.ljust(10) + label
         self.cache.append(s)
 
     def getPair(self, s, delim = ','):
@@ -294,27 +331,32 @@ class RefCat:
         astResult = invoke(astFolder + "/solve-field " + SOLVE_ARGS + " -D temp -N temp/ast.fits temp/src.fits")
 
         r = astResult.split('\n')
-        sCoords = ["0.0", "0.0"]
+        coords = [0.0, 0.0]
         sCoordsSexa = ["00:00:00", "+00:00:00"]
         for line in r:
             if line.startswith("Field center"):
                 if line.find("RA,Dec") > -1:
                     sCoords = self.getPair(line.split('(')[2].split(')')[0])
+                    coords = [ float(sCoords[0]), float(sCoords[1]) ]
                     printInfo("Image center: %s %s" % (sCoords[0], sCoords[1]))
                 else:
                     sCoordsSexa = self.getPair(line.split('(')[2].split(')')[0])
+                    coords = [ hexa2deg(sCoordSexa[0]) * 15.0, hexa2deg(sCoordSexa[1]) ]
                     printInfo("Image center: %s %s" % (sCoordsSexa[0], sCoordsSexa[1]))
             elif line.startswith("Field size"):
                 sFieldSize = self.getPair(line.split(':')[1].split('a')[0], 'x')
                 printInfo("Image size: %s' x %s'" % (sFieldSize[0], sFieldSize[1]))
 
-        return sCoords
+        return coords
 
     def execute(self):
         self.ppl = loadPplSetup()
 
-        if self.opt['image'] != None:
+        if self.opt['mgLimit'] == None:
+            ml = float(self.ppl['DEF_FIELD_STAR_MG_LIMIT'])
+            self.opt['mgLimit'] = ml if ml > 0.0 and ml < 25.0 else 17.0
 
+        if self.opt['image'] != None:
             coords = self.determineCoordsFromImage (self.opt['image'])
             self.opt['ra'] = coords[0]
             self.opt['dec'] = coords[1]
@@ -331,7 +373,7 @@ class RefCat:
         elif self.opt['stdFieldName'] != None:
             outFileName += self.opt['stdFieldName'].lower().replace(' ', '_') + '.cat'
         else:
-            s_ra = deg2hexa(float(self.opt['ra']) / 15.0)
+            s_ra = deg2hexa(self.opt['ra'] / 15.0)
             s_dec = deg2hexa(float(self.opt['dec']))
             if not s_dec.startswith('+') and not s_dec.startswith('-'):
                 s_dec = '+' + s_dec
@@ -360,6 +402,16 @@ class RefCat:
 
                 self.loadVsxCatalogData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
+            # collect field stars
+            if self.opt['fieldStars']:
+
+                if self.opt['object'] != None:
+                    target = self.opt['object']
+                else:
+                    target = SkyCoord(ra=self.opt['ra'], dec=self.opt['dec'], unit=(u.deg, u.deg), frame='icrs')
+
+                self.loadFieldStars(target, self.opt['field'], self.opt['mgLimit'])
+
             # write cataglog to file
             outFile = open(outFileName, 'w')
             for s in self.cache:
@@ -385,19 +437,21 @@ class RefCat:
 class MainApp:
 
     appName = 'ppl-refcat'
-    appVersion = '1.1.0'
+    appVersion = '1.2.0'
     appDescription = 'Create reference catalog for photometry.'
 
     opt = {
-        'coords'   : None,  # coordinates of reference field
-        'source'   : None,  # source catalog of field stars
-        'object'   : None,  # object (variable star) name
-        'stdFieldName': None, # standard area name
-        'image'    : None,  # image file
-        'field'    : RefCat.defFov,  # reference field size in arcmins
-        'auidOnly' : True,  # variables having auid only
-        'overwrite': False,  # overwrite catalog
-        'folder'   : None,  # reference catalog file name
+        'coords'      : None,           # coordinates of reference field
+        'source'      : None,           # source catalog of field stars
+        'object'      : None,           # object (variable star) name
+        'stdFieldName': None,           # standard area name
+        'image'       : None,           # image file
+        'field'       : RefCat.defFov,  # reference field size in arcmins
+        'auidOnly'    : True,           # variables having auid only
+        'overwrite'   : False,          # overwrite catalog
+        'folder'      : None,           # reference catalog file name
+        'fieldStars'  : False,          # collect field stars into the catalog
+        'mgLimit'     : None,           # mg limit for field star selection
         }
 
     def __init__(self, argv):
@@ -423,20 +477,23 @@ class MainApp:
         print("  -c,  --coords ra,decl         coordinates of the center of reference frame, valid format is 12:34:56.7,-12:34:56.7")
         print("  -n,  --field-name field_name  standard field name")
         print("  -i,  --image filename         image file name")
-        print("  -s,  --source catalog         source catalog for field stars")
         print("  -f,  --field size             field size in arcmin, default is 60 arcmin")
         print("  -a,  --all                    collect all variables ; if not set, collect variables having AUID only")
+        print("  -r,  --field-stars            collect field stars")
+        print("  -s,  --source catalog         source catalog for field stars ; default catalog is UCAC-4")
+        print("  -l,  --limit mg               magnitude limit for field star selection")
         print("  -w,  --overwrite              overwrite catalog file, if exists")
         print("  -h,  --help                   print this page")
 
     def processCommands(self):
 
         try:
-            optlist, args = getopt (argv[1:], "ac:s:o:n:i:f:wh", ['all', 'coord=', 'source=', 'object=', 'field-name=', 'image=', 'field=', 'overwrite', 'help'])
+            optlist, args = getopt (argv[1:], "ac:s:o:n:i:f:rl:wh", ['all', 'coord=', 'source=', 'object=', 'field-name=', 'image=', 'field=', 'field-stars', 'limit=', 'overwrite', 'help'])
         except GetoptError:
             print ('Invalid command line options')
             exit(1)
 
+        fieldStarsIndicated = False
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
@@ -444,6 +501,7 @@ class MainApp:
                 self.opt['coords'] = a
             elif o == '-s' or o == '--source':
                 self.opt['source'] = a
+                fieldStarsIndicated = True
             elif o == '-o' or o == '--object':
                 self.opt['object'] = a.replace('_', ' ')
             elif o == '-n' or o == '--field-name':
@@ -454,9 +512,24 @@ class MainApp:
                 if a.isdigit():
                     self.opt['field'] = int(a)
                 else:
-                    print("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
+                    printError("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
             elif o == '-a' or o == '--all':
                 self.opt['auidOnly'] = False
+            elif o == '-r' or o == '--field-stars':
+                self.opt['fieldStars'] = True
+            elif o == '-l' or o == '--limit':
+                err = False
+                if a.isfloat():
+                    ml = float(a)
+                    if ml > 0.0 or ml <= 25.0:
+                        self.opt['mgLimit'] = float(a)
+                    else:
+                        err = True
+                else:
+                    err = True
+                if err:
+                   printError("Invalid mg limit: %s. Use default instead." % (a))
+                fieldStarsIndicated = True
             elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
             elif o == '-h' or o == '--help':
@@ -489,8 +562,12 @@ class MainApp:
                 printError("Invalid coordinate format")
                 exit(1)
 
-            self.opt['ra'] = c[0]
-            self.opt['dec'] = c[1]
+            self.opt['ra'] = hexa2deg(c[0]) * 15.0
+            self.opt['dec'] = hexa2deg(c[1])
+
+        if not self.opt['fieldStars'] and fieldStarsIndicated:
+            printError("Options -s or -l indicates collecting field stars, but -r option was not given. These options will be ignored.")
+
 
     def run(self):
         self.printTitle()
