@@ -14,8 +14,6 @@ NEW PHOTOMETRY BUGS:
 
 NEW IDEAS:
 
--NEW: astropy/astroalign: image registration w/o astrometry
-
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
 	--debug modban
 
@@ -85,6 +83,27 @@ TECH UPGRADE:
 
 --- calibration --------------------------------------------
 
++++(564) Alternatív stack algoritmus: astropy/astroalign: image registration w/o astrometry
+
+	pip3 install astroalign # 2.4.1
+        pip3 install photutils  # 0.7.2
+
+	+ az obs mid time szamolast ellenorizni kell, nem tunik jonak
+
+	+ fits headereket kell csinalni a stackeleshez
+
+		NCOMBINE=                    5 / number of images used by ficombine             
+		MCOMBINE= 'sum'                / combination mode used by ficombine             
+		MASKINFO= '1'                                                                   
+		FI_HSTRY= 'ficombine: 0.9 [0.9.3@2019.02.06] 2020.04.10 21:32:11 (CEST)'        
+		FI_HSTRY= '> ficombine temp/Light_001-Gi.fits temp/Light_002-Gi.fits temp/Li\'  
+		FI_HSTRY= '> ght_003-Gi.fits temp/Light_004-Gi.fits temp/Light_005-Gi.fits -\'  
+		FI_HSTRY= '> m sum -n -o 20200404_dz_uma/Sequence/Combined-Gi.fits'
+
+	+ az astroalign legyen az egyetlen algoritmus, a FITSH torolheto (es a --alt-stack opcio is)
+
+	+ ref image kereses (fwhm, midtime, 0)
+
 (543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
 
 	- ugy tunik, hogy az fwhm minden kepnel nagyjabol ugyan akkora, ez nem mondja meg, ha egy kep rossz
@@ -98,6 +117,121 @@ TECH UPGRADE:
 (459) Dark library kezelés
 
 --- photometry ---------------------------------------------
+
+(548) Tranziens keresés katalógus adatoktól való eltérés alapján
+
+	1. pmmerge: keresztreferenciát kell készíteni a refcat x cat szerint (esetleg cat x ucac3 online)
+
+		+ combined catalog fields:
+                        # id fields
+                        AUID
+                        VIZ_ID
+			ROLE
+                        LABEL
+                        # measured data fields
+			MAG_GI	cat.MAG_ISOCOR
+			ERR_GI  cat.MAGERR_ISOCOR
+			MAG_BI
+			ERR_BI
+			MAG_RI
+			ERR_RI
+			-PX_GI	cat.XWIN_IMAGE
+                        -PY_GI   cat.YWIN_IMAGE
+			-PX_BI
+			-PY_BI
+			-PX_RI
+			-PY_RI
+			RA_J2000	cat.ALPHA_J2000
+			DE_J2000	cat.DELTA_J2000
+			RA_J2000_HEXA
+			DE_J2000_HEXA
+                        -FWHM_IMAGE
+			-FWHM_WORLD
+                        # reference fields
+                        MAG_B
+                        ERR_B
+                        MAG_V
+                        ERR_V
+                        MAG_R
+                        ERR_V
+                        # flags
+			VIZ_FLAG	INVISIBLE, BELOW_LIMIT, NEAR_LIMIT, SATURATED
+			POS_FLAG	BORDER
+	
+
+
+		+1.1 a kulon rgb file-okat ossze kell merge-elni egy kozos file-ba, ha nincs 3 szin, akkor azokat ures tablakent kell kezelni
+
+			+ a referencia legyen a g color, innen vegyuk a koordinatat
+			+ koordinata alapjan matcheljuk ossze oket
+			- csak a mg limit folottiek kerulnek az uj tablaba, a limit a szorasokbol szamitodik
+			- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
+			- !!! a nem matchelodo B es R limit feletti csillagokat is bele kell tenni a cmb-be
+			- szaturalt csillagok kezelese
+
+		+1.2 az osszevont listat matcheltetjuk az UCAC4-el, hozzarendeljuk az azonositokat meg a fenyessegeket
+
+			- !!! az e_Xmag mezok nem jonnek a viz-bol
+
+		+1.3 hozzanezzuk a refcat-ot, flag-eljuk az abban levo csillagokat, es pontositjuk a fenyessegeket
+
+			- ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
+
+		? lehet, hogy a refcat-ba nem is kellenek mezocsillagok emiatt, ott inkabb az ucac4 id-t kell hozzajuk rendelni
+
+		+1.4 kiiratjuk a kombinalt tablazatot -> .cmb
+
+			- hmg alattiakat ne irjunk ki (flag: BBB vagy III, ezek kombinacioja)
+
+		- Sequence-ek kezelese is kell
+
+		- Ha nem 3 szin van megadva
+
+		- debug kiiratasok --debug modban
+
+		+ show-graph, save-graph opciok
+
+	2. pmphot: kell készíteni (mondjuk V-ben) és a gi - V görbét, és egyenest illeszteni rá (refcat C és F csillagok)
+		[539 - grafikon mentése]
+		[522 - kappa-sigma egyenesillesztés]
+		[451] whole frame photometry
+
+		- pmphot: a VF, CF role-okat mikor tesszuk bele? Itt mi lesz helyette? A viz_flag?
+
+		- kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
+
+	3. pmtranzi: megvizsgálunk minden cat csillagot:
+	
+		3.1 ha mg limit felett van, de nincs benne a refcat-ban --> flag: NEW
+	
+		3.2 ha a |gi - V| > N x sigma --> flag: VAR, 
+	
+		3.3 szaturált, beégett csillagokat fel kell ismerni, azoknál vagy PSF fotometriát használni, vagy kizárni őket a vizsgálatból --> flag: SAT
+			[517 - szaturált csillagok kezelése]
+			[510 - PSF fotometria, v2.0]
+		
+		3.4 hmg közelében van-e (a mg limit a mért hmg és a refcat F csillagok maximuma) --> flag: LIMIT
+
+		3.5 ha a kép szélén van --> flag: BORDER
+	
+	4. pmtranzi: megvizsgálunk minden refcat csillagot:
+
+		4.1 ha mg limit felett van, de nincs benne a cat-ban --> flag: MISSING
+	
+	5. pmtranzi: a flaggel ellátott csillagokat kiírni susp katalógusba
+
+		- uj mezok: tranzi_type (VAR, NEW, MIS), sigma
+
+	6. pmtranzi: ellenőrzés, az eredménynel update-elni a listát
+
+		6.1 nem ismert változó-e (refcat-ban legyen benne minden változó)
+	
+		6.2 mélyég objektum (NED, Vizier, LEDA)
+	
+		6.3 naprendszerbeli objektum (MPC)
+
+	7. pmcolorize: a képre felrajzolni a jelölt obejtumokat
+		[525 - változók felrajzolása a képre]
 
 (544) Sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
 
@@ -131,6 +265,8 @@ TECH UPGRADE:
 	- mg calc: coeff szamolasnal is legyen kappa-sigma iteracio ???
 
 (510) PSF fotometria ködös objektumok esetén
+
+	- szaturalt csillagoknal is kell
 
 +++(489) Referencia katalógus tartalmazzon mezőcsillagokat is
 

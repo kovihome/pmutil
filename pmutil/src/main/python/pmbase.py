@@ -267,7 +267,7 @@ def getFitsHeader(fitsFileName, header):
 
 
 def setFitsHeader(fitsFileName, headerName, headerValue, comment = None):
-    if comment:
+    if comment is not None:
         headers = { headerName: (headerValue, comment) }
     else:
         headers = { headerName: headerValue }
@@ -278,6 +278,7 @@ def setFitsHeaders(fitsFileName, headers):
     try:
         hdul = fits.open(fitsFileName, mode = 'update')
     except Exception as e:
+        print(fitsFileName)
         print('Exception:', e)
         return
 

@@ -20,6 +20,10 @@ import time
 
 import numpy as np
 from astropy.table import Table
+from astropy.io import fits
+from astropy.stats import SigmaClip
+import astroalign as aa
+from photutils import Background2D, MedianBackground
 
 from pmbase import printError, printWarning, printInfo, printDebug, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
 from pmdisco import Discovery
@@ -34,9 +38,6 @@ class Pipeline:
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
-    FISTAR_ARGS = "--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,S,D,K,amp,flux,sigma,fwhm"
-    GRMATCH_ARGS = "--col-ref 2,3 --col-ref-ordering +8 --col-inp 2,3 --col-inp-ordering +8 --weight reference,column=4,power=1 --triangulation maxnumber=100,conformable,auto,unitarity=0.002 --order 1 --max-distance 3 --comment"
-    FICOMBINE_ARGS = "-m sum -n"
 
     TEMPDIR = "temp"
 
@@ -84,17 +85,30 @@ class Pipeline:
     def sumDateObs(self, targetFile, sourceFiles):
         e_sum = 0
         m_sum = 0
+        t_min = None
+        count = 0
         for sourceFile in sourceFiles:
             h = getFitsHeaders(sourceFile, ['DATE-OBS', 'EXPTIME'])
             t = time.mktime(time.strptime(h['DATE-OBS'], '%Y-%m-%dT%H:%M:%S'))
             e = int(h['EXPTIME'])
             e_sum = e_sum + e
             m_sum = m_sum + (t + e / 2) * e
+            if t_min == None or t < t_min:
+                t_min = t
+            count += 1
 
         m_avg = m_sum / e_sum
         d = datetime(*time.gmtime(m_avg)[:6])
-        setFitsHeaders(targetFile, { 'EXPTIME': e_sum, 'DATE-MID': (d.isoformat(), 'Effective center of time of observation')  })
-        print('observation center time:', d.isoformat(), 'cumulated exptime:', str(e_sum), 'sec')
+        t_obs = datetime(*time.gmtime(t_min)[:6])
+        headers = { 
+            'DATE-OBS' : t_obs.isoformat(), 
+            'EXPTIME'  : e_sum, 
+            'DATE-MID' : (d.isoformat(), 'Effective center of time of observation'),
+            'NCOMBINE' : (count, 'number of images used for stacking'),
+            'MCOMBINE' : ('sum', 'combination mode')
+        }
+        setFitsHeaders(targetFile, headers)
+        print(f'observation start time: {t_obs.isoformat()}, observation center time: {d.isoformat()}, cumulated exptime: {str(e_sum)} sec')
 
     def invoked(self, cmd):
         if self.opt['debug']:
@@ -281,12 +295,35 @@ class Pipeline:
 
         return 0
 
-    def calculateAvgFwhm(self, fstars):
-        t = Table.read(fstars, format = 'ascii')
-        return np.average(t['col10']) # fwhm
+    def alignImages(self, imageList, refIndex):
+        alignedImageList = []
+        for n, image in enumerate(imageList):
+            if n != refIndex:
+                alignedImage, footprint = aa.register(image, imageList[refIndex], detection_sigma=12)
+                alignedImageList.append(alignedImage)
+            else:
+                alignedImageList.append(image)
+        return alignedImageList
+
+    def combineImages(self, alignedImageList, refIndex):
+        refImage = alignedImageList[refIndex]
+        for n, image in enumerate(alignedImageList):
+            if n != refIndex:
+                refImage = refImage + image
+        return self.subtractBackground(refImage)
+
+    def subtractBackground(self, image):
+        sigma_clip = SigmaClip(sigma = 3.0)
+        bkg_estimator = MedianBackground()
+        bkg = Background2D(image, (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
+        print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+        image -= bkg.background
+        return image
+
 
     def registrate(self, calibFolder, seqFolder, color):
-        # Names of the individual files storing the raw bias, dark, flat and object frames:
+
+        # names of the images files to registrate
         CALIB_PATTERN = "%s/%s*-%s.fits" % (calibFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
         COBJLIST = glob.glob(CALIB_PATTERN)
         COBJLIST.sort()
@@ -294,96 +331,53 @@ class Pipeline:
             return 1
 
         COMBINED_FILE = "%s/Combined-%s.fits" % (seqFolder, color)
-        print("%s -> %s" % (CALIB_PATTERN, COMBINED_FILE))
+
+        # load images
+        fitsList = []
+        for f in COBJLIST:
+            hdul = fits.open(f)
+            fitsList.append(hdul[0].data.byteswap().newbyteorder())
 
         # search for reference image by the best average FWHM
-        bestFwhm = 999.9
-        REF = None
-        REF_IMG = None
-        for f in COBJLIST:
-            fstars = self.TEMPDIR + '/' + basename(f) + ".stars"
+        refIndex = int(len(fitsList)/2) # TODO
 
-            self.invoked("fistar %s %s -o %s" % (f, self.FISTAR_ARGS, fstars))
-
-            if not self.REF:
-                fwhm = self.calculateAvgFwhm(fstars)
-                # printDebug("FWHM: %7.4f - %s" % (fwhm, f))
-
-                if fwhm < bestFwhm:
-                    bestFwhm = fwhm
-                    REF = fstars
-                    REF_IMG = f
-
-        if not self.REF:
-            self.REF = REF_IMG.replace(color, '{color}')
-            if self.opt['debug']:
-                printDebug("Reference image average FWHM: %7.4f" % (bestFwhm))
-        else:
-            REF_IMG = self.REF.replace("{color}", color)
-            REF = self.TEMPDIR + '/' + basename(REF_IMG) + ".stars"
-
-        print("Set reference image: " + REF_IMG)
-        copyfile(REF_IMG, "%s/%s" % (self.TEMPDIR, basename(REF_IMG)))
-
-        # Registration of the source images:
-        for f in COBJLIST:
-            if f == REF_IMG:
-                continue
-
-            bn = basename(f)
-            pbn = self.TEMPDIR + '/' + bn
-
-            print("transform %s -> %s" % (f, pbn))
-            fstars = pbn + ".stars"
-            ftrans = pbn + ".trans"
-
-            matchFailed = 0
-            answer = self.invoked("grmatch %s --input %s --reference %s --output-transformation %s" % (self.GRMATCH_ARGS, fstars, REF, ftrans))
-            if answer.startswith('ERROR'):
-                matchFailed = 1
-            else:
-                ln = findInFile(ftrans, 'Match failed')
-                answer = ''
-                matchFailed = 1 if ln != None else 0
-            if matchFailed == 1:
-                printError("Match failed on %s." % (f))
-                if answer:
-                    print('    ' + answer)
-                if self.opt['onError'] == "stop":
-                    self.exitOnError()
-
-            if matchFailed == 0  or self.opt['onError'] == "noop":
-                self.invoked("fitrans %s --input-transformation %s --reverse -k -o %s" % (f, ftrans, pbn))
-
-        # list of transformed frames
-        TR_PATTERN = "%s/%s*-%s.fits" % (self.TEMPDIR, self.pplSetup['LIGHT_FILE_PREFIX'], color)
-        TROBJLIST = glob.glob(TR_PATTERN)
-        TROBJLIST.sort()
+	# align
+        alignedImages = self.alignImages(fitsList, refIndex)
 
         # create a sequence of combined frames
         cc = self.opt['countCombine']
         if cc != 0:
-            for a in range(0, len(TROBJLIST), cc):
+            for a in range(0, len(alignedImages), cc):
+                seqRefIndex = int(cc/2)
+                combinedImage = self.combineImages(alignedImages[a:a+cc], seqRefIndex)
+
                 fi = "%03d" % (a / cc)
                 combined = "%s/%s%s-%s.fits" % (seqFolder, self.pplSetup['SEQ_FILE_PREFIX'], fi, color)
                 print("combine " + combined)
-                self.invoked("ficombine %s %s -o %s" % (' '.join(TROBJLIST[a:a + cc]), self.FICOMBINE_ARGS, combined))
-                self.sumDateObs(combined, TROBJLIST[a:a + cc])
+                hdul = fits.open(COBJLIST[seqRefIndex], mode='update')
+                hdul[0].data = combinedImage
+                hdul.writeto(combined, overwrite=True)
+                hdul.close()
+
+                self.sumDateObs(combined, COBJLIST[a:a + cc])
 
         # create a combined frame of all images
-        print("combine %s -> %s" % (TR_PATTERN, COMBINED_FILE))
-        self.invoked("ficombine %s %s -o %s" % (' '.join(TROBJLIST), self.FICOMBINE_ARGS, COMBINED_FILE))
-        self.sumDateObs(COMBINED_FILE, TROBJLIST)
+        print("combine %s -> %s" % (CALIB_PATTERN, COMBINED_FILE))
+        combinedImage = self.combineImages(alignedImages, refIndex)
+        hdul = fits.open(COBJLIST[refIndex], mode='update')
+        hdul[0].data = combinedImage
+
+        # TODO add new FITS headers
+        #   source FITS file names
+        #   clipping area
+        hdul.writeto(COMBINED_FILE, overwrite=True)
+        hdul.close()
+
+        self.sumDateObs(COMBINED_FILE, COBJLIST)
 
         # cleanup - remove temp files
-        for f in TROBJLIST:
-            os.remove(f)
-        os.remove(REF)
-        if not self.opt['debug']:
-            for f in glob.glob(self.TEMPDIR + '/*.stars'):
-                os.remove(f)
-            for f in glob.glob(self.TEMPDIR + '/*.trans'):
-                os.remove(f)
+        #  nothing to delete
+
 
     def mastersExist(self, folder, prefix):
         for color in self.opt['color']:
@@ -453,6 +447,7 @@ class Pipeline:
 
         for color in self.opt['color']:
             self.registrate(calibFolder, seqFolder, color)
+
         # TODO: cleanup - delete light FITS files
 
     def execute(self):
@@ -550,17 +545,17 @@ class Pipeline:
 class MainApp:
 
     opt = {
-        'color' : ['Gi'],  # photometry band, mandatory
-        'countCombine' : 0,  #
-        'flatOnly' : False,
+        'color' : ['Gi'],          # photometry band, mandatory
+        'countCombine' : 0,        #
+        'flatOnly' : False,        #
         'useMasterFlat'  : False,  #
-        'imageTime' : 'LT',  #
-        'masterFlat' : None,  # make and use std coeffs for this image only
-        'onError'   : 'noop',  # mg calculation method: comp, gcx, lfit
-        'overwrite': False,  # force to overwrite existing results, optional
-        'baseFolder': None,  # base folder, optional
-        'calibFolder': None,  # optional folder for calibration frames (bias, dark, flat)
-        'debug': False, # debug mode
+        'imageTime' : 'LT',        #
+        'masterFlat' : None,       # make and use std coeffs for this image only
+        'onError'   : 'noop',      # mg calculation method: comp, gcx, lfit
+        'overwrite': False,        # force to overwrite existing results, optional
+        'baseFolder': None,        # base folder, optional
+        'calibFolder': None,       # optional folder for calibration frames (bias, dark, flat)
+        'debug': False,            # debug mode
         }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
@@ -600,7 +595,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'debug'])
+            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'alt-stack',  'debug'])
         except GetoptError:
             printError('Invalid command line options.')
             return
