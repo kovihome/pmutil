@@ -7,6 +7,8 @@ TODO
 
 NEW CALIBRATION BUGS:
 
+- NEW: 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
+
 NEW PHOTOMETRY BUGS:
 
 -NEW: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
@@ -54,8 +56,6 @@ TECH UPGRADE:
 
 === V 1.1 ==================================================
 
---- calibration --------------------------------------------
-
 --- photometry ---------------------------------------------
 
 +(450) !!! standardization (s15n)
@@ -74,35 +74,20 @@ TECH UPGRADE:
 
 === V 1.2 ==================================================
 	Sorrend:
-		High: 489, 451, 548, 549, 550, (488), 491
-		Med : 547, 544, 490, 459
-		Low : 539, 528, 546
+		High: 451, 548, 549, 550, (488), 491, 572, 517
+		Med : 547, 544, +490, 459
+		Low : 539, 528, 546, 461, 465, 501, 513, 522, 525, 535, 537, 538, 543
 ---
 
 (465) RAW képek és eredmény archiválása
 
 --- calibration --------------------------------------------
 
-+++(564) Alternatív stack algoritmus: astropy/astroalign: image registration w/o astrometry
+(572) A távcső neve kerüljön bele a FITS headerbe
 
-	pip3 install astroalign # 2.4.1
-        pip3 install photutils  # 0.7.2
-
-	+ az obs mid time szamolast ellenorizni kell, nem tunik jonak
-
-	+ fits headereket kell csinalni a stackeleshez
-
-		NCOMBINE=                    5 / number of images used by ficombine             
-		MCOMBINE= 'sum'                / combination mode used by ficombine             
-		MASKINFO= '1'                                                                   
-		FI_HSTRY= 'ficombine: 0.9 [0.9.3@2019.02.06] 2020.04.10 21:32:11 (CEST)'        
-		FI_HSTRY= '> ficombine temp/Light_001-Gi.fits temp/Light_002-Gi.fits temp/Li\'  
-		FI_HSTRY= '> ght_003-Gi.fits temp/Light_004-Gi.fits temp/Light_005-Gi.fits -\'  
-		FI_HSTRY= '> m sum -n -o 20200404_dz_uma/Sequence/Combined-Gi.fits'
-
-	+ az astroalign legyen az egyetlen algoritmus, a FITSH torolheto (es a --alt-stack opcio is)
-
-	+ ref image kereses (fwhm, midtime, 0)
+	Raw -> FITS konverzional
+	
+	TELESCOP=
 
 (543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
 
@@ -111,8 +96,6 @@ TECH UPGRADE:
 (528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
 
 (501) Utility: regisztráció és stackelés
-
-(490) Flat library
 
 (459) Dark library kezelés
 

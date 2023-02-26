@@ -232,6 +232,11 @@ def saveCommand(basePath, argv, cmdName):
         f.write(cmd + "\n")
         f.close()
 
+def assureFolder(folder):
+    if not exists(folder):
+        makedirs(folder)
+    return folder
+
 
 def discoverFolders(baseFolder, seqFolderName):
     seqFolders = []

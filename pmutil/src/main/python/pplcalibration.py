@@ -14,7 +14,7 @@ from sys import argv
 from datetime import datetime, timedelta
 import glob
 from os import makedirs
-from os.path import isdir, exists, basename
+from os.path import isdir, exists, basename, expanduser
 from shutil import copyfile
 import time
 
@@ -25,7 +25,7 @@ from astropy.stats import SigmaClip
 import astroalign as aa
 from photutils import Background2D, MedianBackground
 
-from pmbase import printError, printWarning, printInfo, printDebug, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground
+from pmbase import printError, printWarning, printInfo, printDebug, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground, assureFolder
 from pmdisco import Discovery
 from pmhotpix import BadPixelDetector, BadPixelEliminator
 
@@ -38,6 +38,8 @@ class Pipeline:
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
+
+    FLATLIB_FOLDER = expanduser("~/.pmlib/flat")
 
     TEMPDIR = "temp"
 
@@ -258,17 +260,83 @@ class Pipeline:
 
         return 0
 
-    def calibrate(self, lightFolder, calibFolder, color):
-        MB = "%s/%s-%s.fits" % (self.BIAS_FOLDER, self.pplSetup['MASTER_BIAS_FILE'], color)
-        MD = "%s/%s-%s.fits" % (self.DARK_FOLDER, self.pplSetup['MASTER_DARK_FILE'], color)
-        MF = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+    def getFitsHeadersForFlat(self, fitsFile):
+        h = getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", "DATE-OBS"])
+        instrument = (h["INSTRUME"] if "INSTRUME" in h else self.pplSetup["DEF_CAMERA"]).translate({ord(c): '_' for c in " /."})
+        telescope = (h["TELESCOP"] if "TELESCOP" in h else self.pplSetup["DEF_TELESCOPE"]).translate({ord(c): '_' for c in " /."})
+        date = h["DATE-OBS"].split('T')[0].translate({ord(c): None for c in ":-"})
+        return instrument, telescope, date
 
+    def saveMasterFlat(self, flatFolder, color):
+        flatFileName = "%s/%s-%s.fits" % (flatFolder, self.pplSetup['MASTER_FLAT_FILE'], color)
+        instrument, telescope, date = self.getFitsHeadersForFlat(flatFileName)
+        flatLibFolder = assureFolder(self.FLATLIB_FOLDER)
+        libFlatFileName = "%s/%s-%s-%s-%s-%s.fits" % (flatLibFolder, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, date, color)
+        copyfile(flatFileName, libFlatFileName)
+        print(f'Master flat {flatFileName} was saved into flat library as {libFlatFileName}')
+
+    def findBestLibraryFlat (self, color, lightFileName):
+        instrument, telescope, date = self.getFitsHeadersForFlat(lightFileName)
+        masterFlatList = glob.glob("%s/%s-%s-%s-*-%s.fits" % (self.FLATLIB_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, color))
+        idate = int(date)
+        date = None
+        delta = 999
+        for flat in masterFlatList:
+            d = flat.split('/')[-1].split('-')[-2]
+            dd = idate - int(d)
+            if dd >= 0 and dd < delta:
+                date = d
+                delta = dd
+        if date is not None:
+            return "%s/%s-%s-%s-%s-%s.fits" % (self.FLATLIB_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, date, color)
+        else:
+            return None
+
+    def locateMasterFlat(self, color, lightFileName):
+        if self.opt['useMasterFlat']:
+            if self.opt['masterFlat'] == 'flatlib':
+                # search in flat library (-M)
+                libraryFlat = self.findBestLibraryFlat(color, lightFileName)
+                if libraryFlat is not None:
+                    return libraryFlat
+                # fallback to local master flat
+                localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+                return localFlat if exists(localFlat) else None
+
+            else:
+                # user given flat folder (-m)
+                folderFlat = "%s/%s-%s.fits" % (self.opt['masterFlat'], self.pplSetup['MASTER_FLAT_FILE'], color)
+                if exists(folderFlat):
+                    return folderFlat
+                # fallback to local flat
+                localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+                if exists(localFlat):
+                    return localFlat
+                # fallback to library flat
+                return self.findBestLibraryFlat(color, lightFileName)
+
+        else:
+            # local master flat
+            localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+            if exists(localFlat):
+                return localFlat
+            # fallback to library flat
+            return self.findBestLibraryFlat(color, lightFileName)
+
+    def calibrate(self, lightFolder, calibFolder, color):
         # Names of the individual files storing the raw bias, dark, flat and object frames:
         LIGHT_PATTERN = "%s/%s*-%s.fits" % (lightFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
         IOBJLIST = glob.glob(LIGHT_PATTERN)
         IOBJLIST.sort()
         if len(IOBJLIST) == 0:
             return 1
+
+        # get calibration master images
+        MB = "%s/%s-%s.fits" % (self.BIAS_FOLDER, self.pplSetup['MASTER_BIAS_FILE'], color)
+        MD = "%s/%s-%s.fits" % (self.DARK_FOLDER, self.pplSetup['MASTER_DARK_FILE'], color)
+#        MF = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+        MF = self.locateMasterFlat(color, IOBJLIST[0])
+        print(f'Master flat: {MF}')
 
         # echo "$1/${LIGHT_FILE_PREFIX}*-$3.fits -> $2/${LIGHT_FILE_PREFIX}*-$3.fits"
         CALIB_PATTERN = "%s/%s*-%s.fits" % (calibFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
@@ -417,9 +485,11 @@ class Pipeline:
         printInfo(title + ": Convert flat RAW files to FITS.")
         self.raw2fits(flatFolder)
 
-        printInfo(title + ": Create master dark file(s).")
+        printInfo(title + ": Create master flat file(s).")
         for color in self.opt['color']:
             self.makeMasterFlat(flatFolder, biasFolder, darkFolder, color)
+            if self.opt['saveFlat']:
+                self.saveMasterFlat(flatFolder, color)
 
     def processCalibration(self, lightFolder, calibFolder, title):
         printInfo(title + ": Convert light RAW files to FITS.")
@@ -459,7 +529,7 @@ class Pipeline:
 
         self.discoverFolders()
 
-        if self.opt['masterFlat']:
+        if self.opt['masterFlat'] is not None and self.opt['masterFlat'] != 'flatlib':
             if not isdir(self.opt['masterFlat']):
                 printError("Master-flat folder %s not exists." % (self.opt['masterFlat']))
                 exit(1)
@@ -507,7 +577,7 @@ class Pipeline:
                 self.processBias(self.FLAT_BIAS_FOLDER, "FLAT BIAS")
 
         ############################################################################
-        # step 4. create master flat dark frame, if it is differs from mastre dark
+        # step 4. create master flat dark frame, if it is differs from master dark
         ############################################################################
                 self.processDark(self.FLAT_DARK_FOLDER, self.FLAT_BIAS_FOLDER, "FLAT DARK")
 
@@ -546,11 +616,12 @@ class MainApp:
 
     opt = {
         'color' : ['Gi'],          # photometry band, mandatory
-        'countCombine' : 0,        #
-        'flatOnly' : False,        #
-        'useMasterFlat'  : False,  #
+        'countCombine' : 0,        # number of images to combine in a sequence
+        'flatOnly' : False,        # create master flat only
+        'saveFlat' : False,        # save master flat into flat library
+        'useMasterFlat'  : False,  # 
         'imageTime' : 'LT',        #
-        'masterFlat' : None,       # make and use std coeffs for this image only
+        'masterFlat' : None,       # 'flatlib' or path for master flat
         'onError'   : 'noop',      # mg calculation method: comp, gcx, lfit
         'overwrite': False,        # force to overwrite existing results, optional
         'baseFolder': None,        # base folder, optional
@@ -566,7 +637,7 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(BGreen + "ppl-calibration, version 1.1.0" + Color_Off)
+        print(BGreen + "ppl-calibration, version 1.2.0" + Color_Off)
         print(Blue + "Calibrate a set of RAW or FITS images." + Color_Off)
         print()
 
@@ -578,7 +649,9 @@ class MainApp:
         print("  -c,  --color arg               set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
         print("  -n,  --count-combine n         set number of frames to combine in the sequence, 0 means all frames, default is 0")
         print("  -f,  --flat                    make master flat frame only")
+        print("  -F,  --save-flat               save master flat into flat library")
         print("  -m,  --master-flat folder      use the given master-flat folder")
+        print("  -M,  --use-flat                use master flat from flat library")
         print("  -t,  --image-time LT|UT        specify orignal image time zone, LT=local time, UT=universal time")
         print("       --calib-folder folder     alternative folder for calibration frames (bias, dark, flat)")
         print("  -w,  --overwrite               force to overwrite existing results")
@@ -595,7 +668,7 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:fm:t:we:h", ['color=', 'count-combine=', 'flat', 'master-flat=', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'alt-stack',  'debug'])
+            optlist, args = getopt (self.argv[1:], "c:n:fFm:Mt:we:h", ['color=', 'count-combine=', 'flat', 'save-flat', 'master-flat=', 'use-flat', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'alt-stack',  'debug'])
         except GetoptError:
             printError('Invalid command line options.')
             return
@@ -614,9 +687,19 @@ class MainApp:
                     self.opt['color'] = [a]
             elif o == '-f' or o == '--flat':
                 self.opt['flatOnly'] = True
+            elif o == '-F' or o == '--save-flat':
+                self.opt['saveFlat'] = True
             elif o == '-m' or o == '--master-flat':
                 self.opt['useMasterFlat'] = True
+                if self.opt['masterFlat'] != None:
+                    printWarning ('Cannot use both flat folder and flat library in the same time; flat folder will be used.')
                 self.opt['masterFlat'] = a
+            elif o == '-M' or o == '--use-flat':
+                self.opt['useMasterFlat'] = True
+                if self.opt['masterFlat'] != None:
+                    printWarning ('Cannot use both flat folder and flat library in the same time; flat folder will be used.')
+                else:
+                    self.opt['masterFlat'] = 'flatlib'
             elif o == '-n' or o == '--count-combine':
                 self.opt['countCombine'] = int(a)
             elif o == '-t' or o == '--image-time':
@@ -641,6 +724,16 @@ class MainApp:
             elif o == '-h' or o == '--help':
                 self.usage()
                 exit(0)
+
+
+        # checking invalid options
+        if self.opt['flatOnly'] and self.opt['useMasterFlat']:
+            self.opt['useMasterFlat'] = False
+            self.opt['masterFlat'] = None
+            printWarning('Options -m or -M are useless when -f option is set.')
+        if self.opt['saveFlat'] and self.opt['useMasterFlat']:
+            self.opt['saveFlat'] = False
+            printWarning('Option -F is inconsistent with options -m or -M; master flat will not be saved into flat library.')
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]
