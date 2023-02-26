@@ -142,15 +142,30 @@ class Pipeline:
                     IMAGETEMP = line.split(':')[1].strip()
                     break
 
+            # add extra headers for fits file
+            h = getFitsHeaders(FITS_NAME, ['INSTRUME', 'TELESCOP', 'DATE-OBS'])
+            hx = {}
+
             if IMAGETEMP:
                 # write image temperature to fits file
-                setFitsHeaders(FITS_NAME, { 'CCD-TEMP': (IMAGETEMP, 'CCD Temperature (Celsius)') })
+                hx['CCD-TEMP'] = (IMAGETEMP, 'CCD Temperature (Celsius)')
 
-            # convert observation time from local time to UT
             if self.opt['imageTime'] == 'LT':
-                IMAGE_DATE = getFitsHeader(FITS_NAME, 'DATE-OBS')
+                # convert observation time from local time to UT
+                IMAGE_DATE = h['DATE-OBS']
                 IMAGE_DATE_UTC = self.lt2ut(IMAGE_DATE)
-                setFitsHeaders(FITS_NAME, { 'DATE-OBS': IMAGE_DATE_UTC, 'DATE-IMG': (IMAGE_DATE, 'Original image date (in local time)') })
+                hx['DATE-OBS'] = IMAGE_DATE_UTC
+                hx['DATE-IMG'] = (IMAGE_DATE, 'Original image date (in local time)')
+
+            if 'INSTRUME' not in h:
+                # write camera name to fits file
+                hx['INSTRUME'] = (self.pplSetup['DEF_CAMERA'] if 'DEF_CAMERA' in self.pplSetup else 'Generic Camera', 'Camera manufacturer and model')
+
+            if 'TELESCOP' not in h:
+                # write telescope name to fits file
+                hx['TELESCOP'] = (self.pplSetup['DEF_TELESCOPE'] if 'DEF_TELESCOPE' in self.pplSetup else 'Generic Telescope', 'Telescope manufacturer and model')
+
+            setFitsHeaders(FITS_NAME, hx)
 
         else:
             print("%s file already exists." % (FITS_NAME))

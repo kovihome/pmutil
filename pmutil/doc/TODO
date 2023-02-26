@@ -74,7 +74,7 @@ TECH UPGRADE:
 
 === V 1.2 ==================================================
 	Sorrend:
-		High: 451, 548, 549, 550, (488), 491, 572, 517
+		High: 451, 548, 549, 550, (488), 491, 517
 		Med : 547, 544, +490, 459
 		Low : 539, 528, 546, 461, 465, 501, 513, 522, 525, 535, 537, 538, 543
 ---
@@ -82,12 +82,6 @@ TECH UPGRADE:
 (465) RAW képek és eredmény archiválása
 
 --- calibration --------------------------------------------
-
-(572) A távcső neve kerüljön bele a FITS headerbe
-
-	Raw -> FITS konverzional
-	
-	TELESCOP=
 
 (543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
 
