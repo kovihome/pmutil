@@ -20,6 +20,7 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.stats import SigmaClip
 from photutils import Background2D, MedianBackground
+import matplotlib.pyplot as plt
 
 
 Color_Off = '\033[0m'  # Text Reset
@@ -97,6 +98,7 @@ def printDebug(s):
     print(Color_Yellow + s + Color_Off)
 
 
+# RBL: it is moving to pmconventions as loadConfig
 def loadPplSetup():
     pplSetup = {}
     userhome = getenv("HOME")
@@ -173,6 +175,7 @@ def getPair(s, delim = ','):
     return [ss[0].strip(), ss[1].strip()]
 
 
+# TODO: move to pmfits
 def determineCoordsFromImage(imageFileName, pplSetup = None):
     configFolder = pplSetup["PMLIB"]
     if configFolder == None:
@@ -238,15 +241,16 @@ def assureFolder(folder):
     return folder
 
 
-def discoverFolders(baseFolder, seqFolderName):
-    seqFolders = []
+def discoverFolders(baseFolder, folderName):
+    folders = []
     if baseFolder != None:
-        seqFolders = glob('*' + baseFolder + '*/' + seqFolderName + '*')
+        folders = glob('*' + baseFolder + '*/' + folderName + '*')
     else:
-        seqFolders = glob(seqFolderName + '*')
-    return seqFolders
+        folders = glob(folderName + '*')
+    return folders
 
 
+# TODO: move tp pmfits
 def getFitsHeaders(fitsFileName, headers):
     try:
         hdul = fits.open(fitsFileName)
@@ -263,6 +267,7 @@ def getFitsHeaders(fitsFileName, headers):
     return fitsHeaders
 
 
+# TODO: move tp pmfits
 def getFitsHeader(fitsFileName, header):
     hdrs = getFitsHeaders(fitsFileName, [header])
     if hdrs and header in hdrs:
@@ -271,6 +276,7 @@ def getFitsHeader(fitsFileName, header):
         return None
 
 
+# TODO: move tp pmfits
 def setFitsHeader(fitsFileName, headerName, headerValue, comment = None):
     if comment is not None:
         headers = { headerName: (headerValue, comment) }
@@ -279,6 +285,7 @@ def setFitsHeader(fitsFileName, headerName, headerValue, comment = None):
     setFitsHeaders(fitsFileName, headers)
 
 
+# TODO: move tp pmfits
 def setFitsHeaders(fitsFileName, headers):
     try:
         hdul = fits.open(fitsFileName, mode = 'update')
@@ -294,6 +301,7 @@ def setFitsHeaders(fitsFileName, headers):
     hdul.close()
 
 
+# TODO: move tp pmfits
 def subtractFitsBackground(fitsFileName):
     if exists(fitsFileName):
         hdul = fits.open(fitsFileName, mode='update')
@@ -355,6 +363,12 @@ def linfit(x, y, w = None):
     m = (Y * X - M * XY) / (X * X - M * X2)
     b = (Y - m * X) / M
     return m, b
+
+def showOrSavePlot(show, save, fn):
+    if show:
+        plt.show()
+    elif save:
+        plt.savefig(fn, format='png', dpi=72.0)
 
 
 # end pmbase.
