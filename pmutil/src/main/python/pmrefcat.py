@@ -24,14 +24,13 @@ import re
 import urllib
 
 
-from pmbase import printError, printInfo, printWarning, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, hexa2deg, deg2hexa
+import pmbase as pm
 from pmviz import VizUCAC4
 
 
 class RefCat:
 
     opt = {}  # command line options
-    ppl = {}  # PPL setup from ppl-setup config file
 
     defMgLimit = 18.0
     defFov = 60
@@ -41,6 +40,8 @@ class RefCat:
     cache = []
 
     xmatchTable = Table(names=['AUID', 'RA_DEG', 'DEC_DEG', 'LABEL'], dtype=['U16','U16','U16','str'])
+
+    origRefcat = None
 
     def __init__(self, opt):
         self.opt = opt
@@ -57,7 +58,7 @@ class RefCat:
         if objectName != None:
             ids = "star=%s" % (urllib.parse.quote_plus(objectName))
         else:
-            ids = "ra=%s&dec=%s" % (deg2hexa(ra/15.0), deg2hexa(dec))
+            ids = "ra=%s&dec=%s" % (pm.deg2hexa(ra/15.0), pm.deg2hexa(dec))
         vspUrl = "https://www.aavso.org/apps/vsp/api/chart/?format=json&%s&fov=%d&maglimit=%4.1f&other=all" % (ids, fov, self.defMgLimit)
         f = request.urlopen(vspUrl)
         respJson = f.read().decode('UTF-8')
@@ -66,21 +67,21 @@ class RefCat:
 
         self.chartId = resp['chartid']
 
-        for pm in resp['photometry']:
+        for pmr in resp['photometry']:
 
             # 'V', 'B', 'Rc', 'Ic', 'J', 'H', 'K'
             bands = {}
-            for b in pm['bands']:
+            for b in pmr['bands']:
                 bands[b['band']] = b
 
-            auid = pm['auid']
+            auid = pmr['auid']
             role = "C"
-            ra = pm['ra']
-            dec = pm['dec']
-            raDeg = "%10.8f" % (hexa2deg(ra) * 15.0)
+            ra = pmr['ra']
+            dec = pmr['dec']
+            raDeg = "%10.8f" % (pm.hexa2deg(ra) * 15.0)
             if not dec.startswith('-'):
                 dec = "+" + dec
-            decDeg = "%+10.8f" % (hexa2deg(dec))
+            decDeg = "%+10.8f" % (pm.hexa2deg(dec))
             if 'B' in bands:
                 mgB = str(bands['B']['mag'])
                 mgerrB = str(bands['B']['error'])
@@ -105,7 +106,7 @@ class RefCat:
             else:
                 mgR = "-"
                 mgerrR = "-"
-            label = str(pm['label']).replace(' ', '_')
+            label = str(pmr['label']).replace(' ', '_')
 
 
             self.writeRecord(auid, role, ra, raDeg, dec, decDeg, mgB, mgerrB, mgV, mgerrV, mgR, mgerrR, label)
@@ -138,11 +139,11 @@ class RefCat:
             respJson = f.read().decode('UTF-8')
             resp = json.loads(respJson)
 
-            sra = deg2hexa(float(resp['VSXObject']['RA2000']) / 15.0)
-            sdec = deg2hexa(float(resp['VSXObject']['Declination2000']))
+            sra = pm.deg2hexa(float(resp['VSXObject']['RA2000']) / 15.0)
+            sdec = pm.deg2hexa(float(resp['VSXObject']['Declination2000']))
         else:
-            sra = deg2hexa(ra / 15.0)
-            sdec = deg2hexa(dec)
+            sra = pm.deg2hexa(ra / 15.0)
+            sdec = pm.deg2hexa(dec)
 
         if not sdec.startswith('-') and not sdec.startswith('+'):
             sdec = "+" + sdec
@@ -155,7 +156,7 @@ class RefCat:
         votable = xmltodict.parse(respVOTable)
         tableData = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']
         if tableData == None:
-            printWarning('No VSX data for this field')
+            pm.printWarning('No VSX data for this field')
             return
         trs = tableData['TR']
         nrUnknown = 1
@@ -172,8 +173,8 @@ class RefCat:
                 tr['TD'][0] = auid
             role = 'V'
             raDeg, decDeg = tr['TD'][3].split(',')
-            ra = deg2hexa(float(raDeg) / 15.0)
-            dec = deg2hexa(float(decDeg))
+            ra = pm.deg2hexa(float(raDeg) / 15.0)
+            dec = pm.deg2hexa(float(decDeg))
             if not dec.startswith('-'):
                 dec = "+" + dec
                 decDeg = "+" + decDeg
@@ -197,8 +198,8 @@ class RefCat:
                 nrUnknown = nrUnknown + 1
             role = 'V'
             raDeg, decDeg = tr['TD'][3].split(',')
-            ra = deg2hexa(float(raDeg) / 15.0)
-            dec = deg2hexa(float(decDeg))
+            ra = pm.deg2hexa(float(raDeg) / 15.0)
+            dec = pm.deg2hexa(float(decDeg))
             label = tr['TD'][1]
             constell = tr['TD'][2]
             vartype = tr['TD'][4]
@@ -219,40 +220,40 @@ class RefCat:
 
     def loadStdFieldData(self, stdFieldName):
         saName = self.opt['stdFieldName']
-        configFolder = self.ppl["CONFIG_FOLDER"]
+        configFolder = pm.setup["CONFIG_FOLDER"]
         if configFolder == None:
             configFolder = "$HOME/.pmlib"
 
         # load stdArea file
         saFieldsFile = configFolder + "/landolt_fields.txt"
         if not exists(saFieldsFile):
-            printError("Landolt standard field catalog file %s not found" % (saFieldsFile))
+            pm.printError("Landolt standard field catalog file %s not found" % (saFieldsFile))
             return 'NoFile'
         saFields = Table.read(saFieldsFile, format = 'ascii')
 
         # find std area
         rows = list(filter(lambda r: r['FIELD_NAME'] == saName, saFields))
         if len(rows) == 0:
-            printError("No field name %s found in standard area file %s." % (saName, saFieldsFile))
+            pm.printError("No field name %s found in standard area file %s." % (saName, saFieldsFile))
             return 'NoField'
         sa = rows[0]
-        printInfo("StdArea: %s, Coords: %s %s, NumStars: %d, Comment: %s" % (saName, sa['RA_2000'], sa['DEC_2000'], sa['NS'], sa['COMMENT']))
+        pm.printInfo("StdArea: %s, Coords: %s %s, NumStars: %d, Comment: %s" % (saName, sa['RA_2000'], sa['DEC_2000'], sa['NS'], sa['COMMENT']))
 
-        self.opt['ra'] = hexa2deg(sa['RA_2000']) * 15.0
-        self.opt['dec'] = hexa2deg(sa['DEC_2000'])
+        self.opt['ra'] = pm.hexa2deg(sa['RA_2000']) * 15.0
+        self.opt['dec'] = pm.hexa2deg(sa['DEC_2000'])
         self.chartId = saName
 
         # load stdStars file
         saStarsFile = configFolder + "/landolt_stars.txt"
         if not exists(saStarsFile):
-            printError("Landolt standard stars catalog file %s not found" % (saStarsFile))
+            pm.printError("Landolt standard stars catalog file %s not found" % (saStarsFile))
             return 'NoFile'
         saStars = Table.read(saStarsFile, format = 'ascii')
 
         # find std stars
         stars = list(filter(lambda r: r['FIELD_NAME'] == saName, saStars))
         if len(stars) == 0:
-            printError("No stars for standard field %s in standard area file %s." % (saName, saStarsFile))
+            pm.printError("No stars for standard field %s in standard area file %s." % (saName, saStarsFile))
             return 'NoStars'
 
         # write stars to catalog file
@@ -262,9 +263,9 @@ class RefCat:
             nrUnknown = nrUnknown + 1
             role = "C"
             ra = star['RA_2000']
-            raDeg = "%10.8f" % (hexa2deg(ra) * 15.0)
+            raDeg = "%10.8f" % (pm.hexa2deg(ra) * 15.0)
             dec = star['DEC_2000']
-            decDeg = "%+10.8f" % (hexa2deg(dec))
+            decDeg = "%+10.8f" % (pm.hexa2deg(dec))
             mv = float(star['MAG_V'])
             ev = float(star['ERR_V'])
             magB = "%+6.4f" % (float(star['MAG_BV']) + mv)
@@ -315,20 +316,20 @@ class RefCat:
         return [ss[0].strip(), ss[1].strip()]
 
     def determineCoordsFromImage(self, imageFileName):
-        configFolder = self.ppl["CONFIG_FOLDER"]
+        configFolder = pm.setup["CONFIG_FOLDER"]
         if configFolder == None:
             configFolder = "$HOME/.pmlib"
         SOLVE_ARGS = "-O --config " + configFolder + "/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
 
         makedirs("temp", exist_ok = True)
 
-        invoke("cp " + imageFileName + " temp/src.fits")
+        pm.invoke("cp " + imageFileName + " temp/src.fits")
 
-        astFolder = self.ppl["AST_BIN_FOLDER"]
+        astFolder = pm.setup["AST_BIN_FOLDER"]
         if astFolder == None:
             astFolder = "/usr/local/astrometry/bin"
 
-        astResult = invoke(astFolder + "/solve-field " + SOLVE_ARGS + " -D temp -N temp/ast.fits temp/src.fits")
+        astResult = pm.invoke(astFolder + "/solve-field " + SOLVE_ARGS + " -D temp -N temp/ast.fits temp/src.fits")
 
         r = astResult.split('\n')
         coords = [0.0, 0.0]
@@ -338,22 +339,54 @@ class RefCat:
                 if line.find("RA,Dec") > -1:
                     sCoords = self.getPair(line.split('(')[2].split(')')[0])
                     coords = [ float(sCoords[0]), float(sCoords[1]) ]
-                    printInfo("Image center: %s %s" % (sCoords[0], sCoords[1]))
+                    pm.printInfo("Image center: %s %s" % (sCoords[0], sCoords[1]))
                 else:
                     sCoordsSexa = self.getPair(line.split('(')[2].split(')')[0])
-                    coords = [ hexa2deg(sCoordSexa[0]) * 15.0, hexa2deg(sCoordSexa[1]) ]
-                    printInfo("Image center: %s %s" % (sCoordsSexa[0], sCoordsSexa[1]))
+                    coords = [ pm.hexa2deg(sCoordSexa[0]) * 15.0, pm.hexa2deg(sCoordSexa[1]) ]
+                    pm.printInfo("Image center: %s %s" % (sCoordsSexa[0], sCoordsSexa[1]))
             elif line.startswith("Field size"):
                 sFieldSize = self.getPair(line.split(':')[1].split('a')[0], 'x')
-                printInfo("Image size: %s' x %s'" % (sFieldSize[0], sFieldSize[1]))
+                pm.printInfo("Image size: %s' x %s'" % (sFieldSize[0], sFieldSize[1]))
 
         return coords
 
-    def execute(self):
-        self.ppl = loadPplSetup()
+    def loadOrigRefcat(self, fileName):
+        self.origRefcat = Table.read(fileName, format='ascii')
 
+    def updateUserModifications(self):
+        # commented records
+        for rec in [ x for x in self.origRefcat.meta['comments'] if x.startswith('000-') and x[4:7] != 'FFF' ]:
+            r = rec.split()
+            auid = r[0]
+            label = r[-1]
+            for j in range(len(self.cache)):
+                if self.cache[j].startswith(auid):
+                    self.cache[j] = '#' + self.cache[j]
+                    print(f"Update: preserve user disabled object {auid} {label}")
+                    break
+
+        # user defined variables
+        var_mask = self.origRefcat['ROLE'] == 'V'
+        var_list = self.origRefcat[var_mask]
+        for rec in var_list:
+            auid = rec['AUID']
+            label = rec['LABEL']
+            missing = True
+            for j in range(len(self.cache)):
+                if self.cache[j][13] == 'V' and self.cache[j].endswith(label):
+                    missing = False
+                    break
+            if missing:
+                self.writeRecord(auid, rec['ROLE'], rec['RA'], "%10.8f" % (rec['RA_DEG']), rec['DEC'], "%+10.8f" % (rec['DEC_DEG']), \
+                    "-", "-", "-", "-", "-", "-", label)
+                for cmt in [ x for x in self.origRefcat.meta['comments'] if x.startswith(label) ]:
+                    self.cache.append(f"#{cmt}")
+                print(f"Update: preserve user added variable {auid} {label}")
+        
+
+    def execute(self):
         if self.opt['mgLimit'] == None:
-            ml = float(self.ppl['DEF_FIELD_STAR_MG_LIMIT'])
+            ml = float(pm.setup['DEF_FIELD_STAR_MG_LIMIT'])
             self.opt['mgLimit'] = ml if ml > 0.0 and ml < 25.0 else 17.0
 
         if self.opt['image'] != None:
@@ -361,7 +394,7 @@ class RefCat:
             self.opt['ra'] = coords[0]
             self.opt['dec'] = coords[1]
 
-        outFileName = self.ppl['CONFIG_FOLDER']
+        outFileName = pm.setup['CONFIG_FOLDER']
         if not outFileName.endswith('/'):
             outFileName += '/'
         outFileName += 'cat/'
@@ -373,11 +406,15 @@ class RefCat:
         elif self.opt['stdFieldName'] != None:
             outFileName += self.opt['stdFieldName'].lower().replace(' ', '_') + '.cat'
         else:
-            s_ra = deg2hexa(self.opt['ra'] / 15.0)
-            s_dec = deg2hexa(float(self.opt['dec']))
+            s_ra = pm.deg2hexa(self.opt['ra'] / 15.0)
+            s_dec = pm.deg2hexa(float(self.opt['dec']))
             if not s_dec.startswith('+') and not s_dec.startswith('-'):
                 s_dec = '+' + s_dec
             outFileName += s_ra.replace(':', '')[:4] + s_dec.replace(':', '')[:5] + '.cat'
+
+        # save original Refcat table for update
+        if exists(outFileName) and self.opt['update']:
+            self.loadOrigRefcat(outFileName)
 
         if not exists(outFileName) or self.opt['overwrite']:
 
@@ -412,6 +449,10 @@ class RefCat:
 
                 self.loadFieldStars(target, self.opt['field'], self.opt['mgLimit'])
 
+            # update user modifications from original Refcat table
+            if self.origRefcat:
+                self.updateUserModifications()
+
             # write cataglog to file
             outFile = open(outFileName, 'w')
             for s in self.cache:
@@ -420,11 +461,11 @@ class RefCat:
             outFile.write('### fov: ' + str(self.opt['field']) + ' arcmin\n')
             outFile.close()
 
-            printInfo("Reference catalog file %s created." % (outFileName))
+            pm.printInfo("Reference catalog file %s created." % (outFileName))
 
         else:
 
-            printInfo("Reference catalog file %s is exists." % (outFileName))
+            pm.printInfo("Reference catalog file %s is exists." % (outFileName))
 
         if self.opt['folder']:
 
@@ -452,25 +493,23 @@ class MainApp:
         'folder'      : None,           # reference catalog file name
         'fieldStars'  : False,          # collect field stars into the catalog
         'mgLimit'     : None,           # mg limit for field star selection
+        'update'      : False,          # update catalog
         }
 
     def __init__(self, argv):
         self.argv = argv
 
     def printVersion(self):
-        print(BGreen + self.appName + ", version " + self.appVersion + Color_Off)
+        print(pm.BGreen + self.appName + ", version " + self.appVersion + pm.Color_Off)
 
     def printTitle(self):
         print()
         self.printVersion()
-        print(Blue + self.appDescription + Color_Off)
+        print(pm.Blue + self.appDescription + pm.Color_Off)
+        print()
 
     def usage(self):
-        print()
-        self.printVersion()
-        print()
         print("Usage: " + self.appName + " [OPTIONS]... FOLDER_NAME")
-        print(self.appDescription)
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
         print("  -o,  --object object_name     object (variable star) name")
@@ -482,13 +521,14 @@ class MainApp:
         print("  -r,  --field-stars            collect field stars")
         print("  -s,  --source catalog         source catalog for field stars ; default catalog is UCAC-4")
         print("  -l,  --limit mg               magnitude limit for field star selection")
+        print("  -u,  --update                 update catalog file, if exists")
         print("  -w,  --overwrite              overwrite catalog file, if exists")
         print("  -h,  --help                   print this page")
 
     def processCommands(self):
 
         try:
-            optlist, args = getopt (argv[1:], "ac:s:o:n:i:f:rl:wh", ['all', 'coord=', 'source=', 'object=', 'field-name=', 'image=', 'field=', 'field-stars', 'limit=', 'overwrite', 'help'])
+            optlist, args = getopt (argv[1:], "ac:s:o:n:i:f:rl:uwh", ['all', 'coord=', 'source=', 'object=', 'field-name=', 'image=', 'field=', 'field-stars', 'limit=', 'update', 'overwrite', 'help'])
         except GetoptError:
             print ('Invalid command line options')
             exit(1)
@@ -512,24 +552,27 @@ class MainApp:
                 if a.isdigit():
                     self.opt['field'] = int(a)
                 else:
-                    printError("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
+                    pm.printError("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
             elif o == '-a' or o == '--all':
                 self.opt['auidOnly'] = False
             elif o == '-r' or o == '--field-stars':
                 self.opt['fieldStars'] = True
             elif o == '-l' or o == '--limit':
                 err = False
-                if a.isfloat():
+                try:
                     ml = float(a)
                     if ml > 0.0 or ml <= 25.0:
                         self.opt['mgLimit'] = float(a)
                     else:
                         err = True
-                else:
+                except ValueError:
                     err = True
                 if err:
-                   printError("Invalid mg limit: %s. Use default instead." % (a))
+                   pm.printError("Invalid mg limit: %s. Use default instead." % (a))
                 fieldStarsIndicated = True
+            elif o == '-u' or o == '--update':
+                self.opt['update'] = True
+                self.opt['overwrite'] = True
             elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
             elif o == '-h' or o == '--help':
@@ -538,14 +581,14 @@ class MainApp:
 
         if len(args) > 0:
             if not isdir(args[0]):
-                printError('%s is not a folder.' % (args[0]))
+                pm.printError('%s is not a folder.' % (args[0]))
                 exit(1)
             self.opt['folder'] = args[0]
             if not self.opt['folder'].endswith('/'):
                 self.opt['folder'] += '/'
 
         if self.opt['object'] == None and self.opt['coords'] == None and self.opt['stdFieldName'] == None and self.opt['image'] == None:
-            printError("Either object name (-o), coordinates (-c), standard field name (-n) or image file (-i) must be given.")
+            pm.printError("Either object name (-o), coordinates (-c), standard field name (-n) or image file (-i) must be given.")
             exit(1)
 
         if self.opt['coords'] != None:
@@ -559,20 +602,20 @@ class MainApp:
                 if re.fullmatch("[+-]*(\d){2}:(\d){2}:(\d){2}(\.\d)*", c[1]) == None:
                     ok = False
             if not ok:
-                printError("Invalid coordinate format")
+                pm.printError("Invalid coordinate format")
                 exit(1)
 
-            self.opt['ra'] = hexa2deg(c[0]) * 15.0
-            self.opt['dec'] = hexa2deg(c[1])
+            self.opt['ra'] = pm.hexa2deg(c[0]) * 15.0
+            self.opt['dec'] = pm.hexa2deg(c[1])
 
         if not self.opt['fieldStars'] and fieldStarsIndicated:
-            printError("Options -s or -l indicates collecting field stars, but -r option was not given. These options will be ignored.")
+            pm.printError("Options -s or -l indicates collecting field stars, but -r option was not given. These options will be ignored.")
 
 
     def run(self):
         self.printTitle()
         self.processCommands()
-        saveCommand(self.opt['folder'], self.argv, 'refcat')
+        pm.saveCommand(self.opt['folder'], self.argv, 'refcat')
 
         start = datetime.now()
 
@@ -580,7 +623,7 @@ class MainApp:
         cat.execute()
 
         exectime = (datetime.now() - start).total_seconds()
-        print("%sexecution time was %d seconds.%s" % (Blue, exectime, Color_Off))
+        print("%sexecution time was %d seconds.%s" % (pm.Blue, exectime, pm.Color_Off))
 
 
 if __name__ == '__main__':
