@@ -8,12 +8,13 @@ Created on Jan 1, 2020
 @author: kovi
 '''
 
-from os import getenv, makedirs
+from os import getenv, makedirs, chmod, getcwd
 from os.path import isfile, exists
 from datetime import datetime
 from glob import glob
 from math import sqrt
 import subprocess
+import stat
 
 import numpy as np
 from astropy.io import fits
@@ -31,6 +32,8 @@ BCyan = '\033[1;36m'  # Cyan
 Color_Yellow = '\033[0;93m' # Light yellow
 
 pmlog = None
+
+setup = None
 
 class Logger:
 
@@ -232,8 +235,13 @@ def saveCommand(basePath, argv, cmdName):
             folder += '/'
 
         f = open(folder + cmdName, "w+")
+        f.write(f"#!/bin/bash\n#\n# ppl command: {cmdName}\n#\n\n")
+        f.write(f"cd {getcwd()}\n")
         f.write(cmd + "\n")
         f.close()
+
+        chmod(folder + cmdName, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH)
+
 
 def assureFolder(folder):
     if not exists(folder):
@@ -370,5 +378,8 @@ def showOrSavePlot(show, save, fn):
     elif save:
         plt.savefig(fn, format='png', dpi=72.0)
 
+
+if setup is None:
+    setup = loadPplSetup()
 
 # end pmbase.
