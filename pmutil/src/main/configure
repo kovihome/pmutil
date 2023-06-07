@@ -37,7 +37,7 @@ exit_on_error() {
 }
 
 echo
-echo -e "${BGreen}configure, version 1.1.0${Color_Off}"
+echo -e "${BGreen}configure, version 1.2.0${Color_Off}"
 echo -e "${Blue}Configure pmutil package.${Color_Off}"
 echo
 
@@ -109,9 +109,10 @@ warn_py_module "astroalign" "2.4"
 warn_py_module "astropy" "4.0"
 warn_py_module "astropquery" "0.4"
 warn_py_module "matplotlib" "3.1"
-warn_py_module "numpy" "1.16"
+warn_py_module "numpy" "1.18"
 warn_py_module "photutils" "0.7"
-warn_py_module "Pillow" "5.1"
+warn_py_module "Pillow" "5.3"
+warn_py_module "regions" "0.5"
 warn_py_module "scipy" "1.4"
 warn_py_module "xmltodict" "0.12"
 
@@ -136,7 +137,7 @@ warn_version "$EXIFTOOL_VERSION" "$EXIFTOOL_MINVERSION" "exiftool"
 # Astrometry.net solve_field
 
 ASTROMETRY_VERSION=$(solve-field --help | grep "Revision" | cut -d" " -f2 | cut -d"," -f1)
-ASTROMETRY_MINVERSION=0.77
+ASTROMETRY_MINVERSION=0.81
 warn_version "$ASTROMETRY_VERSION" "$ASTROMETRY_MINVERSION" "Astrometry.net"
 
 # SExtractor

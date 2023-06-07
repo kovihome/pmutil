@@ -15,6 +15,8 @@ Created on Mar 03, 2021
 #from glob import glob
 #from datetime import datetime
 
+
+from requests.exceptions import ConnectionError
 from astroquery.vizier import Vizier
 from astroquery.xmatch import XMatch
 import astropy.units as u
@@ -25,22 +27,21 @@ from astropy.coordinates import SkyCoord
 from pmbase import hexa2deg, deg2hexa
 
 
-def fmg(mg, er):
-    fmg = str("%-6.3f" % (float(mg))) if mg != '--' else '-'
-    fer = ("%-5.2f" % (float(er) / 100.0)) if mg != '--' and er != '' else '-'
-    return fmg,fer
-
 class Refcat(Table):
     names=['AUID','ROLE','RA','RA_DEG','DEC','DEC_DEG','MAG_B','ERR_B','MAG_V','ERR_V','MAG_R','ERR_R','LABEL']
     dtype=['U11','U2','U12','U12','U12','U12','U6','U5','U6','U5','U6','U5','U50']
     def __init__(self, masked=None):
         Table.__init__(self, names=self.names, dtype=self.dtype, masked=masked)
+    def fmg(self, mg, er):
+        fmg = str("%-6.3f" % (float(mg))) if mg != '--' else '-'
+        fer = ("%-5.2f" % (float(er) / 100.0)) if mg != '--' and er != '' else '-'
+        return fmg,fer
     def load(self, table, abbrev, mapping, auid_start=1):
         n_auid = auid_start
         for row in table:
-            v,ev = fmg(row[mapping['MAG_V']], row[mapping['ERR_V']])
-            b,eb = fmg(row[mapping['MAG_B']], row[mapping['ERR_B']])
-            r,er = fmg(row[mapping['MAG_R']], row[mapping['ERR_R']])
+            v,ev = self.fmg(row[mapping['MAG_V']], row[mapping['ERR_V']])
+            b,eb = self.fmg(row[mapping['MAG_B']], row[mapping['ERR_B']])
+            r,er = self.fmg(row[mapping['MAG_R']], row[mapping['ERR_R']])
             fra = float(row[mapping['RA_DEG']])
             fdec = float(row[mapping['DEC_DEG']])
             ra = "%12.8f" % fra
@@ -66,12 +67,19 @@ class VizUCAC4:
 
     def query(self, target, size):
         t = Refcat()
-        result = self.viz.query_region(target, width=size*u.arcmin)
+        try:
+            result = self.viz.query_region(target, width=size*u.arcmin)
+        except ConnectionError:
+            return None
         t.load(result[0], self.catName, self.cs)
         return t
 
     def xmatch(self, srcTable, raColName, decColName):
-        return XMatch.query(cat1=srcTable, cat2='vizier:' + self.catFull, max_distance=5 * u.arcsec, colRA1=raColName, colDec1=decColName, colRA2='RAJ2000', colDec2='DEJ2000')
+        try:
+            return XMatch.query(cat1=srcTable, cat2='vizier:' + self.catFull, max_distance=5 * u.arcsec, \
+                colRA1=raColName, colDec1=decColName, colRA2='RAJ2000', colDec2='DEJ2000')
+        except ConnectionError:
+            return None
 
 if __name__ == '__main__':
 

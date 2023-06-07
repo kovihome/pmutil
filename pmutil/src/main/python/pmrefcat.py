@@ -287,8 +287,10 @@ class RefCat:
     def loadFieldStars(self, target, fieldSize, mgLimit):
         v = VizUCAC4(mgLimit)
         t = v.query(target, fieldSize)
-
         xt = v.xmatch(self.xmatchTable, 'RA_DEG', 'DEC_DEG')
+        if not t or not xt:
+            printError("Accessing Vizier service if failed.")
+            return
 
         matchCount = 0
         for row in t:
