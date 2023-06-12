@@ -4,6 +4,10 @@
 
 - #572 - FITS headers contain instrument and camera name
 - #564 - new algorithm for aligning and stacking
+- #556 - store mag limit in catalog files
+- #553 - store std coefficients in catalog files
+- #545 - preserve records even mag is below limit
+- #539 - save graphs with --saveGraph option
 - #537 - update reference catalog
 - #490 - manage flat library
 - #489 - reference catalog contains field stars
