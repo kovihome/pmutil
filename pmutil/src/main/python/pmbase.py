@@ -372,11 +372,56 @@ def linfit(x, y, w = None):
     b = (Y - m * X) / M
     return m, b
 
-def showOrSavePlot(show, save, fn):
-    if show:
-        plt.show()
-    elif save:
-        plt.savefig(fn, format='png', dpi=72.0)
+class Plot:
+    INV_X = 1
+    INV_Y = 2
+    def __init__(self, count, show, save):
+        self.show = show
+        self.save = save
+        if show or save:
+            fig = plt.figure(figsize=[6.4, 4.8*count])
+#            fig.tight_layout(h_pad=1.7)
+            self.plot_index = 100 * count + 11
+    def add(self, xdata, ydata, coef, xlabel, ylabel, dotcolor, invaxis = None):
+        if self.show or self.save:
+            ax = plt.subplot(self.plot_index)
+            if invaxis is not None:
+                if invaxis & 1 == 1:
+                    ax.invert_xaxis()
+                if invaxis & 2 == 2:
+                    ax.invert_yaxis()
+            #ax[self.plot_index % 10].set_title('Plot title')
+            xr = np.arange(min(xdata), max(xdata), 0.01)
+            plt.plot(xdata, ydata, dotcolor + 'o', xr, coef[0] * xr + coef[1], 'k')
+            plt.xlabel(xlabel)
+            plt.ylabel(ylabel)
+            self.plot_index += 1
+    def showOrSave(self, fileName):
+        if self.save or self.show:
+            plt.subplots_adjust(hspace=0.3)
+        if self.save:
+            plt.savefig(fileName, format='png', dpi=72.0)
+        if self.show:
+            plt.show()
+        elif self.save:
+            plt.close()
+
+
+
+def addTableComment(tbl, key, value):
+    cmt = key + ': ' + value
+    print(f'add table comment: {cmt}')
+    if 'comments' not in tbl.meta:
+        tbl.meta['comments'] = []
+    tbl.meta['comments'].append(cmt)
+
+def getTableComment(tbl, key):
+    if 'comments' in tbl.meta:
+        cmt = next(filter(lambda x: x.startswith(key + ':'), tbl.meta['comments']))
+        if cmt:
+            return cmt.partition(':')[2].strip()
+    return None
+    
 
 
 if setup is None:

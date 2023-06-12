@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 # PmUtils/pmphot
 #
@@ -13,54 +14,8 @@ from copy import deepcopy
 
 import numpy as np
 from astropy.table import Table, Column
-import matplotlib.pyplot as plt
 
 import pmbase as pm
-
-
-def loadCatalog(refFileName):
-    '''
-        Load a catalog with one line header
-    '''
-
-    refCat = { 'header': [], 'cat': [] }
-
-    ref = open(refFileName, 'r')
-    if ref:
-        headerLine = ref.readline()
-        refCat['header'] = headerLine.split()
-
-        for refLine in ref:
-            refCatLine = refLine.split()
-            refCat['cat'].append(refCatLine)
-        ref.close()
-
-        print (("Photometric result catalog: %s") % refFileName)
-        return refCat
-
-    else:
-
-        print (("Reference catalog %s not found") % refFileName)
-        return None
-
-
-def getHeaderPos(cat, headerName):
-    index = 0
-    for header in cat['header']:
-        if header == headerName:
-            return index
-        index = index + 1
-    return None
-
-
-def addHeader(cat, headerName):
-    pos = getHeaderPos(cat, headerName)
-    if pos != None:
-        return pos
-
-    pos = len(cat['header'])
-    cat['header'].append(headerName)
-    return pos
 
 
 fieldMgInstrumental = 'MAG_BEST'
@@ -111,33 +66,11 @@ class StdCoeffs:
             for field in self.fields:
                 self.coeffs.add_column(Column(name = field['name'], dtype = field['dtype'], format = field['format']))
 
-#            self.coeffs.add_column(Column(name = 'OBSERVER', dtype = 'U5', format = '%-10s'))
-#            self.coeffs.add_column(Column(name = 'DATE', dtype = 'U10', format = '%-14s'))
-#            self.coeffs.add_column(Column(name = 'TV', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'ERR_TV', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'TVR', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'ERR_TVR', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'TBV', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'ERR_TBV', dtype = 'f4', format = '%11.4f'))
-#            self.coeffs.add_column(Column(name = 'CAMERA', dtype = 'U24', format = '%-24s'))
-#            self.coeffs.add_column(Column(name = 'TELESCOPE', dtype = 'U24', format = '%-24s'))
-#            self.coeffs.add_column(Column(name = 'FIELD', dtype = 'U24', format = '%-24s'))
         else:
             self.coeffs = Table.read(self.fileName, format = 'ascii')
             for field in self.fields:
                 self.coeffs[field['name']].format = field['format']
 
-#            self.coeffs['OBSERVER'].format = '%-10s'
-#            self.coeffs['DATE'].format = '%-14s'
-#            self.coeffs['TV'].format = '%11.4f'
-#            self.coeffs['ERR_TV'].format = '%11.4f'
-#            self.coeffs['TVR'].format = '%11.4f'
-#            self.coeffs['ERR_TVR'].format = '%11.4f'
-#            self.coeffs['TBV'].format = '%11.4f'
-#            self.coeffs['ERR_TBV'].format = '%11.4f'
-#            self.coeffs['CAMERA'].format = '%-24s'
-#            self.coeffs['TELESCOPE'].format = '%-24s'
-#            self.coeffs['FIELD'].format = '%-24s'
 
     def addCoeffs(self, Tv, Tvr, Tbv, errTv = None, errTvr = None, errTbv = None):
         lastCoeffs = self.getCoeffs()
@@ -202,31 +135,32 @@ class StdCoeffs:
 class Photometry:
 
     opt = {}  # command line options
-    ppl = {}  # PPL setup from ppl-setup config file
     pos = None  # catalog header positions
     imageProps = {}  # image properties from FITS header
     coeffTable = None
     fits = {}
 
-    def __init__(self, opt, ppl):
+    mif = { 'Gi': 'MAG_GI', 'Bi': 'MAG_BI', 'Ri' : 'MAG_RI' }
+    eif = { 'Gi': 'ERR_GI', 'Bi': 'ERR_BI', 'Ri' : 'ERR_RI' }
+    mvf = { 'Gi': 'MAG_V', 'Bi': 'MAG_B', 'Ri' : 'MAG_R' }
+    evf = { 'Gi': 'ERR_V', 'Bi': 'ERR_B', 'Ri' : 'ERR_R' }
+
+    def __init__(self, opt):
         self.opt = opt
-        self.ppl = ppl
 
     def loadFitsHeaders(self, fileName):
         '''
-        fileName: path/[Seq_nnn|Combined]_c.fits.cat.cat
+        fileName: path/[Seq_nnn|Combined].cmb.pm
         '''
-        astFileName = fileName.split('.')[0]
-        astFileName = astFileName + '.ast.fits'
-        self.fits = pm.getFitsHeaders(astFileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
+        self.fits = pm.getFitsHeaders(fileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
 
     def getCamera(self):
         if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
             return self.fits['INSTRUME']
         if 'camera' in self.opt and self.opt['camera'] and len(self.opt['camera']) > 0:
             return self.opt['camera']
-        if 'DEF_CAMERA' in self.ppl.keys() and self.ppl['DEF_CAMERA'] and len(self.ppl['DEF_CAMERA']) > 0:
-            return self.ppl['DEF_CAMERA']
+        if 'DEF_CAMERA' in pm.setup.keys() and pm.setup['DEF_CAMERA'] and len(pm.setup['DEF_CAMERA']) > 0:
+            return pm.setup['DEF_CAMERA']
         return 'Generic Camera'
 
     def getTelescope(self):
@@ -234,8 +168,8 @@ class Photometry:
             return self.fits['TELESCOP']
         if 'telescope' in self.opt and self.opt['telescope'] and len(self.opt['telescope']) > 0:
             return self.opt['telescope']
-        if 'DEF_TELESCOPE' in self.ppl.keys() and self.ppl['DEF_TELESCOPE'] and len(self.ppl['DEF_TELESCOPE']) > 0:
-            return self.ppl['DEF_TELESCOPE']
+        if 'DEF_TELESCOPE' in pm.setup.keys() and pm.setup['DEF_TELESCOPE'] and len(pm.setup['DEF_TELESCOPE']) > 0:
+            return pm.setup['DEF_TELESCOPE']
         return 'Generic Telescope'
 
     def stdColor(self, color):
@@ -244,7 +178,7 @@ class Photometry:
             stdcolor = 'V'
         return stdcolor
 
-    def calculateMgsRobustAveraging(self, refCat, color, bestCompId):
+    def calculateMgsRobustAveraging(self, comps, color, bestCompId):
         '''
         Calculate unit slope linear fit regression with robust averaging
         see: http://gcx.sourceforge.net/html/node11.html
@@ -256,28 +190,21 @@ class Photometry:
 
         stdcolor = self.stdColor(color)
 
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        miPos = getHeaderPos(refCat, fieldMgInstrumental)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-        rolePos = getHeaderPos(refCat, fieldRole)
-
-        bestComp = self.findRow(refCat['cat'], bestCompId)
-        bestComp[rolePos] = 'K'
+        bestComp = comps.loc['AUID', bestCompId]
 
         y = []
         e2 = []
         w = []
         mis = []
         mvs = []
-        for pm in refCat['cat']:
-            if pm[rolePos] == 'C' and pm[mvPos] != '-':
-                mi = float(pm[miPos])
-                mv = float(pm[mvPos])
+        for r in comps:
+            if r[self.mvf[color]] != '-':
+                mi = float(r[self.mif[color]])
+                mv = float(r[self.mvf[color]])
                 mis.append(mi)
                 mvs.append(mv)
-                ei = float(pm[eiPos])
-                ev = float(pm[evPos]) if pm[evPos][0].isdigit() and pm[evPos] != '0.0' else ei
+                ei = float(r[self.eif[color]])
+                ev = float(r[self.evf[color]]) if r[self.evf[color]][0].isdigit() and r[self.evf[color]] != '0.0' else ei
                 y.append(mv - mi)
                 ek2 = ei * ei + ev * ev
                 e2.append(ek2)
@@ -316,17 +243,11 @@ class Photometry:
         err = np.sqrt(se2 / len(y))
         print ("(gcx) color: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" % (color, z, mel_2, ez_2, np.sqrt(ez_2), len(y), err))
 
-        if self.opt['showGraphs']:
-            plotcolor = color[0].lower()
-            plt.subplot(311 + self.opt['color'].index(color))
-            xr = np.arange(min(mis), max(mis), 0.01)
-            plt.plot(mis, mvs, plotcolor + 'o', xr, xr + z, 'k')
-            plt.xlabel(color)
-            plt.ylabel(stdcolor)
+        self.ePlot.add(mis, mvs, [1, z], color, stdcolor, color[0].lower(), pm.Plot.INV_X + pm.Plot.INV_Y)
 
         return [1.0, z], err
 
-    def calculateMgsLinearFit(self, refCat, color, bestCompId):
+    def calculateMgsLinearFit(self, comps, color, bestCompId):
         '''
         Calculate magnitudes with naive linear fit
         '''
@@ -334,14 +255,7 @@ class Photometry:
 
         stdcolor = self.stdColor(color)
 
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        miPos = getHeaderPos(refCat, fieldMgInstrumental)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-        rolePos = getHeaderPos(refCat, fieldRole)
-
-        bestComp = self.findRow(refCat['cat'], bestCompId)
-        bestComp[rolePos] = 'K'
+        bestComp = cmb.loc['AUID', bestCompId]
 
         # TODO
         mi = []
@@ -350,12 +264,12 @@ class Photometry:
 #    p = [1.0, 0.0]
         ep = 0.0
         N = 0
-        for pm in refCat['cat']:
-            if pm[rolePos] == 'C' and pm[mvPos] != '-':
-                mi.append(float(pm[miPos]))
-                mv.append(float(pm[mvPos]))
-                ei = float(pm[eiPos])
-                ev = float(pm[evPos]) if pm[evPos] != '-' and pm[evPos] != '0.0' else ei
+        for pm in comps:
+            if pm[mvPos] != '-':
+                mi.append(float(pm[self.mif[color]]))
+                mv.append(float(pm[self.mvf[color]]))
+                ei = float(pm[self.eif[color]])
+                ev = float(pm[self.evf[color]]) if pm[self.evf[color]] != '-' and pm[self.evf[color]] != '0.0' else ei
                 e2 = ei * ei + ev * ev
                 ep = ep + e2
                 N = N + 1
@@ -371,45 +285,26 @@ class Photometry:
 
         print ('polyfit result:', coef, 'error:', ep)
 
-        if self.opt['showGraphs']:
-            plotcolor = color[0].lower()
-            plt.subplot(311 + self.opt['color'].index(color))
-            xr = arange(min(mi), max(mi), 0.01)
-            plt.plot(mi, mv, plotcolor + 'o', xr, coef[0] * xr + coef[1], 'k')
-            plt.xlabel(color)
-            plt.ylabel(stdcolor)
+        self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower())
 
         return coef, ep
 
-    def findBestCompStar(self, allCatalogs, color):
-
-        refCat = allCatalogs[color]
-        stdcolor = self.stdColor(color)
-
-        idPos = getHeaderPos(refCat, fieldAuid)
-        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-        rolePos = getHeaderPos(refCat, fieldRole)
-
-        mvPosList = {}
-        evPosList = {}
-        for c in self.opt['color']:
-            mvPosList[c] = getHeaderPos(refCat, 'MAG_' + self.stdColor(c))
-            evPosList[c] = getHeaderPos(refCat, 'ERR_' + self.stdColor(c))
+    def findBestCompStar(self, comps, color):
 
         emin = 1.0
         bestComp = None
-        for pms in refCat['cat']:
-            mvs = pms[mvPosList[color]]
-            evs = pms[evPosList[color]]
-            if pms[rolePos] == 'C' and mvs != '-':
-                ei = float(pms[eiPos]) if pms[eiPos] != '-' else MAG_ERR_DEFAULT
+        for pms in comps:
+            mvs = pms[self.mvf[color]]
+            evs = pms[self.evf[color]]
+            if mvs != '-' and mvs != '99.0':
+                ei = float(pms[self.eif[color]]) if pms[self.eif[color]] != '-' else MAG_ERR_DEFAULT
                 ev = float(evs) if evs != '-' and evs != '0.0' else ei
                 e = ei * ei + ev * ev
                 if e < emin:
                     haveAllMags = True
                     for c in self.opt['color']:
                        if c != color:
-                           if pms[mvPosList[c]] == '-' or pms[evPosList[c]] == '-':
+                           if pms[self.mvf[c]] == '-' or pms[self.evf[c]] == '-':
                                haveAllMags = False
                                break
                     if not haveAllMags:
@@ -418,192 +313,63 @@ class Photometry:
                     bestComp = pms
 
         if bestComp:
-            ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
-            ev = float(bestComp[evPosList[color]]) if bestComp[evPosList[color]] != '-' else MAG_ERR_DEFAULT
+            ei = float(bestComp[self.eif[color]]) if bestComp[self.eif[color]] != '-' else MAG_ERR_DEFAULT
+            ev = float(bestComp[self.evf[color]]) if bestComp[self.evf[color]] != '-' else MAG_ERR_DEFAULT
             e = pm.quad(ei, ev)
-            bestComp[rolePos] = 'K'
-            print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp[idPos], bestComp[mvPosList[color]], e))
-            return bestComp[idPos]
+            bestComp['ROLE'] = 'K'
+            print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp['AUID'], bestComp[self.mvf[color]], e))
+            return bestComp['AUID']
         else:
             pm.printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
             return None
 
-    def calculateMgsComparision(self, refCat, color, bestCompId):
+    def calculateMgsComparision(self, comps, color, bestCompId):
         stdcolor = self.stdColor(color)
 
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        miPos = getHeaderPos(refCat, fieldMgInstrumental)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-        eiPos = getHeaderPos(refCat, fieldMgErrInstrumental)
-        rolePos = getHeaderPos(refCat, fieldRole)
-
         # find best comp star
-        bestComp = self.findRow(refCat['cat'], bestCompId)
-        bestComp[rolePos] = 'K'
+        bestComp = comps.loc['AUID', bestCompId]
 
-        zp = float(bestComp[mvPos]) - float(bestComp[miPos])
+        zp = float(bestComp[self.mvf[color]]) - float(bestComp[self.mif[color]])
         p = [ 1.0, zp ]
-        ei = float(bestComp[eiPos]) if bestComp[eiPos] != '-' else MAG_ERR_DEFAULT
-        ev = float(bestComp[evPos]) if bestComp[evPos] != '-' and bestComp[evPos] != '0.0' else ei
+        ei = float(bestComp[self.eif[color]]) if bestComp[self.eif[color]] != '-' else MAG_ERR_DEFAULT
+        ev = float(bestComp[self.evf[color]]) if bestComp[self.evf[color]] != '-' and bestComp[self.evf[color]] != '0.0' else ei
         ep = pm.quad(ei, ev)
 
-        if self.opt['showGraphs']:
+        if self.opt['showGraphs'] or self.opt['saveGraphs']:
             mi = []
             mv = []
-            for pm in refCat['cat']:
-                if pm[rolePos] == 'C' and pm[mvPos] != '-':
-                    mi.append(float(pm[miPos]))
-                    mv.append(float(pm[mvPos]))
+            for pm in comps:
+                if pm[self.mvf[color]] != '-':
+                    mi.append(float(pm[self.mif[color]]))
+                    mv.append(float(pm[self.mvf[color]]))
 
-            plotcolor = color[0].lower()
-            plt.subplot(311 + self.opt['color'].index(color))
-            xr = arange(min(mi), max(mi), 0.01)
-            plt.plot(mi, mv, plotcolor + 'o', xr, xr + zp, 'k')
-            plt.xlabel(color)
-            plt.ylabel(stdcolor)
+            self.ePlot.add(mi, mv, [1, zp], color, stdcolor, color[0].lower())
 
         return p, ep
 
-    def getHeaderPositions(self, refCat):
-        pos = {}
-        pos[fieldAuid] = getHeaderPos(refCat, fieldAuid)
-        pos['LABEL'] = getHeaderPos(refCat, 'LABEL')
-        pos['NUMBER'] = getHeaderPos(refCat, 'NUMBER')
-        pos['MAG_V'] = getHeaderPos(refCat, 'MAG_V')
-        pos['MAG_R'] = getHeaderPos(refCat, 'MAG_R')
-        pos['MAG_B'] = getHeaderPos(refCat, 'MAG_B')
-        pos['ERR_V'] = getHeaderPos(refCat, 'ERR_V')
-        pos['ERR_R'] = getHeaderPos(refCat, 'ERR_R')
-        pos['ERR_B'] = getHeaderPos(refCat, 'ERR_B')
-        pos[fieldMgInstrumental] = getHeaderPos(refCat, fieldMgInstrumental)
-        pos[fieldMgErrInstrumental] = getHeaderPos(refCat, fieldMgErrInstrumental)
-        pos['RA'] = getHeaderPos(refCat, 'RA')
-        pos['DEC'] = getHeaderPos(refCat, 'DEC')
-        pos[fieldRole] = getHeaderPos(refCat, fieldRole)
-        return pos
 
-    def reportResult(self, result, refCat, outFileName, color, dateObs):
+    def reportResult(self, cmb, outFileName, color, dateObs, coeffs):
 
-        stdcolor = self.stdColor(color)
+        jdObs = "%12.4f" % pm.jd(dateObs)
 
-        idPos = getHeaderPos(refCat, fieldAuid)
-        labelPos = getHeaderPos(refCat, 'LABEL')
-        astIdPos = getHeaderPos(refCat, 'NUMBER')
-        mvPos = getHeaderPos(refCat, 'MAG_' + stdcolor)
-        evPos = getHeaderPos(refCat, 'ERR_' + stdcolor)
-        raPos = getHeaderPos(refCat, 'RA')
-        decPos = getHeaderPos(refCat, 'DEC')
-        rolePos = getHeaderPos(refCat, fieldRole)
-        stdPos = len(refCat['header'])
+        dateObsCol = [ dateObs ] * len(cmb)
+        jdObsCol = [ jdObs ] * len(cmb)
+        cmb['DATE-OBS'] = dateObsCol
+        cmb['JD'] = jdObsCol
 
-        if outFileName == None:
-            outFileName = 'result.pm'
-        r = open(outFileName, 'w')
+        # put std coeffs into table comments
+        pm.addTableComment(cmb, 'StdTv', str(coeffs[0]))
+        pm.addTableComment(cmb, 'StdTbv', str(coeffs[1]))
+        pm.addTableComment(cmb, 'StdTvr', str(coeffs[2]))
 
-        # write headers
-        r.write('AUID'.ljust(15))
-        r.write('LABEL'.ljust(30))
-        r.write('ASTID'.ljust(10))
-        # ref cat: RA_DEG, DEC_DEG
-        # pm cat: ALPHA_J2000, DELTA_J2000
-        r.write('RA'.ljust(20))
-        r.write('DEC'.ljust(20))
-        r.write('DATE-OBS'.ljust(20))
-        r.write('JD'.ljust(20))
-        r.write(('FLAG').ljust(5))
-        r.write(('MAG').ljust(20))
-        r.write(('COL').ljust(5))
-        r.write(('ERR').ljust(20))
-        r.write('\n')
+        cmb.write(outFileName, format = 'ascii.fixed_width', delimiter = ' ', overwrite=True)
+        return
 
-        # write result data
-        jdObs = pm.jd(dateObs)
-        jds = "%12.4f" % jdObs
-        for res in result:
-            r.write(res[idPos].ljust(15))
-            r.write(res[labelPos].ljust(30))
-            r.write(res[astIdPos].ljust(10))
-            r.write(res[raPos].ljust(20))
-            r.write(res[decPos].ljust(20))
-            r.write(dateObs.ljust(20))
-            r.write(jds.ljust(20))
-            if res[rolePos] == 'VF':
-                flag = 'F'
-            elif res[rolePos] == 'K':
-                flag = 'K'
-            else:
-                flag = '-'
-            r.write(flag.ljust(5))
-            r.write(("%6.3f" % (float(res[mvPos]))).ljust(20))
-#            c = stdcolor if self.opt['useCoeffs'] else color
-            c = stdcolor if res[stdPos] == 'S' else color
-            r.write(c.ljust(5))
-            r.write(("%5.3f" % (float(res[evPos])) if res[evPos] != '-' and flag != 'F' else '-').ljust(20))
-            r.write('\n')
-
-        r.close()
 
     # standardization functions
 
-    def findRow(self, cdata, rid):
-        for row in cdata:
-            if row[self.pos[fieldAuid]] == rid:
-                return row
-        return None
-
-    def mergeCatalogs(self, allCatalogs):
-        auidPos = self.pos[fieldAuid]
-        rolePos = self.pos['ROLE']
-        mgiPos = self.pos[fieldMgInstrumental]
-
-        # collect ids
-        allIds = set()
-        for j in range(len(self.opt['color'])):
-            color = self.opt['color'][j]
-            stdcolor = self.stdColor(color)
-
-            mgsPos = self.pos['MAG_' + stdcolor]
-
-            result = allCatalogs[color]['cat']
-            ids = set()
-            for row in result:
-                role = row[rolePos]
-                mgi = row[mgiPos]
-                mgs = row[mgsPos]
-                auid = row[auidPos]
-                if role == 'C' and mgs and mgs != '-' and mgi and mgi != '-':
-                    ids.add(auid)
-
-            if len(allIds) == 0:
-                allIds = ids
-            else:
-                allIds = allIds.intersection(ids)
-
-        # find records for all ids
-        # merged catalog fields: ID, B, V, R, bi, gi, ri
-        merged = []
-        for rid in allIds:
-            grow = self.findRow(allCatalogs['Gi']['cat'], rid)
-            brow = self.findRow(allCatalogs['Bi']['cat'], rid)
-            rrow = self.findRow(allCatalogs['Ri']['cat'], rid)
-
-            mV = grow[self.pos['MAG_V']]
-            mR = rrow[self.pos['MAG_R']]
-            mB = brow[self.pos['MAG_B']]
-            mgi = grow[self.pos[fieldMgInstrumental]]
-            mbi = brow[self.pos[fieldMgInstrumental]]
-            mri = rrow[self.pos[fieldMgInstrumental]]
-
-            eB = brow[self.pos['ERR_B']]
-            eV = grow[self.pos['ERR_V']]
-            eR = rrow[self.pos['ERR_R']]
-            egi = grow[self.pos[fieldMgErrInstrumental]]
-            ebi = brow[self.pos[fieldMgErrInstrumental]]
-            eri = rrow[self.pos[fieldMgErrInstrumental]]
-
-            merged.append([ rid, mB, mV, mR, mbi, mgi, mri, eB, eV, eR, ebi, egi, eri ])
-
-        return merged
+    def mgd(self, s):
+        return float(s) if s != '-' and s != '0.0' else MAG_ERR_DEFAULT
 
     def calculateCoeffs(self, mergedCat):
         # Tv:  slope of (V-v) -> (V-R)
@@ -618,20 +384,21 @@ class Photometry:
         w_Tvr = []
         w_Tbv = []
         for row in mergedCat:
-            V_vi.append(float(row[2]) - float(row[5]))
-            V_R.append(float(row[2]) - float(row[3]))
-            vi_ri.append(float(row[5]) - float(row[6]))
-            bi_vi.append(float(row[4]) - float(row[5]))
-            B_V.append(float(row[1]) - float(row[2]))
+            if row['MAG_V'] == '-' or row['MAG_B'] == '-' or row['MAG_R'] == '-' or \
+                row['MAG_GI'] == '-' or row['MAG_BI'] == '-' or row['MAG_RI'] == '-':
+                continue
 
-            for p in range(7, 12):
-                if row[p] == '-' or row[p] == '0.0':
-                    row[p] = str(MAG_ERR_DEFAULT)
-            e_V_vi = float(row[8]) + float(row[11])
-            e_V_R = float(row[8]) + float(row[9])
-            e_vi_ri = float(row[11]) + float(row[12])
-            e_bi_vi = float(row[10]) + float(row[11])
-            e_B_V = float(row[7]) + float(row[8])
+            V_vi.append(float(row['MAG_V']) - float(row['MAG_GI']))
+            V_R.append(float(row['MAG_V']) - float(row['MAG_R']))
+            vi_ri.append(float(row['MAG_GI']) - float(row['MAG_RI']))
+            bi_vi.append(float(row['MAG_BI']) - float(row['MAG_GI']))
+            B_V.append(float(row['MAG_B']) - float(row['MAG_V']))
+
+            e_V_vi = self.mgd(row['ERR_V']) + self.mgd(row['ERR_GI'])
+            e_V_R = self.mgd(row['ERR_V']) + self.mgd(row['ERR_R'])
+            e_vi_ri = self.mgd(row['ERR_GI']) + self.mgd(row['ERR_RI'])
+            e_bi_vi = self.mgd(row['ERR_BI']) + self.mgd(row['ERR_GI'])
+            e_B_V = self.mgd(row['ERR_B']) + self.mgd(row['ERR_V'])
             w_Tv.append(1.0 / (e_V_vi * e_V_vi + e_V_R * e_V_R))
             w_Tvr.append(1.0 / (e_vi_ri * e_vi_ri + e_V_R * e_V_R))
             w_Tbv.append(1.0 / (e_bi_vi * e_bi_vi + e_B_V * e_B_V))
@@ -646,40 +413,30 @@ class Photometry:
         Tbv = 1.0 / coef[0]
         Bbv = coef[1]  # ##
 
-        if self.opt['showGraphs']:
-            plt.figure()
-            plt.subplot(311)
-            xr = arange(min(V_R), max(V_R), 0.01)
-            plt.plot(V_R, V_vi, 'go', xr, Tv * xr + Bv, 'k')
-            plt.xlabel('V-R')
-            plt.ylabel('V-v')
-
-            plt.subplot(312)
-            plt.plot(V_R, vi_ri, 'ro', xr, xr / Tvr + Bvr, 'k')
-            plt.xlabel('V-R')
-            plt.ylabel('v-r')
-
-            plt.subplot(313)
-            xr = arange(min(B_V), max(B_V), 0.01)
-            plt.plot(B_V, bi_vi, 'bo', xr, xr / Tbv + Bbv, 'k')
-            plt.xlabel('B-V')
-            plt.ylabel('b-v')
-            plt.show()
+        # show/save graph of std coeffs
+        stdPlot = pm.Plot(3, self.opt['showGraphs'], self.opt['saveGraphs'])
+        stdPlot.add(V_R, V_vi, [Tv, Bv], 'V-R', 'V-v', 'g')
+        stdPlot.add(V_R, vi_ri, [1.0/Tvr, Bvr], 'V-R', 'v-r', 'r')
+        stdPlot.add(B_V, bi_vi, [1.0/Tbv, Bbv], 'B-V', 'b-v', 'b')
+        folder,a,b = self.opt['files'][0].partition('Photometry')
+        stdPlot.showOrSave(folder + 'std_coefficients.png')
 
         print ('standard coeffs: Tv =', Tv, 'Tvr =', Tvr, 'Tbv = ', Tbv)
         return [Tv, Tvr, Tbv]
 
     def openCoeffs(self, obsDate, target):
         if not self.coeffTable:
-            configFolder = self.ppl['CONFIG_FOLDER'].rstrip('/')
+            configFolder = pm.setup['CONFIG_FOLDER'].rstrip('/')
             coeffFile = configFolder + '/stdcoeffs.cat'
-            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, self.getCamera().replace(' ', '_'), self.getTelescope().replace(' ', '_'), target.replace(' ', '_').upper())
+            self.coeffTable = StdCoeffs(coeffFile, self.opt['observer'], obsDate, self.getCamera().replace(' ', '_'), \
+                self.getTelescope().replace(' ', '_'), target.replace(' ', '_').upper())
             self.coeffTable.open()
 
     def saveCoeffs(self, coeffs, obsDate, target):
         self.openCoeffs(obsDate, target)
         if not self.opt['overwrite'] and self.coeffTable.exists():
-            printError('Standard coefficients for %s/%s/%s/%s is exists ; to overwrite it use -w option' % (self.coeffTable.observer, self.coeffTable.obsdate, self.coeffTable.camera, self.coeffTable.telescope))
+            printError('Standard coefficients for %s/%s/%s/%s is exists ; to overwrite it use -w option' % \
+                (self.coeffTable.observer, self.coeffTable.obsdate, self.coeffTable.camera, self.coeffTable.telescope))
             return
         self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, target.replace(' ', '_').upper())
 #        self.coeffTable.save(overwrite=True)
@@ -694,50 +451,67 @@ class Photometry:
         print ('standard coeffs: Tv =', bestCoeffs['TV'], 'Tvr =', bestCoeffs['TVR'], 'Tbv = ', bestCoeffs['TBV'])
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
-    def calcVComp(self, colors, allCatalogs, bestComp, p_a, err_a):
+    def calcVComp(self, colors, cmb, bestComp, p_a, err_a):
         vcomp = {}
+        c_row = cmb.loc['AUID', bestComp]
         for c in colors:
-            c_row = self.findRow(allCatalogs[c]['cat'], bestComp)
-            c_row[self.pos['ROLE']] = 'K'
             vcomp[c] = {}
-            vcomp[c]['mi'] = float(c_row[self.pos[fieldMgInstrumental]])
-            vcomp[c]['ei'] = float(c_row[self.pos[fieldMgErrInstrumental]])
+            vcomp[c]['mi'] = float(c_row[self.mif[c]])
+            vcomp[c]['ei'] = float(c_row[self.eif[c]])
             vcomp[c]['mc'] = p_a[c][0] * vcomp[c]['mi'] + p_a[c][1]
             vcomp[c]['ec'] = pm.quad(vcomp[c]['ei'], err_a[c]) if err_a[c] else vcomp[c]['ei'] * np.sqrt(2.0)
 
         return vcomp
 
-    def calculateSimpleMgs(self, colors, allCatalogs, vcomp):
-        allResults = {}
-        for c in colors:
+    def setEmptyStd(self, cmb):
+        cmb['MAG_STDB'] = ['-'] * len(cmb)
+        cmb['ERR_STDB'] = ['-'] * len(cmb)
+        cmb['MAG_STDV'] = ['-'] * len(cmb)
+        cmb['ERR_STDV'] = ['-'] * len(cmb)
+        cmb['MAG_STDR'] = ['-'] * len(cmb)
+        cmb['ERR_STDR'] = ['-'] * len(cmb)
+        return cmb
+
+
+    def calculateSimpleMgs(self, colors, cmb, vcomp):
+
+        v_result = []
+        b_result = []
+        r_result = []
+        ev_result = []
+        eb_result = []
+        er_result = []
+
+        ma = []
+        ea = []
+
+        for c in ['Ri', 'Gi', 'Bi']:
             stdc = self.stdColor(c)
-            allResults[c] = []
-            for row in allCatalogs[c]['cat']:
-                role = row[self.pos['ROLE']]
-                if role == 'V' or role == 'VF' or role == 'K':
+            cc = c[:1]
+            for row in cmb:
 
-                    m0 = float(row[self.pos[fieldMgInstrumental]])
-                    M = m0 + vcomp[c]['mc'] - vcomp[c]['mi']
-                    row[self.pos['MAG_' + stdc]] = M
+                isFainter = g_row['VIZ_FLAG'] == 'III' # TODO: I es B flagek kezelese is
 
-                    if role != 'VF':
-                        err_m0 = float(row[self.pos[fieldMgErrInstrumental]])
-                        errM = np.sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
-                        row[self.pos['ERR_' + stdc]] = errM
+                m0 = float(row['MAG_' + c])
+                M = m0 + vcomp[c]['mc'] - vcomp[c]['mi']
+                ma.append(M)
 
-                    row.append('I')
-                    allResults[c].append(row)
+                err_m0 = float(row['ERR_' + c])
+                errM = np.sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
+                ea.append(errM)
 
-        return allResults
+            cmb['MAG_T' + cc] = ma
+            cmb['ERR_T' + cc] = ea
+
+        cmb = self.setEmptyStd(cmb)
+
+        return cmb
 
 
-    def calculateStdMgs(self, coeffs, allCatalogs, vcomp):
+    def calculateStdMgs(self, coeffs, cmb, vcomp, std):
         '''
         allResults: dict of results, key is th color
         '''
-#        Tv = coeffs[0]
-#        Tvr = coeffs[1]
-#        Tbv = coeffs[2]
         vc = vcomp['Gi']['mi']
         bc = vcomp['Bi']['mi']
         rc = vcomp['Ri']['mi']
@@ -753,77 +527,120 @@ class Photometry:
         err_Bc = vcomp['Bi']['ec']
         err_Rc = vcomp['Ri']['ec']
 
-        allResults = { 'Gi': [], 'Bi': [], 'Ri': [] }
-        for g_row in allCatalogs['Gi']['cat']:
-            role = g_row[self.pos['ROLE']]
-            if role == 'V' or role == 'VF' or role == 'K':
-                auid = g_row[self.pos['AUID']]
-                b_row = self.findRow(allCatalogs['Bi']['cat'], auid)
-                r_row = self.findRow(allCatalogs['Ri']['cat'], auid)
+        v_result = []
+        b_result = []
+        r_result = []
+        ev_result = []
+        eb_result = []
+        er_result = []
+        
+        for g_row in cmb:
+            role = g_row['ROLE']
+            if 1 == 1: # role == 'V' or role == 'VF' or role == 'K':
+                auid = g_row['AUID']
  
-                isFainter = role == 'VF' or b_row[self.pos['ROLE']] == 'VF' or r_row[self.pos['ROLE']] == 'VF'
+                isFainter = g_row['VIZ_FLAG'] == 'III' # TODO: I es B flagek kezelese is
 
                 Tv = coeffs[0] if not isFainter else 0.0
                 Tvr = coeffs[1] if not isFainter else 1.0
                 Tbv = coeffs[2] if not isFainter else 1.0
 
-                v0 = float(g_row[self.pos[fieldMgInstrumental]])
-                b0 = float(b_row[self.pos[fieldMgInstrumental]])
-                r0 = float(r_row[self.pos[fieldMgInstrumental]])
+                v0 = float(g_row['MAG_GI'])
+                b0 = float(g_row['MAG_BI'])
+                r0 = float(g_row['MAG_RI'])
 
                 V_R = (Vc_Rc) + Tvr * ((v0 - r0) - (vc - rc))
                 V = v0 + (Vc - vc) + Tv * ((V_R) - (Vc_Rc))
                 R = V - (V_R)
                 B = V + (Bc - Vc) + Tbv * ((b0 - v0) - (bc - vc))
 
-                g_row[self.pos['MAG_V']] = V
-                b_row[self.pos['MAG_B']] = B
-                r_row[self.pos['MAG_R']] = R
+                v_result.append(V)
+                b_result.append(B)
+                r_result.append(R)
 
                 if not isFainter:
 
-                    err_v0 = float(g_row[self.pos[fieldMgErrInstrumental]]) if g_row[self.pos[fieldMgErrInstrumental]] != '-' and g_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_vc
-                    err_b0 = float(b_row[self.pos[fieldMgErrInstrumental]]) if b_row[self.pos[fieldMgErrInstrumental]] != '-' and b_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_bc
-                    err_r0 = float(r_row[self.pos[fieldMgErrInstrumental]]) if r_row[self.pos[fieldMgErrInstrumental]] != '-' and r_row[self.pos[fieldMgErrInstrumental]] != '0.0' else err_rc
+                    err_v0 = float(g_row['ERR_GI']) \
+                                 if g_row['ERR_GI'] != '-' and g_row['ERR_GI'] != '0.0' \
+                                 else err_vc
+                    err_b0 = float(g_row['ERR_BI']) \
+                                 if g_row['ERR_BI'] != '-' and g_row['ERR_BI'] != '0.0' \
+                                 else err_bc
+                    err_r0 = float(g_row['ERR_RI']) \
+                                 if g_row['ERR_RI'] != '-' and g_row['ERR_RI'] != '0.0' \
+                                 else err_rc
 
                     errV = np.sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
                     errB = np.sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
                     errR = np.sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
 
-                    g_row[self.pos['ERR_V']] = errV
-                    b_row[self.pos['ERR_B']] = errB
-                    r_row[self.pos['ERR_R']] = errR
+                    ev_result.append(errV)
+                    eb_result.append(errB)
+                    er_result.append(errR)
 
-                flagStd = 'S' if self.opt['useCoeffs'] and not isFainter else 'I'
-                g_row.append(flagStd)
-                b_row.append(flagStd)
-                r_row.append(flagStd)
-                allResults['Gi'].append(g_row)
-                allResults['Bi'].append(b_row)
-                allResults['Ri'].append(r_row)
+                else:
 
-        return allResults
+                    ev_result.append(-1.0)
+                    eb_result.append(-1.0)
+                    er_result.append(-1.0)
 
-    def calculateEnsembleParams(self, refcat, bestComp):
-        if self.opt['showGraphs']:
-            plt.figure()
+            else:
+
+                v_result.append(99.0)
+                b_result.append(99.0)
+                r_result.append(99.0)
+                ev_result.append(-1.0)
+                eb_result.append(-1.0)
+                er_result.append(-1.0)
+
+        if std:
+
+            cmb['MAG_STDB'] = b_result
+            cmb['ERR_STDB'] = eb_result
+            cmb['MAG_STDV'] = v_result
+            cmb['ERR_STDV'] = ev_result
+            cmb['MAG_STDR'] = r_result
+            cmb['ERR_STDR'] = er_result
+
+        else:
+
+            cmb['MAG_TB'] = b_result
+            cmb['ERR_TB'] = eb_result
+            cmb['MAG_TG'] = v_result
+            cmb['ERR_TG'] = ev_result
+            cmb['MAG_TR'] = r_result
+            cmb['ERR_TR'] = er_result
+
+        return cmb
+
+    def calcHmg(self, cmb, vcomp):
+        print(f'vcomp: {vcomp}')
+        for cc in ['Gi', 'Bi', 'Ri']:
+            hmgInst = pm.getTableComment(cmb, 'MgLimitInst' + cc)
+            hmg = float(hmgInst) + vcomp[cc]['mc'] - vcomp[cc]['mi']
+            pm.addTableComment(cmb, 'MgLimit' + cc, '%7.3f' % (hmg))
+
+
+    def calculateEnsembleParams(self, cmb, bestComp):
+
+        self.ePlot = pm.Plot(3, self.opt['showGraphs'], self.opt['saveGraphs'])
 
         p_a = {}
         err_a = {}
         for color in self.opt['color']:
 
             if self.opt['method'] == 'comp':
-                p, ep = self.calculateMgsComparision(refcat[color], color, bestComp)
+                p, ep = self.calculateMgsComparision(cmb, color, bestComp)
             elif self.opt['method'] == 'lfit':
-                p, ep = self.calculateMgsLinearFit(refcat[color], color, bestComp)
+                p, ep = self.calculateMgsLinearFit(cmb, color, bestComp)
             else:
-                p, ep = self.calculateMgsRobustAveraging(refcat[color], color, bestComp)
+                p, ep = self.calculateMgsRobustAveraging(cmb, color, bestComp)
 
             p_a[color] = p
             err_a[color] = ep
 
-        if self.opt['showGraphs']:
-            plt.show()
+        folder,a,b = self.opt['files'][0].partition('Photometry')
+        self.ePlot.showOrSave(folder + 'ensemble_parameters.png')
 
         return p_a, err_a
 
@@ -832,31 +649,27 @@ class Photometry:
             pm.printError('No input files are given.')
             return
 
-        allCatalogs = {}
+        # load cmb catalog
+        cmbFileName = self.opt['files'][0]
+        print(f' Input files: {cmbFileName}')
+        cmb = Table.read(cmbFileName, format='ascii')
+        cmb.add_index('AUID')
 
-        # load refcats
-        for j in range(len(self.opt['color'])):
-
-            fileName = self.opt['files'][j]
-            color = self.opt['color'][j]
-
-            if not exists(fileName):
-                pm.printError("File %s is not exists." % (fileName))
-                return
-
-            refCat = loadCatalog(fileName)
-            if not self.pos:
-                self.pos = self.getHeaderPositions(refCat)
-
-            allCatalogs[color] = refCat
+        # filter comp stars
+        compStarMask = cmb['ROLE'] == 'C'
+        compStars = cmb[compStarMask]
 
         # find best comp star in Gi frame
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         indexGi = self.opt['color'].index(color)
-        self.loadFitsHeaders(self.opt['files'][indexGi])
+        fitsFileName = cmbFileName.replace('.cmb', '-Gi.ast.fits')
+        print(f'.ast.fits file name: {fitsFileName}')
+        self.loadFitsHeaders(fitsFileName)
+        print(f' Headers: {self.fits}')
         dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
-        bestComp = self.findBestCompStar(allCatalogs, color)  # refcat record of best comp in Gi
+
+        bestComp = self.findBestCompStar(compStars, color)  # refcat record of best comp in Gi
         if not bestComp:
             return False
 
@@ -864,10 +677,11 @@ class Photometry:
         allResults = {}
 
         # calculate virtual comp star
-        p_a, err_a = self.calculateEnsembleParams(allCatalogs, bestComp)
-        vcomp = self.calcVComp(self.opt['color'], allCatalogs, bestComp, p_a, err_a)
+        p_a, err_a = self.calculateEnsembleParams(compStars, bestComp)
+        vcomp = self.calcVComp(self.opt['color'], compStars, bestComp, p_a, err_a)
 
         # calculate or load std coeffs
+        std = True
         if self.opt['useCoeffs'] or self.opt['makeCoeffs']:
             # standardization
             coeffs = None
@@ -875,9 +689,8 @@ class Photometry:
             target = pm.guess(self.opt['files'][0])['target']
 
             if self.opt['makeCoeffs']:
-                mergedCat = self.mergeCatalogs(allCatalogs)
 
-                coeffs = self.calculateCoeffs(mergedCat)
+                coeffs = self.calculateCoeffs(compStars)
 
                 if self.opt['saveCoeffs']:
                     self.saveCoeffs(coeffs, dateObsDate, target)
@@ -889,82 +702,142 @@ class Photometry:
             if not coeffs:
                 pm.printError('No std coefficients for transformation ; use Tv = 0, Tvr = 1, Tbv = 1 for comp star method.')
                 coeffs = [ 0.0, 1.0, 1.0 ]  # this is for non-std transformation
+                std = False
 
         else:
 
             coeffs = [ 0.0, 1.0, 1.0 ]
+            std = False
 
         # apply virtual comp and std coeffs to calculate magnitudes
         if len(self.opt['color']) == 3:
-            allResults = self.calculateStdMgs(coeffs, allCatalogs, vcomp)
+            cmb = self.calculateStdMgs([ 0.0, 1.0, 1.0 ], cmb, vcomp, False)
+            if std:
+               cmb = self.calculateStdMgs(coeffs, cmb, vcomp, True)
+            else:
+               cmb = self.setEmptyStd(cmb)
         else:
-            allResults = self.calculateSimpleMgs(self.opt['color'], allCatalogs, vcomp)
+            cmb = self.calculateSimpleMgs(self.opt['color'], cmb, vcomp)
+
+        # calculate real mg limit
+        self.calcHmg(cmb, vcomp)
+
+        # save compStar auid
+        if bestComp:
+            pm.addTableComment(cmb, 'CompStar', bestComp)
 
         # save results
-        for j in range(len(self.opt['color'])):
-
-            fileName = self.opt['files'][j]
-            color = self.opt['color'][j]
-
-            self.reportResult(allResults[color], allCatalogs[color], fileName + '.pm', color, dateObs)
+        fileName = self.opt['files'][0]
+        self.reportResult(cmb, fileName + '.pm', color, dateObs, coeffs)
 
         return True
 
 
-class MainApp:
-
-    opt = {
-        'out' : None,  # output photometry file name, if None, '*.pm' will be created
-        'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
-        'color' : ['Gi'],  # photometry bands
-        'loadCoeffs' : False,  # load std coeffs
-        'useCoeffs': False,  # use std coeffs
-        'makeCoeffs': False,  # create std coeffs
-        'saveCoeffs': False,  # save std coeffs
-        'showGraphs': False,  # show standard coefficient graphs
-        'observer': 'XXX',  # observer code
-        'camera'   : None,   # camera name
-        'telescope': None,   # telescope name
-        'files': None,
-        }
-
-    def __init__(self, argv):
-        self.argv = argv
-        pass
-
-    def processCommands(self):
-        try:
-            optlist, args = getopt (argv[1:], "c:smo:p:", ['color=', 'std', 'make-std', 'out=', 'comp='])
-        except GetoptError:
-            pm.printError('Invalid command line options')
-            return
-
-        for o, a in optlist:
-            if a[:1] == ':':
-                a = a[1:]
-            elif o == '-c' or o == '--color':
-                self.opt['color'] = [a]
-            elif o == '-s' or o == '--std':
-                self.opt['std'] = True
-            elif o == '-m' or o == '--make-std':
-                self.opt['makestd'] = True
-            elif o == '-p' or o == '--comp':
-                self.opt['comp'] = a
-            elif o == '-o' or o == '--':
-                self.opt['out'] = a
-
-        self.opt['files'] = args
-
-    def run(self):
-        self.processCommands()
-
-        ppl = pm.loadPplSetup()
-
-        phot = Photometry(self.opt, ppl)
-        phot.process()
-
-
 if __name__ == '__main__':
+
+    class MainApp:
+
+        opt = {
+            'out' : None,  # output photometry file name, if None, '*.pm' will be created
+            'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
+            'color' : ['Gi'],  # photometry bands
+            'loadCoeffs' : False,  # load std coeffs
+            'useCoeffs': False,  # use std coeffs
+            'makeCoeffs': False,  # create std coeffs
+            'saveCoeffs': False,  # save std coeffs
+            'showGraphs': False,  # show standard coefficient graphs
+            'saveGraphs': False,  # save standard coefficient graphs
+            'camera'   : None,   # camera name
+            'telescope': None,   # telescope name
+            'files': None,
+
+            # from pplphotomety
+            'makeStd'  : False,  # make std coeffs
+            'useStd'   : False,  # use std coeffs
+            'adhocStd' : False,  # make and use std coeffs for this image only
+            'overwrite': False,  # force to overwrite existing results, optional
+            'baseFolder': None,  # base folder, optional
+
+            }
+
+        availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
+
+        mgCalcMethods = {
+            'comp': 'Best comparision star',
+            'gcx' : 'GCX''s robust averaging ensemble',
+            'lfit': 'Linear fit ensemble',
+            }
+
+        def __init__(self, argv):
+            self.argv = argv
+            pass
+
+        def processCommands(self):
+            try:
+                optlist, args = getopt (self.argv[1:], "c:msat:w", ['color=', 'make-std', 'use-std', 'adhoc-std', 'show-graph', 'save-graph', 'method=', 'overwrite'])
+            except GetoptError:
+                printError('Invalid command line options.')
+                return
+
+            for o, a in optlist:
+                if a[:1] == ':':
+                    a = a[1:]
+                elif o == '-c' or o == '--color':
+                    color = a.lower()
+                    if not color in self.availableBands:
+                        printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % (a))
+                        exit(1)
+                    if color == 'all':
+                        self.opt['color'] = ['Ri', 'Gi', 'Bi']
+                    else:
+                        self.opt['color'] = [a]
+                elif o == '-m' or o == '--make-std':
+                    self.opt['makeStd'] = True
+                elif o == '-s' or o == '--use-std':
+                    self.opt['useStd'] = True
+                elif o == '-a' or o == '--adhoc-std':
+                    self.opt['adhocStd'] = True
+                elif o == '--show-graph':
+                    self.opt['showGraphs'] = True
+                elif o == '--save-graph':
+                    self.opt['saveGraphs'] = True
+                elif o == '--camera':
+                    self.opt['camera'] = a
+                elif o == '--telescope':
+                    self.opt['telescope'] = a
+                elif o == '-t' or o == '--method':
+                    if not a in self.mgCalcMethods.keys():
+                        printWarning('Invalid mg calculation method %s ; use gcx instead.')
+                    else:
+                        self.opt['method'] = a
+
+                elif o == '-w' or o == '--overwrite':
+                    self.opt['overwrite'] = True
+
+            if self.opt['adhocStd'] and (self.opt['makeStd'] or self.opt['useStd']):
+                printWarning('Both -a and either -m or -s option cannot be used at once.')
+                exit(0)
+
+            if len(args) > 0:
+                self.opt['baseFolder'] = args[0]
+                if args[0].endswith('/'):
+                    self.opt['baseFolder'] = args[0][:-1]
+
+            print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
+
+            self.opt['loadCoeffs'] = self.opt['useStd']
+            self.opt['useCoeffs']  = self.opt['useStd'] or self.opt['adhocStd']
+            self.opt['makeCoeffs'] = self.opt['makeStd'] or self.opt['adhocStd']
+            self.opt['saveCoeffs'] = self.opt['makeStd']
+
+        def run(self):
+            self.processCommands()
+
+            self.opt['files'] = [ self.opt['baseFolder'] + '/Photometry/Combined.cmb' ]
+
+            phot = Photometry(self.opt)
+            phot.process()
+
 
     app = MainApp(argv)
     app.run()
