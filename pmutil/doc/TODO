@@ -1,15 +1,34 @@
 TODO
 ----
 
++pplphotometry			547 451
+-pmstack	
+-pplcalibration			pplSetup 575
+-pmtranzi	
++pmbase				451
++pmresult			451 544 547
++pmphot				451
++pmmerge	        451
+
+
+-----------
+
 -NEW: configure error:
 
 	chmod: cannot access '/home/kovi/bin/*': No such file or directory
 
 NEW CALIBRATION BUGS:
 
-- NEW: 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
-
 NEW PHOTOMETRY BUGS:
+
++NEW: A riport keszites nagyon lassu, az airmass kiszamolasa tart sokaig
+        convertToAAVSORecords futasido 7 mp korul (korabban 20 mp volt)
+        airmass nelkul: 0.002 mp
+        ossz futasido: 250 mp / 38 mp (29 kep)
+
++NEW: A graph megjelenitesnel/mentesenel lehetne title, hogy tudjuk, hogy mi van a graph-on
+
+-NEW: Ha az astrometria hibara fut, akkor ne akarja az .aavso file-t elkesziteni
 
 -NEW: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 	az std rendben van, a tobbit kell megnezni
@@ -25,15 +44,53 @@ NEW IDEAS:
 
 TECH UPGRADE:
 
-- photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
+- astrometry.net upgrade
 
-- Katalogus kezeles astropy.table.Table segitsegevel
+	- !!! astrometry.net 0.81 needed
 
-	pmphot, pmresult
+- Upgrade to python 3.8+
+
+- Upgrade ext packages:
+
+	Pkg			Lastest version		Actual version
+
+	RawTran			1.1	2019-01-21	0.3.8	2007-12-15	!!!
+
+	ExifTool		12.58	2023-03-15	10.80+			!!!
+
+	FITSH			0.9.4	2021-02-04	0.9.3	2019-02-06
+
+	Astrometry.net		0.93	2022-12-20	0.93	2022-12-20	OK
+
+	SExtractor		2.23.1	2016-03-28	2.19.5	2013-12-14	!!!
+
+	wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
+
+	python			3.8+			3.6				3.8+ kellene, de ez ubuntu 20.0-t igenyel
+
+	python/astroalign	2.4.2	2023-02-21	2.4.1
+
+	python/astropy		5.2.1	2023-01-08	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+
+	python/astroquery	0.4.6	2022-03-23	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min pzthon 3.7 szukseges
+
+	python/matplotlib	3.7.1	2023-03-04	3.1.2			!!!
+
+	python/numpy		1.24.2	2023-02-05	1.16.3			!!!
+
+	python/Pillow		9.4.0	2023-01-02	5.1.0			!!!
+
+	python/photutils	1.6.0	2022-12-09	0.7.2			!!!
+
+	python/scipy		1.10.1	2023-02-19	1.4.1			!!!
+
+	python/xmltodict	0.13.0	2022-05-08	0.12.0
+
++ photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
 
 - SCAMP: grmatch helyett
 
-- fiphot: sextractor helyett
+/ fiphot: sextractor helyett
 
 	# Common arguments (saturation level, image section & trimming, etc.):
 	FISTAR_ARGS="--algorithm uplink --prominence 0.0 --model elliptic --format id,x,y,s,d,k,amp,flux"
@@ -74,176 +131,51 @@ TECH UPGRADE:
 
 === V 1.2 ==================================================
 	Sorrend:
-		High: 451, 548, 549, 550, (488), 491, 517
-		Med : 547, 544, +490, 459
-		Low : 539, 528, 546, 461, 465, 501, 513, 522, 525, 535, 537, 538, 543
----
-
-(465) RAW képek és eredmény archiválása
+		High: *451, *548, *575
+		Med : *554
+		Low : *525, *544, 576, *580
 
 --- calibration --------------------------------------------
 
-(543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
+(580) hibas light image jelolese filenevben
 
-	- ugy tunik, hogy az fwhm minden kepnel nagyjabol ugyan akkora, ez nem mondja meg, ha egy kep rossz
+	- Doc: hibas kepek kezelese
 
-(528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
-
-(501) Utility: regisztráció és stackelés
-
-(459) Dark library kezelés
+(575) 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
 
 --- photometry ---------------------------------------------
 
-(548) Tranziens keresés katalógus adatoktól való eltérés alapján
+(554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
-	1. pmmerge: keresztreferenciát kell készíteni a refcat x cat szerint (esetleg cat x ucac3 online)
-
-		+ combined catalog fields:
-                        # id fields
-                        AUID
-                        VIZ_ID
-			ROLE
-                        LABEL
-                        # measured data fields
-			MAG_GI	cat.MAG_ISOCOR
-			ERR_GI  cat.MAGERR_ISOCOR
-			MAG_BI
-			ERR_BI
-			MAG_RI
-			ERR_RI
-			-PX_GI	cat.XWIN_IMAGE
-                        -PY_GI   cat.YWIN_IMAGE
-			-PX_BI
-			-PY_BI
-			-PX_RI
-			-PY_RI
-			RA_J2000	cat.ALPHA_J2000
-			DE_J2000	cat.DELTA_J2000
-			RA_J2000_HEXA
-			DE_J2000_HEXA
-                        -FWHM_IMAGE
-			-FWHM_WORLD
-                        # reference fields
-                        MAG_B
-                        ERR_B
-                        MAG_V
-                        ERR_V
-                        MAG_R
-                        ERR_V
-                        # flags
-			VIZ_FLAG	INVISIBLE, BELOW_LIMIT, NEAR_LIMIT, SATURATED
-			POS_FLAG	BORDER
-	
-
-
-		+1.1 a kulon rgb file-okat ossze kell merge-elni egy kozos file-ba, ha nincs 3 szin, akkor azokat ures tablakent kell kezelni
-
-			+ a referencia legyen a g color, innen vegyuk a koordinatat
-			+ koordinata alapjan matcheljuk ossze oket
-			- csak a mg limit folottiek kerulnek az uj tablaba, a limit a szorasokbol szamitodik
-			- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
-			- !!! a nem matchelodo B es R limit feletti csillagokat is bele kell tenni a cmb-be
-			- szaturalt csillagok kezelese
-
-		+1.2 az osszevont listat matcheltetjuk az UCAC4-el, hozzarendeljuk az azonositokat meg a fenyessegeket
-
-			- !!! az e_Xmag mezok nem jonnek a viz-bol
-
-		+1.3 hozzanezzuk a refcat-ot, flag-eljuk az abban levo csillagokat, es pontositjuk a fenyessegeket
-
-			- ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
-
-		? lehet, hogy a refcat-ba nem is kellenek mezocsillagok emiatt, ott inkabb az ucac4 id-t kell hozzajuk rendelni
-
-		+1.4 kiiratjuk a kombinalt tablazatot -> .cmb
-
-			- hmg alattiakat ne irjunk ki (flag: BBB vagy III, ezek kombinacioja)
-
-		- Sequence-ek kezelese is kell
-
-		- Ha nem 3 szin van megadva
-
-		- debug kiiratasok --debug modban
-
-		+ show-graph, save-graph opciok
-
-	2. pmphot: kell készíteni (mondjuk V-ben) és a gi - V görbét, és egyenest illeszteni rá (refcat C és F csillagok)
-		[539 - grafikon mentése]
-		[522 - kappa-sigma egyenesillesztés]
-		[451] whole frame photometry
-
-		- pmphot: a VF, CF role-okat mikor tesszuk bele? Itt mi lesz helyette? A viz_flag?
-
-		- kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
-
-	3. pmtranzi: megvizsgálunk minden cat csillagot:
-	
-		3.1 ha mg limit felett van, de nincs benne a refcat-ban --> flag: NEW
-	
-		3.2 ha a |gi - V| > N x sigma --> flag: VAR, 
-	
-		3.3 szaturált, beégett csillagokat fel kell ismerni, azoknál vagy PSF fotometriát használni, vagy kizárni őket a vizsgálatból --> flag: SAT
-			[517 - szaturált csillagok kezelése]
-			[510 - PSF fotometria, v2.0]
-		
-		3.4 hmg közelében van-e (a mg limit a mért hmg és a refcat F csillagok maximuma) --> flag: LIMIT
-
-		3.5 ha a kép szélén van --> flag: BORDER
-	
-	4. pmtranzi: megvizsgálunk minden refcat csillagot:
-
-		4.1 ha mg limit felett van, de nincs benne a cat-ban --> flag: MISSING
-	
-	5. pmtranzi: a flaggel ellátott csillagokat kiírni susp katalógusba
-
-		- uj mezok: tranzi_type (VAR, NEW, MIS), sigma
-
-	6. pmtranzi: ellenőrzés, az eredménynel update-elni a listát
-
-		6.1 nem ismert változó-e (refcat-ban legyen benne minden változó)
-	
-		6.2 mélyég objektum (NED, Vizier, LEDA)
-	
-		6.3 naprendszerbeli objektum (MPC)
-
-	7. pmcolorize: a képre felrajzolni a jelölt obejtumokat
-		[525 - változók felrajzolása a képre]
++++(547) sequence eseten ne csak a Seq-bol csinal riportot, hanem a Combined-bol is, de mas file-nevvel
 
 (544) Sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
+    + mg tengely cimkei nem jok, tul surun vannak
+    + title hianyzik
+    - jd felirat kicsit bena (2.460999e+6)
+    + fainter than nincs jelolve
+    - C-K nincs a gorben - lehet, hogy 3 kulon gorbe kell, hogy a C-K-val ne keveredjen
+    + error bar nincs a gorben
+    / kapcsolok a finomhangolashoz ???
+    + egyelore nem kezeli a command line parametereket
+    + az elso LC mentese utan ez a hiba jon 2x:
+        ERROR:dbus.proxies:Introspect error on :1.87:/modules/kwalletd5: dbus.exceptions.DBusException:
+        org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application
+        did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the
+        network connection was broken.
+    - PM: ZTF J180122.06+674151.5 - tobb eszleles 120 mg alatti
+    - PM: Nem veszi figyelembe a kiszamolt hmg-t
+    - PM: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
 
-(538) riport szures: ha a refcat-ban nem csak AUID-es valtozok vannak (kesobb tranziens field stars is), a riport a pm-bol csak az AUID-es valtozokat tegye a riport file-ba
-	esetleg lehetne opcio a szures erossegere (auid, whitelist, all)
+(525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
+	+ ezt a colorize csinalja? ez lenne a legjobb
+	+ csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
+	+ com star legyen sarga, a valtozo feher
 
-(537) refcat -u --update opcio, ami nem felulirja a refcat file-t, hanem letolti es merge-eli, hogy a refcat-ba csinalt modositasok megmaradjanak
+	+ refcat
+	- pm
 
-(535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
-
-	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
-
-	- a folder nev elejerol vegye el a szamokat, ha az datumnak nez ki
-
-	- keressen a letoltott refcat-k kozott olyat, ami a folder nevvel kezdodik
-
-	- ha ilyen nincs, keressen a VSX-ben ezzel kezdodot
-
-	- ha ilyen sincs, akkor a folder/Sequence/Combined-Gi.fits alapjan keressen (opcionalis)
-
-	- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
-		a kep koordinataja alapjan keszitsen refcat-ot
-		a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
-			vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
-		feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
-
-(522) kappa-sigma iteracio egyenes illesztesnel
-
-	- mg calc: lfit - legyen itt is kappa-sigma iteracio, lehet, hogy lfit egyaltalan nem kell
-
-	- mg calc: coeff szamolasnal is legyen kappa-sigma iteracio ???
-
-(510) PSF fotometria ködös objektumok esetén
-
-	- szaturalt csillagoknal is kell
+	- !!! pillow 5.3.0 needed
 
 +++(489) Referencia katalógus tartalmazzon mezőcsillagokat is
 
@@ -274,9 +206,215 @@ TECH UPGRADE:
 
 		DEF_FIELD_STAR_MG_LIMIT = 17.0
 
-(488) Tranziens detektálás
-
 (451) whole frame photometry
+
+	pmmerge:
+
+		+ Vizier HMG kezelese, szamolas, vagy egyaltalan nem kell a matchinghez
+
+		- NEW: HMG konstansok konfigba keruljenek
+
+		/ [#517 V1.3 - szaturalt objektumok flagelese]
+
+		- !!! keruljenek bele azok a csillagok is, amik nem minden szinben latszanak
+		
+		    G B R		GiBiRi.cat
+            G B		    GiBiRi.xrf
+            G   R		GiBi.xrf, GiBiRi.xin
+            G		    Gibi.xrf
+              B R		Gibi.xin, GiBiRi.xin
+              B		    Gibi.xin
+                R		GiBiRi.xin
+
+		- !!! az e_Xmag mezok nem jonnek a viz-bol
+
+		+ sequence kezelese
+
+		+ csak a mg limit folottiek kerulnek az uj tablaba, a limit a szorasokbol szamitodik
+
+		- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
+
+		- ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
+
+		+ ha a refcat-ban szerepel, de a kepen nem, akkor hozza kell adni a cmb-hez MATCH_FLAG = 'N' ertekkel
+
+		- !!! Ha nem 3 szin van megadva
+
+		- NEW: debug kiiratasok --debug modban
+
+		- Temp folder kitisztitasa: .cat .xrf .xin file-ok
+
+	pmphot:
+
+		+ a felhasznalt coeff ertekeket tegye bele a pm tablaba commentkent
+
+                + hmg erteket tegye bele a pm tablaba commentkent
+
+		+ a comp star auid-ot tegye a pm tablaba commentkent
+
+		/ [#522 V1.4 - kappa-sigma egyenesillesztés]
+
+		+ a VF, CF role-okat mikor tesszuk bele? Itt mi lesz helyette? A viz_flag?
+
+		- NEW: kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
+
+	pmresult:
+
+		+ BUG: nem kerul bele a comp id es mg
+
+		+ fainter valtozok: a mert mg van a hmg ertek helyett
+
+		+ EX Dra: olyan mg es mgerr ertekek vannak, hogy 'nan'
+
+		+ [#547 V1.2] sequence eseten csak a Seq-bol csinal riportot, a Combined-bol nem
+
+
+		+ combined catalog fields:
+                        # id fields
+                        AUID
+                        VIZ_ID
+			ROLE
+                        LABEL
+                        # measured data fields (cat)
+			MAG_GI	cat.MAG_ISOCOR
+			ERR_GI  cat.MAGERR_ISOCOR
+			MAG_BI
+			ERR_BI
+			MAG_RI
+			ERR_RI
+			-PX_GI	cat.XWIN_IMAGE
+                        -PY_GI   cat.YWIN_IMAGE
+			-PX_BI
+			-PY_BI
+			-PX_RI
+			-PY_RI
+			RA_J2000	cat.ALPHA_J2000
+			DE_J2000	cat.DELTA_J2000
+			RA_J2000_HEXA
+			DE_J2000_HEXA
+                        -FWHM_IMAGE
+			-FWHM_WORLD
+			# ucac4 catalog fields (ucac4)
+                        # reference fields (refcat)
+			RA
+			RA_DEG
+			DEC
+			DEC_DEG
+                        MAG_B
+                        ERR_B
+                        MAG_V
+                        ERR_V
+                        MAG_R
+                        ERR_V
+                        # flags
+			VIZ_FLAG	INVISIBLE, BELOW_LIMIT, NEAR_LIMIT, SATURATED
+			POS_FLAG	BORDER
+			MATCH_FLAG	TRANSIENT, NEGATIVE_TRANSIENT
+	
+--- transients ---------------------------------------------
+
+(576) ppl-clean a Transients konyvtarat is tisztogassa meg
+
+(548) Tranziens keresés katalógus adatoktól való eltérés alapján
+
+	3. pmtranzi: megvizsgálunk minden cat csillagot:
+	
+		3.1 ha mg limit felett van, de nincs benne a refcat-ban --> flag: NEW
+
+			- MATCH_FLAG = 'T'
+	
+		3.2 ha a |gi - V| > N x sigma --> flag: VAR, 
+	
+		3.3 szaturált, beégett csillagokat fel kell ismerni, azoknál vagy PSF fotometriát használni, vagy kizárni őket a vizsgálatból --> flag: SAT
+			[517 - szaturált csillagok kezelése]
+			[510 - PSF fotometria, v2.0]
+		
+		3.4 hmg közelében van-e (a mg limit a mért hmg és a refcat F csillagok maximuma) --> flag: LIMIT
+
+		3.5 ha a kép szélén van --> flag: BORDER
+	
+	4. pmtranzi: megvizsgálunk minden refcat csillagot:
+
+		4.1 ha mg limit felett van, de nincs benne a cat-ban --> flag: MISSING
+
+			- MATCH_FLAG = 'N'
+	
+	5. pmtranzi: a flaggel ellátott csillagokat kiírni susp katalógusba
+
+		- uj mezok: tranzi_type (VAR, NEW, MIS), sigma
+
+	6. pmtranzi: ellenőrzés, az eredménynel update-elni a listát
+
+		6.1 nem ismert változó-e (refcat-ban legyen benne minden változó)
+	
+		6.2 mélyég objektum (NED, Vizier, LEDA)
+	
+		6.3 naprendszerbeli objektum (MPC)
+
+	7. pmcolorize: a képre felrajzolni a jelölt obejtumokat
+		[525 - változók felrajzolása a képre]
+
+
+=== V 1.3 ==================================================
+
+	Sorrend:
+		High: 517, 549
+		Med : 491, 540, 493
+		Low : 528, 546, 461, 535, 543
+
+
+--- calibration --------------------------------------------
+
+(543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
+
+	- ugy tunik, hogy az fwhm minden kepnel nagyjabol ugyan akkora, ez nem mondja meg, ha egy kep rossz
+
+(528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
+
+--- photometry ---------------------------------------------
+
+(535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
+
+	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
+
+	- a folder nev elejerol vegye el a szamokat, ha az datumnak nez ki
+
+	- keressen a letoltott refcat-k kozott olyat, ami a folder nevvel kezdodik
+
+	- ha ilyen nincs, keressen a VSX-ben ezzel kezdodot
+
+	- ha ilyen sincs, akkor a folder/Sequence/Combined-Gi.fits alapjan keressen (opcionalis)
+
+	- PPLSERVER: katalogus automatikus keszitese - a pplserver-en csak erre van lehetoseg
+		a kep koordinataja alapjan keszitsen refcat-ot
+		a refcat neve vagy a koordinata valamilyen kerekitessel (hogy ne csinaljon minden kis elteresre kulon file-t),
+			vagy ha a kep kozepen valameilyen pontossaggal van valtozo, akkor annak a neve
+		feltoltott csoportonkent csak egy refcat keszuljon (ez pplserver igeny)
+
+=== V 1.4 ==================================================
+
+	Sorrend:
+		High: 573, 550
+		Med : 459
+		Low : 522, 538
+
+
+--- calibration --------------------------------------------
+
+(459) Dark library kezelés
+
+--- photometry ---------------------------------------------
+
+(538) riport szures: ha a refcat-ban nem csak AUID-es valtozok vannak (kesobb tranziens field stars is), a riport a pm-bol csak az AUID-es valtozokat tegye a riport file-ba
+	esetleg lehetne opcio a szures erossegere (auid, whitelist, all)
+
+(522) kappa-sigma iteracio egyenes illesztesnel
+
+	- mg calc: lfit - legyen itt is kappa-sigma iteracio, lehet, hogy lfit egyaltalan nem kell
+
+	- mg calc: coeff szamolasnal is legyen kappa-sigma iteracio ???
+
+(488) Tranziens detektálás
 
 === V 2.0 ==================================================
 
@@ -339,6 +477,8 @@ TECH UPGRADE:
 	elcsuszik, es a szinek is elcsusznak egymashoz kepes
 	A pythonos verzioban a szekvencia szamolaskor ezt figyelembe kell venni, a szekvenciabol kihagyni
 
+(501) Utility: regisztráció és stackelés
+
 (448) Create/use 3D/4D FITS
 
 (472) A RAW -> FITS konverziónál ne csak CR2 file-okat tudjon konvertálni
@@ -347,22 +487,30 @@ TECH UPGRADE:
 
 (516) AST: 20090717_ez_aql eseteben sikertelen az asztrometria, B es G szinben, R-ben is eszmeletlen sokaig tart
 
+(510) PSF fotometria ködös objektumok esetén
+
+	- szaturalt csillagoknal is kell
+
+	- *Error*: PSF file not found: default.psf
+
 (491) Két szín fotometria
 
 (461) Fénygörbe készítése
 
 === NOT VERSIONED  ==================================================
 
+(578): environment variable to the .pmlib
+
+	- a configure stript-nek legyen egy opcioja (--config-folder), hogy hol legyen a .pmlib folder. Alapertelmezett: ~/.pmlib. 
+		Ezt tegye bele egy env. valtozoba (PM_CONFIG_FOLDER)
+
+	- a programok ezt nezzek meg eloszor
+
 (558) colorize: astropy.visualization normalizalas
 
 (559) refcat: astropy.io.votable - egyszerubb votable kezeles 
 
 (534) ppl-refcat: ha coord volt megadva, akkor nézze meg, hogy a változók között van-e olyan, ami elég közel esik a kép közepéhez, és inkább ez legyen a catalog neve.
-
-(525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
-	- ezt a colorize csinalja? ez lenne a legjobb
-	- csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
-	- com star legyen sarga, a valtozo feher
 
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
@@ -413,13 +561,7 @@ TECH UPGRADE:
 	SA38		  19	   +45			20			16
 	SA41		  22	   +45			30			13
 
-(556) pmphot: a hmg-t is kiirathatna valodi mg-ben, ezt akar a fits-be is betehetne
-
 (555) OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
-
-(554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
-
-(553) STD: fits es cat/pm tartalmazza a coeff infokat
 
 (552) STD: average coeff szamolasa
 
@@ -427,17 +569,19 @@ TECH UPGRADE:
 
 (551) STD: calculate coeff errors
 
-(545) PHOT: ha egy csillag latszik, de HMG alatti, akkor valamelyik file-ban ezt megjegyzesben vagy valahogy bele kellene irni, real mg-t meg hibat
-
 (517) szaturalt csillagok kezelese, ha tul fenyes a csillag, akkor nem szabad fotometralni, se comp starnak hasznalni
 	ezt a kappa-sigma kimutatja?
 
-	- tudjuk-e valahogy megmerni a szaturacios szintet, es flagelni a szaturalt csillagokat
+	+ tudjuk-e valahogy megmerni a szaturacios szintet, es flagelni a szaturalt csillagokat
+
+	+ sextractor param es cfg
+
+	- pmmerge: nezze a sextractor flageket, ls ha szaturalt, akkor a psf mg-t tegye bele a cmb tablaba, es irja a megfelelo flag-et
+
+	- pmreport: kommentbe irja bele, hogy szaturalt es psf mg
 
 (514) AST: az astrometriat ugy kellene parameterezni, hogy a sextractor a megfelelo outputot adja,
 	es ne kelljen meg egyszer meghivni
 
 (513) AST: egy objektum fotometralasanal, az elso kepbol ki kell szedni a koordinatakat (CRVAL1, CRVAl2), 
 	es felhasznalni a tobbi kepnel hintnek.
-
-

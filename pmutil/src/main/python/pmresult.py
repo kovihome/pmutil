@@ -2,108 +2,60 @@
 #
 # PmUtils/pmresult
 #
-'''
+"""
 Created on Apr 28, 2019
-
 @author: kovi
-
-AAVSO extended format spec:
-
-        header:
-        #TYPE=Extended
-        #OBSCODE=?
-        #SOFTWARE=
-        #DELIM=,
-        #DATE=JD
-        #OBSTYPE=DSLR
-    
-        data:
-        STARID: The star's identifier. It can be the AAVSO Designation, the AAVSO Name, or the AAVSO Unique Identifier, but NOT more than one of these. 
-		Limit: 30 characters.
-        DATE: The date of the observation, in the format specified in the DATE parameter. Limit: 16 characters.
-        MAGNITUDE: The magnitude of the observation. Prepend with < if a fainter-than.  A dot is required (e.g. "9.0" rather than "9"). Limit: 8 characters.
-        MAGERR: Photometric uncertainty associated with the variable star magnitude. If not available put "na". Limit: 6 characters.
-        FILTER: The filter used for the observation. This can be one of the following letters (in bold):
-            B: Johnson B
-            V: Johnson V
-            R: Cousins R
-            TG: Green Filter (or Tri-color green). This is commonly the "green-channel" in a DSLR or color CCD camera. These observations use V-band comp star magnitudes.
-            TB: Blue Filter (or Tri-color blue). This is commonly the "blue-channel" in a DSLR or color CCD camera. These observations use B-band comp star magnitudes.
-            TR: Red Filter (or Tri-color red). This is commonly the "red-channel" in a DSLR or color CCD camera. These observations use R-band comp star magnitudes.
-        TRANS: YES if transformed using the Landolt Standards or those fields that contain secondary standards, or NO if not. 
-		Document the method used to transform in the "NOTES" section.
-        MTYPE: Magnitude type. STD if standardized (Click here for definition of standardized) or DIF if differential (very rare). 
-		If you are currently using ABS for 'absolute' we will still accept it.
-            Differential requires the use of CNAME.
-        CNAME: Comparison star name or label such as the AUID (much preferred) or the chart label for the comparison star used. 
-		If not present, use "na". Limit: 20 characters.
-        CMAG: Instrumental magnitude of the comparison star. If "ensemble" see example below. If not present, use "na". Limit: 8 characters.
-        KNAME: Check star name or label such as the AUID (much preferred) or the chart label for the check star. If not present, use "na". Limit: 20 characters.
-        KMAG: Instrumental magnitude of the check star. If "ensemble" see example below. If not present, use "na".Limit: 8 characters.
-        AIRMASS: Airmass of observation Limit 7 characters - entry will be truncated if longer than that. If not present, use "na".
-        GROUP: Grouping identifier (maximum 5 characters). It is used for grouping multiple observations together, usually an observation set 
-		that was taken through multiple filters. 
-            It makes it easier to retrieve all magnitudes from a given set in the database, say, if someone wanted to form color indices such as (B-V) with them. 
-		If you are just doing time series, 
-            or using the same filter for multiple stars, etc., just set GROUP to "na." For cases where you want to group observations, GROUP should be an integer, 
-		identical for all observations in a group,
-            and unique for a given observer for a given star on a given Julian Date. Limit: 5 characters.
-        CHART: Please use the sequence ID you will find written in Bold print near the top of the photometry table in a sentence that reads 
-		"Report this sequence as [ID] in the chart field of your observation report." If a non–AAVSO sequence was used, please describe it as clearly as possible. 			Limit: 20 characters.
-        NOTES: Comments or notes about the observation. If no comments, use "na". This field has a maximum length of several thousand characters, 
-		so you can be as descriptive as necessary. 
-            One convention for including a lot of information as concisely as possible is to use subfields in the format |A=B; the '|' character is the separator, 
-		A is a keyvalue name and B is its value. 
-            If you need an alternative delimiter from '|', use it but preceed the first instance with "DELIM=". 
-		Using this mechanismnyou can document your transform process in more detail. 
-            Here is an example as used by TransformApplier:
-            5 records aggregated|VMAGINS=-7.244|VERR=0.006|CREFMAG=13.793|CREFERR=0.026|
-            KREFMAG=14.448|KREFERR=0.021|VX=1.1501|CX=1.1505|KX=1.1500|Tv_bv=0.0090|Tv_bvErr=0.0100|
-            TAver=2.47
-'''
+"""
 
 import getopt
-import sys
 import glob
+import sys
 from os.path import exists
-from astropy.table import Table
-from astropy.coordinates import SkyCoord, EarthLocation, AltAz, ICRS
-from astropy.time import Time
+
 import astropy.units as u
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz, ICRS
+from astropy.table import Table
+from astropy.time import Time
+from matplotlib import pyplot as plt
 
 import pmbase as pm
+
 
 # manage catalog file
 def loadCatalog(refFileName):
     table = Table.read(refFileName, format='ascii')
     if not table:
-        print (("Reference catalog %s not found") % refFileName)
+        print(f"Reference catalog {refFileName} not found")
         return None
     return table
 
 
 # create report
 class ReportProcessor:
-
     NOT_AVAILABLE = 'na'
 
     opt = {}  # command line options
     pos = None  # catalog header positions
+    airmasses = {}  # airmass cache
+    loc = None
+
+    lcdata = {}
 
     chartId = NOT_AVAILABLE
 
     aavso_colors = {
         'Gi': 'TG',
         'Ri': 'TR',
-        'Bi': 'TB' 
+        'Bi': 'TB'
     }
     aavso_std_colors = {
-        'Gi' : 'V',
-        'Ri' : 'R',
-        'Bi' : 'B'
+        'Gi': 'V',
+        'Ri': 'R',
+        'Bi': 'B'
     }
 
     def __init__(self, opt):
+        self.airmasses = {}
         self.opt = opt
 
     def findChartId(self, baseFolder):
@@ -124,15 +76,27 @@ class ReportProcessor:
         cf.close()
         return chartId
 
+    def getAirmass(self, ra, dec, obsDate):
+        key = f"{ra}{dec}{obsDate}"
+        if key in self.airmasses:
+            return self.airmasses[key]
+        else:
+            airmass = self.calcAirmass(ra, dec, obsDate)
+            # airmass = 1.0
+            # print(f"new airmass {key} -> {airmass}")
+            self.airmasses[key] = airmass
+            return airmass
+
     def calcAirmass(self, ra, dec, obsDate):
-        co = SkyCoord(ra, dec, frame = ICRS, unit = (u.hourangle, u.deg))
+        co = SkyCoord(ra, dec, frame=ICRS, unit=(u.hourangle, u.deg))
         t = Time(obsDate.replace('T', ' '))
         # TODO: store observer's location in config
-        loc = EarthLocation.of_address('Budapest')
-        hc = co.transform_to(AltAz(obstime = t, location = loc))
+        if self.loc is None:
+            self.loc = EarthLocation.of_address('Budapest')
+        hc = co.transform_to(AltAz(obstime=t, location=self.loc))
         return float(hc.secz)
 
-    def convertToAAVSORecord(self, res, color, compStar):
+    def convertToAAVSOData(self, res, color, compStar):
 
         # MAG_Tc, ERR_Tc, MAG_STDc, ERR_STDc
 
@@ -150,18 +114,18 @@ class ReportProcessor:
             magerr = self.NOT_AVAILABLE
             aavsoColor = self.aavso_colors[color]
         else:
-            std = True
+            # std = True
             m = res['MAG_STD' + sc]
             e = res['ERR_STD' + sc]
             aavsoColor = self.aavso_std_colors[color]
             if str(m) == '-':
-               m = res['MAG_T' + cc]
-               e = res['ERR_T' + cc]
-               aavsoColor = self.aavso_colors[color]
-               std = False
+                m = res['MAG_T' + cc]
+                e = res['ERR_T' + cc]
+                aavsoColor = self.aavso_colors[color]
+                # std = False
             if str(m) == '-':
-               return None
-       
+                return None
+
             magnitude = "%4.3f" % (float(m))
             magerr = "%4.3f" % (float(e)) if e != '-' else self.NOT_AVAILABLE
 
@@ -179,16 +143,23 @@ class ReportProcessor:
             cmag = self.NOT_AVAILABLE
             kname = compStar['AUID'] if compStar else self.NOT_AVAILABLE
             kmag = compStar['MAG_' + sc] if compStar else self.NOT_AVAILABLE
-        airmass = "%6.4f" % (self.calcAirmass(res['RA'], res['DEC'], res['DATE-OBS']))
+        airmass = f"{self.getAirmass(res['RA'], res['DEC'], res['DATE-OBS']):6.4f}"
         group = self.NOT_AVAILABLE
         chart = self.chartId
         notes = self.NOT_AVAILABLE
-        return '%s,%s,%s%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % \
-            (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype, cname, cmag, kname, kmag, airmass, group, chart, notes)
 
+        return (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype, cname, cmag,
+                kname, kmag, airmass, group, chart, notes)
+
+    def convertToAAVSORecord(self, data):
+        # (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype,
+        #  cname, cmag, kname, kmag, airmass, group, chart, notes)
+        return '%s,%s,%s%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % \
+            (data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
+             data[9], data[10], data[11], data[12], data[13], data[14], data[15])
 
     def convertToAAVSORecords(self, pmt, colors):
-
+        # self.tick()
         compStar = self.findCompStar(pmt)
 
         varMask = pmt['ROLE'] == 'V'
@@ -196,22 +167,24 @@ class ReportProcessor:
         aavsoResults = ''
         for v in vt:
             for c in colors:
-                aavso = self.convertToAAVSORecord(v, c, compStar)
-                if aavso:
+                aavsoData = self.convertToAAVSOData(v, c, compStar)
+                if aavsoData:
+                    aavso = self.convertToAAVSORecord(aavsoData)
                     aavsoResults += aavso
+                    self.addToLCData(aavsoData)
+        # self.tick("convertToAAVSORecords")
         return aavsoResults
 
-
-    def saveAAVSOReport(self, aavso, outFolder, obsName):
+    def saveAAVSOReport(self, aavso, outFolder, obsName, postfix=""):
         r = outFolder.split('/')
         fileName = r[-1]
 
-        outFileName = outFolder + '/' + fileName + '.extended.aavso'
+        outFileName = outFolder + '/' + fileName + postfix + '.extended.aavso'
         print("Print AAVSO extended report to the file", outFileName)
         r = open(outFileName, 'w')
 
         r.write('#TYPE=Extended\n')
-        r.write('#OBSCODE=%s\n' % (obsName))
+        r.write('#OBSCODE=%s\n' % obsName)
         r.write('#SOFTWARE=pmutil v1.2\n')
         r.write('#DELIM=,\n')
         r.write('#DATE=JD\n')
@@ -221,33 +194,93 @@ class ReportProcessor:
 
         r.close()
 
+    def addToLCData(self, aavsoData):
+        name = aavsoData[0]
+        #        jd = aavsoData[1]
+        #        fainter = aavsoData[2]
+        #        mg = aavsoData[3]
+        #        err = aavsoData[4]
+        #        color = aavsoData[5]
+        lcr = aavsoData[1:6]
+        if name not in self.lcdata:
+            self.lcdata[name] = [lcr]
+        else:
+            self.lcdata[name].append(lcr)
+
+    def drawLCs(self, save_folder):
+        for name in self.lcdata:
+            if len(self.lcdata[name]) > 3:
+                self.drawLC(name, save_folder)
+
+    def drawLC(self, name, save_folder):
+        if self.opt["showGraphs"] or self.opt['saveGraphs']:
+            lc = {
+                'r': [[], [], []],
+                'g': [[], [], []],
+                'b': [[], [], []],
+                'fr': [[], []],
+                'fg': [[], []],
+                'fb': [[], []]
+            }
+            for data in self.lcdata[name]:
+                color = data[4].lower()
+                if color[0] == 't':  # TG, TR, TB
+                    color = color[1:]
+                elif color == 'v':
+                    color = 'g'
+                if data[1] != '<':
+                    lc[color][0].append(data[0])
+                    lc[color][1].append(float(data[2]))
+                    err = float(data[3]) if data[3] != "na" else 0.0
+                    if err > 1.0:
+                        err = 1.0
+                    lc[color][2].append(err)
+                    # print(f"{data[0]} {data[2]} {float(data[3]) if data[3] != 'na' else 0.0}")
+                else:
+                    lc['f' + color][0].append(data[0])
+                    lc['f' + color][1].append(float(data[2]))
+                    # print(f"{data[0]} <{data[2]}")
+
+            plot = pm.Plot(1, self.opt["showGraphs"], self.opt['saveGraphs'])
+            ax = plt.subplot(111)
+            ax.invert_yaxis()
+            # plt.locator_params(axis='y', nbins=10)
+            plt.xlabel("JD")
+            plt.ylabel("mg")
+            plt.title(name)
+            for color in ['r', 'g', 'b']:
+                if len(lc[color][0]) > 0:
+                    # plt.plot(lc[color][0], lc[color][1], color + 'o')
+                    plt.errorbar(lc[color][0], lc[color][1], lc[color][2], None, color + 'o')
+                if len(lc['f' + color][0]) > 0:
+                    plt.plot(lc['f' + color][0], lc['f' + color][1], color + 'v')
+
+            lcfile = save_folder + ("/" if save_folder[-1] != '/' else "") + name + ".png"
+            print(f"Save LC of {name} into file {lcfile}")
+            plot.showOrSave(lcfile)
 
     def findCompStar(self, results):
         auid = pm.getTableComment(results, 'CompStar')
         return results.loc['AUID', auid] if auid else None
 
-
     def getMgLimits(self, cmb):
         hmgGi = pm.getTableComment(cmb, 'MgLimitGi')
         hmgBi = pm.getTableComment(cmb, 'MgLimitBi')
         hmgRi = pm.getTableComment(cmb, 'MgLimitRi')
-        self.mgLimits = { 'Gi' : hmgGi, 'Bi': hmgBi, 'Ri': hmgRi }
+        self.mgLimits = {'Gi': hmgGi, 'Bi': hmgBi, 'Ri': hmgRi}
 
+    # RBL
+    # def tick(self, text=None):
+    #     if text is None:
+    #         self.start = time.time()
+    #     else:
+    #         now = time.time()
+    #         print(f"{text} lasted {now - self.start} seconds")
+    #         self.start = now
 
-    def process(self):
-
-        if not self.opt['files']:
-            f = glob.glob(pm.setup['PHOT_FOLDER_NAME'] + '/' + pm.setup['SEQ_FILE_PREFIX'] + '*.cmb.pm')
-            f.sort()
-            self.opt['files'] = f
-
-        headers = []
+    def processFiles(self, fileNames, postfix=""):
         aavso = ''
-
-        print(self.opt['files'])
-
-        for fileName in self.opt['files']:
-
+        for fileName in fileNames:
             pmResult = loadCatalog(fileName)
             pmResult.add_index('AUID')
 
@@ -260,7 +293,29 @@ class ReportProcessor:
             aavso += self.convertToAAVSORecords(pmResult, ['Ri', 'Gi', 'Bi'])
 
         if self.opt['rpt'] == 'aavso':
-            self.saveAAVSOReport(aavso, self.opt['out'], self.opt['name'])
+            self.saveAAVSOReport(aavso, self.opt['out'], self.opt['name'], postfix)
+
+    def process(self):
+
+        if not self.opt['files']:
+            f = glob.glob(pm.setup['PHOT_FOLDER_NAME'] + '/' + pm.setup['SEQ_FILE_PREFIX'] + '*.cmb.pm')
+            f.sort()
+            self.opt['files'] = f
+
+        seqFilenames = list(filter(lambda fn: "Seq_" in fn, self.opt['files']))
+        cmbFilenames = list(filter(lambda fn: "Combined" in fn, self.opt['files']))
+
+        # print(self.opt['files'])
+
+        if len(seqFilenames) > 0:
+            self.processFiles(seqFilenames)
+
+            baseFolder = self.opt['files'][0][:self.opt['files'][0].find(pm.setup['PHOT_FOLDER_NAME'])]
+            self.drawLCs(baseFolder)
+
+        if len(cmbFilenames) > 0:
+            postfix = "_cmb" if len(seqFilenames) > 0 else ""
+            self.processFiles(cmbFilenames, postfix)
 
 
 if __name__ == '__main__':
@@ -268,12 +323,13 @@ if __name__ == '__main__':
     class MainApp:
 
         opt = {
-            'out' : None,     # output folder
-            'rpt' : 'aavso',  # report format, default: aavso extended
-            'name': '?',      # observer name code
-            'method': 'gcx',  # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
+            'out': None,  # output folder
+            'rpt': 'aavso',  # report format, default: aavso extended
+            'name': '?',  # observer name code
+            'method': 'gcx',
+            # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
             'files': None,
-            }
+        }
 
         def __init__(self, argv):
             self.argv = argv
@@ -281,9 +337,9 @@ if __name__ == '__main__':
 
         def processCommands(self):
             try:
-                optlist, args = getopt.getopt (sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
+                optlist, args = getopt.getopt(sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
             except getopt.GetoptError:
-                print ('Invalid command line options')
+                print('Invalid command line options')
                 return
 
             for o, a in optlist:
@@ -312,4 +368,3 @@ if __name__ == '__main__':
     app.run()
 
 # end main.
-

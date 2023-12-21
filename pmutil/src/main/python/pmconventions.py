@@ -8,9 +8,10 @@ Created on Mar 2, 2020
 @author: kovi
 '''
 from os import getenv
-from os.path import isdir
+from os.path import isdir, exists
 from glob import glob
 
+from astropy.table import Table
 
 class Discovery:
 
@@ -133,6 +134,14 @@ def loadConfig():
                         value = value.replace('$' + k, pplSetup[k])
             pplSetup[r[0].strip()] = value
     return pplSetup
+
+# Refcat functions
+
+# TODO: pmmerge, pplphotometry, pmresult, pmphot
+def loadRefcat(baseFolder):
+    refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
+    return Table.read(refcatFileName, format='ascii') if exists(refcatFileName) else None
+
 
 
 
