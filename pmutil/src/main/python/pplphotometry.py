@@ -42,12 +42,11 @@ class Pipeline:
             colors += 'r'
 
         refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
-        print(f'Inspect refcat {refcatFileName}')
+        pm.printDebug(f'Inspect refcat {refcatFileName}')
         if not exists(refcatFileName):
             pm.printWarning(f"Reference catalog {refcatFileName} is missing.")
             return False
         rc = Table.read(refcatFileName, format='ascii')
-        # print(rc)
         varCount = 0
         compCount = 0
         compColorCount = {'bvr': 0, 'bv': 0, 'vr': 0, 'b': 0, 'v': 0, 'r': 0}
@@ -97,7 +96,7 @@ class Pipeline:
                     pm.printWarning('No B and R comp stars ; downgrade colors to V and disable std photometry.')
                     return True
             pm.printWarning(
-                f'No comp stars to achieve {colors.upper()} photometry with reference catalog {refcatFileName}')
+                    f'No comp stars to achieve {colors.upper()} photometry with reference catalog {refcatFileName}')
             # TODO: more color downgrade rule
             return False
         elif compColorCount[colors] < 3:
@@ -120,34 +119,35 @@ class Pipeline:
             # print("%s/solve-field %s -D %s -N %s %s" % (pm.setup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
             # pm.invoke("%s/solve-field %s -D %s -N %s %s" % (pm.setup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
             astCommand = f"solve-field {self.SOLVE_ARGS} -D {photFolder} -N {astFile} {seqFile}"
-            print(astCommand)
+            pm.printDebug(astCommand)
             pm.invoke(astCommand)
             fsolved = photFolder + '/' + basename(seqFile).replace('.fits', '.solved')
             if not exists(fsolved):
                 pm.printError(f"Astrometry of {fsolved} failed.")
                 return False
         else:
-            print(f"astrometry file {astFile} already exists.")
+            pm.printDebug(f"astrometry file {astFile} already exists.")
         return True
 
     def do_photometry(self, astFile, pmcatFile):
         pm.printInfo(f"Make photometry for {astFile}")
         if not exists(pmcatFile) or self.opt['overwrite']:
             pmCommand = f"sextractor {astFile} -c {self.SEX_CFG} -CATALOG_NAME {pmcatFile} -CATALOG_TYPE ASCII_HEAD"
-            print(pmCommand)
+            pm.printDebug(pmCommand)
             pm.invoke(pmCommand)
         else:
-            print(f"photometry file {pmcatFile} already exists.")
+            pm.printDebug(f"photometry file {pmcatFile} already exists.")
 
-    def do_merge(self, baseFile, photFolder, colors):
-        combinedCatalog = f"{photFolder}/{baseFile}.cmb"
-        pm.printInfo(f"Combine result catalogs to {combinedCatalog}")
-        if not exists(combinedCatalog) or self.opt['overwrite']:
-            matcher = CatalogMatcher(baseFile, photFolder, colors, self.opt['showGraphs'], self.opt['saveGraphs'],
-                                     self.opt['logMode'])
-            matcher.process()
-        else:
-            print(f"filtered photometry file {combinedCatalog} already exists.")
+    def do_merge(self, baseFile, baseFolder, colors):
+        # combinedCatalog = f"{baseFolder}/{pm.setup['PHOT_FOLDER_NAME']}/{baseFile}.cmb"
+        # pm.printInfo(f"Combine result catalogs to {combinedCatalog}")
+        # if not exists(combinedCatalog) or self.opt['overwrite']:
+        matcher = CatalogMatcher(baseFile, baseFolder, colors, self.opt['showGraphs'], self.opt['saveGraphs'],
+                                 self.opt['logMode'])
+        matcher.process()
+
+    # else:
+    #     pm.printInfo(f"Combined photometry file {combinedCatalog} already exists.")
 
     #    def photometry(self, seqFolder, photFolder, refcatFileName, color):
 
@@ -210,7 +210,6 @@ class Pipeline:
 
         cmbFileName = f"{photFolder}/{baseName}.cmb"
 
-        #        pm.printInfo("Calculate real magnitudes to %s" % (f.replace('-' + color, '-*') + '.pm'))
         pm.printInfo(f"Calculate real magnitudes to {cmbFileName}.pm")
         pmopt = {
             'out': None,
@@ -252,7 +251,7 @@ class Pipeline:
         baseSeqFileNames = self.collectBaseFileNames(sf)
 
         for baseFile in baseSeqFileNames:
-            print(f"Do photometry on {baseFile}-*.fits")
+            pm.printDebug(f"Do photometry on {baseFile}-*.fits")
 
             for color in self.opt['color']:
                 seqFile = f"{seqFolder}/{baseFile}-{color}.fits"
@@ -291,9 +290,9 @@ class Pipeline:
 
         seqFolders = pm.discoverFolders(self.opt['baseFolder'], pm.setup['SEQ_FOLDER_NAME'])
         if len(seqFolders) == 0:
-            pm.printError('No sequence folder found in base folder %s' % (self.opt['baseFolder']))
+            pm.printError(f'No sequence folder found in base folder {self.opt["baseFolder"]}')
             exit(1)
-        print("Sequence folders discovered:", seqFolders)
+        pm.printDebug(f"Sequence folders discovered: {seqFolders}")
 
         # ## Common arguments (saturation level, image section & trimming, etc.):
         self.AST_CFG = pm.setup['CONFIG_FOLDER'] + "/astrometry.cfg"
@@ -353,7 +352,7 @@ class Pipeline:
             proc.process()
 
         print()
-        print(pm.Blue + "Photometry is ready." + pm.Color_Off)
+        pm.printInfo("Photometry is ready.")
 
 
 class MainApp:
@@ -396,7 +395,7 @@ class MainApp:
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
         print(
-            "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
+                "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
         print("  -n,  --name nameCode    set observer code for the AAVSO report")
         print("  -t,  --method method    magnitude calculation method ; values are: comp, gcx, lfit")
         print("  -h,  --help             print this page")
@@ -404,17 +403,17 @@ class MainApp:
         print("       --debug            print debug info")
         print("standardization:")
         print(
-            "  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
+                "  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
         print(
-            "  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
+                "  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
         print(
-            "  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
+                "  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
         print("       --show-graph       show graphs or plots for diagnostic or illustration purpose")
         print("       --save-graph       save graphs or plots for diagnostic or illustration purpose")
         print(
-            "       --camera           set camera name ; this overrides DEF_CAMERA settings in ppl.cfg, but does not override the INSTRUME FITS header value")
+                "       --camera           set camera name ; this overrides DEF_CAMERA settings in ppl.cfg, but does not override the INSTRUME FITS header value")
         print(
-            "       --telescope        set telescope name ; this overrides DEF_TELESCOPE settings in ppl.cfg, but does not override the TELESCOP FITS header value")
+                "       --telescope        set telescope name ; this overrides DEF_TELESCOPE settings in ppl.cfg, but does not override the TELESCOP FITS header value")
         print()
         print("Available filter color codes are:")
         print("  Gi | G | gi | g         green channel")
@@ -461,7 +460,7 @@ class MainApp:
             elif o == '--telescope':
                 self.opt['telescope'] = a
             elif o == '-t' or o == '--method':
-                if not a in self.mgCalcMethods.keys():
+                if a not in self.mgCalcMethods.keys():
                     pm.printWarning('Invalid mg calculation method %s ; use gcx instead.')
                 else:
                     self.opt['method'] = a

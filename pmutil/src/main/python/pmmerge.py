@@ -129,15 +129,15 @@ class CatalogMatcher:
 
     def calcVisFlag(self, mg, limit):
         """
-        flags I - INVISIBLE, B - BELOW_LIMIT, N - EAR_LIMIT, S - SATURATED
+        flags I - INVISIBLE, B - BELOW_LIMIT, N - NEAR_LIMIT, S - SATURATED
         """
-        # TODO: saturated objects
-
-        if mg > 0.0:
+        # TODO 1.3: saturated objects
+        mgf = float(mg)
+        if mgf > 0.0:
             return 'I'
-        elif mg > limit:
+        elif mgf > limit:
             return 'B'
-        elif mg > limit - self.LIMIT_THRE:
+        elif mgf > limit - self.LIMIT_THRE:
             return 'N'
         return '-'
 
@@ -223,8 +223,8 @@ class CatalogMatcher:
             posFlags.append(
                     self.calcPosFlag(float(table[r.index]['col16']), float(table[r.index]['col17']), img_w, img_h))
             visFlags.append((self.calcVisFlag(r['MAG_GI'], self.mgLimits['Gi']) if 'Gi' in self.colors else " ") +
-                            (self.calcVisFlag(r['MAG_BI'], self.mgLimits['Bi']) if 'Gi' in self.colors else " ") +
-                            (self.calcVisFlag(r['MAG_RI'], self.mgLimits['Ri']) if 'Gi' in self.colors else " "))
+                            (self.calcVisFlag(r['MAG_BI'], self.mgLimits['Bi']) if 'Bi' in self.colors else " ") +
+                            (self.calcVisFlag(r['MAG_RI'], self.mgLimits['Ri']) if 'Ri' in self.colors else " "))
 
         cmb['AUID'] = auid
         cmb['RA'] = ras
@@ -327,7 +327,7 @@ class CatalogMatcher:
         for row in cat:
             row['FRAME_STATUS'] = self.determineOnFrameStatus(row['X'], row['Y'], fx, fy)
 
-        foMask = cat['FRAME_STATUS'] == 'O'
+        foMask = cat['FRAME_STATUS'] != 'O'
         foCat = cat[foMask]
         #        print('Out of frame objects:')
         #        print(foCat)
@@ -368,7 +368,7 @@ class CatalogMatcher:
     #        r['MATCH_FLAG'] = xr['MATCH_FLAG']
 
     def insertCmb(self, cmb, r):
-        n = [r['AUID'], '-', r['ROLE'], r['LABEL'], 'NNN', '-', 'N', r['RA'], r['RA_DEG'], r['DEC'], r['DEC_DEG'],
+        n = [r['AUID'], '-', r['ROLE'], r['LABEL'], 'III', '-', 'N', r['RA'], r['RA_DEG'], r['DEC'], r['DEC_DEG'],
              '99.0', '99.0', '99.0', '99.0', '99.0', '99.0', r['MAG_B'], r['ERR_B'], r['MAG_V'], r['ERR_V'], r['MAG_R'],
              r['ERR_R']]
         cmb.add_row(n)
@@ -385,10 +385,7 @@ class CatalogMatcher:
         xmt = self.viz.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
         self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
 
-        #        print(xmt)
-
         missingRefcat = setdiff(foRefcat, xmt, 'AUID')
-        #        print(missingRefcat)
 
         cmb.add_index('VIZ_ID')
 
@@ -400,11 +397,10 @@ class CatalogMatcher:
 
                 except KeyError:
                     self.log.debug(xr)
-                    print(xr)  # RBL
 
             # else:
-                # self.log.debug('xmt record not matched in cmb:')
-                # print(xr)  # RBL
+            # self.log.debug('xmt record not matched in cmb:')
+            # print(xr)  # RBL
 
         mergedTable = join(xmt, cmb, keys='AUID', join_type='left')
         mask = mergedTable['VIZ_ID'] == '-'  # or mergedTable['VIZ_ID'] == '' or mergedTable['VIZ_ID'] == None
@@ -417,8 +413,6 @@ class CatalogMatcher:
         #        'MAG_GI','ERR_GI','MAG_BI','ERR_BI','MAG_RI','ERR_RI','MAG_B','ERR_B','MAG_V','ERR_V','MAG_R','ERR_R']
 
         for r in nt:
-            #            self.insertCmb(cmb, r)
-            #            print(r)
             n = [r['AUID'], '-', r['ROLE_1'], r['LABEL_1'], r['VIZ_FLAG'], r['POS_FLAG'], r['MATCH_FLAG'], r['RA_1'],
                  r['RA_DEG_1'], r['DEC_1'], r['DEC_DEG_1'],
                  r['MAG_GI'], r['ERR_GI'], r['MAG_BI'], r['ERR_BI'], r['MAG_RI'], r['ERR_RI'],
@@ -429,7 +423,7 @@ class CatalogMatcher:
         for r in missingRefcat:
             auid, d = self.matchCatalogByCoords(cmb, float(r['RA_DEG']), float(r['DEC_DEG']))
             self.log.debug(f"Match missingRefcat object {r['AUID']} {r['LABEL']} for {auid} within {d * 60}'")
-            print(r)  # RBL
+            # print(r)  # RBL
             if d < 2.0 / 60.0:
                 self.updateCmb(cmb, r, auid=auid)
             else:
@@ -441,6 +435,7 @@ class CatalogMatcher:
 
     def save(self, combined):
         combinedFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}.cmb"
+        self.log.debug(f"Combined file name: {combinedFileName}")
         combined.write(combinedFileName, format='ascii.fixed_width', delimiter=' ', overwrite=True)
 
     def process(self):

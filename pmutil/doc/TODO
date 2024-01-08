@@ -30,9 +30,6 @@ NEW PHOTOMETRY BUGS:
 
 -NEW: Ha az astrometria hibara fut, akkor ne akarja az .aavso file-t elkesziteni
 
--NEW: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
-	az std rendben van, a tobbit kell megnezni
-
 NEW IDEAS:
 
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
@@ -72,7 +69,7 @@ TECH UPGRADE:
 
 	python/astropy		5.2.1	2023-01-08	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.6	2022-03-23	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min pzthon 3.7 szukseges
+	python/astroquery	0.4.6	2022-03-23	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
 	python/matplotlib	3.7.1	2023-03-04	3.1.2			!!!
 
@@ -163,9 +160,6 @@ TECH UPGRADE:
         org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application
         did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the
         network connection was broken.
-    - PM: ZTF J180122.06+674151.5 - tobb eszleles 120 mg alatti
-    - PM: Nem veszi figyelembe a kiszamolt hmg-t
-    - PM: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
 
 (525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
 	+ ezt a colorize csinalja? ez lenne a legjobb
@@ -173,7 +167,8 @@ TECH UPGRADE:
 	+ com star legyen sarga, a valtozo feher
 
 	+ refcat
-	- pm
+	- pm result stars
+	- transients
 
 	- !!! pillow 5.3.0 needed
 
@@ -234,11 +229,15 @@ TECH UPGRADE:
 
 		- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
 
+		- addRefcatData: ha a distance túl nagy, akkor dobja el (bad match)
+
 		- ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
 
 		+ ha a refcat-ban szerepel, de a kepen nem, akkor hozza kell adni a cmb-hez MATCH_FLAG = 'N' ertekkel
 
 		- !!! Ha nem 3 szin van megadva
+
+		- mergeExclusions: nem lett befejezve
 
 		- NEW: debug kiiratasok --debug modban
 
@@ -258,6 +257,19 @@ TECH UPGRADE:
 
 		- NEW: kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
 
+        + BUG: EX Dra: ZTF J180122.06+674151.5 - tobb eszleles 120 mg alatti
+
+        - BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
+
+        + BUG: EX Dra: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
+
+        - BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
+	            az std rendben van, a tobbit kell megnezni
+
+	    - process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
+
+	    - check star kereses es fotometria, keruljon a catalog-ba is
+
 	pmresult:
 
 		+ BUG: nem kerul bele a comp id es mg
@@ -267,6 +279,11 @@ TECH UPGRADE:
 		+ EX Dra: olyan mg es mgerr ertekek vannak, hogy 'nan'
 
 		+ [#547 V1.2] sequence eseten csak a Seq-bol csinal riportot, a Combined-bol nem
+
+        - calcAirMass: observer location legyen a konfigban, vagy helység vagy koordináta, legyen base függvény,
+            ami a koordinátát adja vissza
+
+        - convertToAAVSOData: check star kezelés (nem itt kell megvalósítani, itt csak használja)
 
 
 		+ combined catalog fields:

@@ -199,7 +199,7 @@ class Photometry:
         mis = []
         mvs = []
         for r in comps:
-            if r[self.mvf[color]] != '-':
+            if r[self.mvf[color]] != '-' and r['VIZ_FLAG'] == '---':
                 mi = float(r[self.mif[color]])
                 mv = float(r[self.mvf[color]])
                 mis.append(mi)
@@ -243,10 +243,11 @@ class Photometry:
         ez_2 = su / sl
         mel_2 = su / float(len(y) - 1)
         err = np.sqrt(se2 / len(y))
-        print("(gcx) color: %s, zp: %7.4f, mel^2: %7.4f, ez^2: %7.4f, ez: %7.4f, N: %d, ev: %7.4f" %
-              (color, z, mel_2, ez_2, np.sqrt(ez_2), len(y), err))
+        pm.printDebug(
+                f"(gcx) color: {color}, zp: {z:7.4f}, mel^2: {mel_2:7.4f}, ez^2: {ez_2:7.4f}, ez: {np.sqrt(ez_2):7.4f}, N: {len(y):d}, ev: {err:7.4f}")
 
-        self.ePlot.add(mis, mvs, [1, z], color, stdcolor, color[0].lower(), pm.Plot.INV_X + pm.Plot.INV_Y, title="Inst {color}i vs. Cat {stdcolor}")
+        self.ePlot.add(mis, mvs, [1, z], color, stdcolor, color[0].lower(), pm.Plot.INV_X + pm.Plot.INV_Y,
+                       title="Inst {color}i vs. Cat {stdcolor}")
 
         return [1.0, z], err
 
@@ -268,7 +269,7 @@ class Photometry:
         ep = 0.0
         N = 0
         for pmr in comps:
-            if pmr[self.mvf[color]] != '-':
+            if pmr[self.mvf[color]] != '-' and r['VIZ_FLAG'] == '---':
                 mi.append(float(pmr[self.mif[color]]))
                 mv.append(float(pmr[self.mvf[color]]))
                 ei = float(pmr[self.eif[color]])
@@ -287,14 +288,14 @@ class Photometry:
         coef = pm.linfit(mi, mv, er)
         ep = np.sqrt(ep / float(N))
 
-        print('polyfit result:', coef, 'error:', ep)
+        pm.printDebug('polyfit result:', coef, 'error:', ep)
 
         self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower(), title="Inst {color}i vs. Cat {stdcolor}")
 
         return coef, ep
 
     def findBestCompStar(self, comps, color):
-
+        # filter out com stars not measured
         emin = 1.0
         bestComp = None
         for pms in comps:
@@ -321,7 +322,7 @@ class Photometry:
             ev = float(bestComp[self.evf[color]]) if bestComp[self.evf[color]] != '-' else MAG_ERR_DEFAULT
             e = pm.quad(ei, ev)
             bestComp['ROLE'] = 'K'
-            print('Best comp star: %s, mag: %s, err: %4.3f' % (bestComp['AUID'], bestComp[self.mvf[color]], e))
+            pm.printDebug(f'Best comp star: {bestComp["AUID"]}, mag: {bestComp[self.mvf[color]]}, err: {e:4.3f}')
             return bestComp['AUID']
         else:
             pm.printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
@@ -344,7 +345,7 @@ class Photometry:
             mi = []
             mv = []
             for pmr in comps:
-                if pmr[self.mvf[color]] != '-':
+                if pmr[self.mvf[color]] != '-' and r['VIZ_FLAG'] == '---':
                     mi.append(float(pmr[self.mif[color]]))
                     mv.append(float(pmr[self.mvf[color]]))
 
@@ -367,6 +368,7 @@ class Photometry:
         pm.addTableComment(cmb, 'StdTvr', str(coeffs[2]))
 
         cmb.write(outFileName, format='ascii.fixed_width', delimiter=' ', overwrite=True)
+
         return
 
     # standardization functions
@@ -424,7 +426,7 @@ class Photometry:
         folder, a, b = self.opt['files'][0].partition('Photometry')
         stdPlot.showOrSave(folder + 'std_coefficients.png')
 
-        print('standard coeffs: Tv =', Tv, 'Tvr =', Tvr, 'Tbv = ', Tbv)
+        pm.printDebug(f"Standard coeffs: Tv = {Tv} Tvr = {Tvr} Tbv = {Tbv}")
         return [Tv, Tvr, Tbv]
 
     def openCoeffs(self, obsDate, target):
@@ -438,9 +440,8 @@ class Photometry:
     def saveCoeffs(self, coeffs, obsDate, target):
         self.openCoeffs(obsDate, target)
         if not self.opt['overwrite'] and self.coeffTable.exists():
-            pm.printError('Standard coefficients for %s/%s/%s/%s is exists ; to overwrite it use -w option' %
-                          (self.coeffTable.observer, self.coeffTable.date, self.coeffTable.camera,
-                           self.coeffTable.telescope))
+            pm.printError(
+                f'Standard coefficients for {self.coeffTable.observer}/{self.coeffTable.date}/{self.coeffTable.camera}/{self.coeffTable.telescope} is exists ; to overwrite it use -w option')
             return
         self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, target.replace(' ', '_').upper())
         #        self.coeffTable.save(overwrite=True)
@@ -452,7 +453,7 @@ class Photometry:
         if not bestCoeffs:
             pm.printWarning('standard coeffs not found')
             return None
-        print('standard coeffs: Tv =', bestCoeffs['TV'], 'Tvr =', bestCoeffs['TVR'], 'Tbv = ', bestCoeffs['TBV'])
+        pm.printDebug(f"standard coeffs: Tv = {bestCoeffs['TV']} Tvr = {bestCoeffs['TVR']} Tbv = {bestCoeffs['TBV']}")
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
     def calcVComp(self, colors, cmb, bestComp, p_a, err_a):
@@ -603,7 +604,7 @@ class Photometry:
         return cmb
 
     def calcHmg(self, cmb, vcomp):
-        print(f'vcomp: {vcomp}')
+        # print(f'vcomp: {vcomp}')
         for cc in ['Gi', 'Bi', 'Ri']:
             hmgInst = pm.getTableComment(cmb, 'MgLimitInst' + cc)
             hmg = float(hmgInst) + vcomp[cc]['mc'] - vcomp[cc]['mi']
@@ -639,7 +640,7 @@ class Photometry:
 
         # load cmb catalog
         cmbFileName = self.opt['files'][0]
-        print(f' Input files: {cmbFileName}')
+        pm.printDebug(f' Input files: {cmbFileName}')
         cmb = Table.read(cmbFileName, format='ascii')
         cmb.add_index('AUID')
 
@@ -651,9 +652,9 @@ class Photometry:
         color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
         # indexGi = self.opt['color'].index(color)
         fitsFileName = cmbFileName.replace('.cmb', '-Gi.ast.fits')
-        print(f'.ast.fits file name: {fitsFileName}')
+        pm.printDebug(f'.ast.fits file name: {fitsFileName}')
         self.loadFitsHeaders(fitsFileName)
-        print(f' Headers: {self.fits}')
+        pm.printDebug(f' Headers: {self.fits}')
         dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
 
@@ -774,7 +775,7 @@ if __name__ == '__main__':
                 elif o == '-c' or o == '--color':
                     color = a.lower()
                     if color not in self.availableBands:
-                        pm.printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % a)
+                        pm.printError(f'Invalid color: {a}, use on of these: Gi, g, Bi, b, Ri, r, all')
                         exit(1)
                     if color == 'all':
                         self.opt['color'] = ['Ri', 'Gi', 'Bi']
@@ -796,7 +797,7 @@ if __name__ == '__main__':
                     self.opt['telescope'] = a
                 elif o == '-t' or o == '--method':
                     if a not in self.mgCalcMethods.keys():
-                        pm.printWarning('Invalid mg calculation method %s ; use gcx instead.')
+                        pm.printWarning(f'Invalid mg calculation method {a} ; use gcx instead.')
                     else:
                         self.opt['method'] = a
 
@@ -812,7 +813,7 @@ if __name__ == '__main__':
                 if args[0].endswith('/'):
                     self.opt['baseFolder'] = args[0][:-1]
 
-            print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
+            pm.printInfo('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
 
             self.opt['loadCoeffs'] = self.opt['useStd']
             self.opt['useCoeffs'] = self.opt['useStd'] or self.opt['adhocStd']

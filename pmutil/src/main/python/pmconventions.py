@@ -13,8 +13,8 @@ from glob import glob
 
 from astropy.table import Table
 
-class Discovery:
 
+class Discovery:
     BIAS_FOLDER = None
     DARK_FOLDER = None
     FLAT_FOLDER = None
@@ -58,11 +58,13 @@ class Discovery:
 
     # discover Bias folder
     def discoverBiasFolder(self, baseFolder):
-        self.BIAS_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder, self.ppl['BIAS_FOLDER_NAME'], 'Bias')
+        self.BIAS_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder,
+                                               self.ppl['BIAS_FOLDER_NAME'], 'Bias')
 
     # discover Dark folder
     def discoverDarkFolder(self, baseFolder):
-        self.DARK_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder, self.ppl['DARK_FOLDER_NAME'], 'Dark')
+        self.DARK_FOLDER = self.discoverFolder(baseFolder if not self.calibFolder else self.calibFolder,
+                                               self.ppl['DARK_FOLDER_NAME'], 'Dark')
 
     def discover(self):
         if not self.flatOnly:
@@ -72,7 +74,8 @@ class Discovery:
         if not self.nonFlatFolderOnly:
 
             # discover flat bias folder
-            FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_BIAS_FOLDER_NAME'])
+            FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
+                                                 self.ppl['FLAT_BIAS_FOLDER_NAME'])
             if len(FLAT_BIAS_FOLDERS) > 1:
                 print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Bias'))
                 print("  --> " + ' '.join(FLAT_BIAS_FOLDERS))
@@ -87,7 +90,8 @@ class Discovery:
             print("Flat Bias folder discovered: %s" % (self.FLAT_BIAS_FOLDER))
 
             # discover flat dark folder
-            FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_DARK_FOLDER_NAME'])
+            FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
+                                                 self.ppl['FLAT_DARK_FOLDER_NAME'])
             if len(FLAT_DARK_FOLDERS) > 1:
                 print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Dark'))
                 print("  --> " + ' '.join(FLAT_DARK_FOLDERS))
@@ -102,10 +106,10 @@ class Discovery:
             print("Flat Bias folder discovered: %s" % (self.FLAT_DARK_FOLDER))
 
             # discover flat folder
-            self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder, self.ppl['FLAT_FOLDER_NAME'], 'Flat')
+            self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder,
+                                                   self.ppl['FLAT_FOLDER_NAME'], 'Flat')
 
         if not self.flatOnly:
-
             # discovery Light folders
             self.LIGHT_FOLDERS = self.findFolders(self.folderPattern, self.ppl['LIGHT_FOLDER_NAME'])
 
@@ -135,18 +139,10 @@ def loadConfig():
             pplSetup[r[0].strip()] = value
     return pplSetup
 
+
 # Refcat functions
 
 # TODO: pmmerge, pplphotometry, pmresult, pmphot
 def loadRefcat(baseFolder):
     refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
     return Table.read(refcatFileName, format='ascii') if exists(refcatFileName) else None
-
-
-
-
-
-
-
-
-

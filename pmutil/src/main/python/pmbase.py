@@ -66,42 +66,19 @@ class Logger:
     def error(self, text):
         self.log("Error: ", text, self.LOG_MODE_ERROR, BRed)
 
-    #        s = BRed + "Error: " + text + Color_Off
-    #        if self.logMode >= self.LOG_MODE_ERROR:
-    #            print(s)
-    #        self.write(s)
-
     def warning(self, text):
         self.log("Warning: ", text, self.LOG_MODE_WARNING, BGreen)
-
-    #        s = BGreen + "Warning: " + text + Color_Off
-    #        if self.logMode >= self.LOG_MODE_WARNING:
-    #            print(s)
-    #        self.write(s)
 
     def info(self, text):
         self.log(None, text, self.LOG_MODE_INFO, BCyan)
 
-    #        s = BCyan + text + Color_Off
-    #        if self.logMode >= self.LOG_MODE_INFO:
-    #            print(s)
-    #        self.write(s)
-
     def debug(self, text):
-        self.log(None, text, self.LOG_MODE_DEBUG, Color_Yellow)
-
-    #        s = Color_Yellow + text + Color_Off
-    #        if self.logMode >= self.LOG_MODE_DEBUG:
-    #            print(s)
-    #        self.write(s)
+        # self.log(None, text, self.LOG_MODE_DEBUG, Color_Yellow)
+        self.log(None, text, self.LOG_MODE_DEBUG, None)
 
     def print(self, text):
         self.log(None, text, self.LOG_MODE_PRINT, None)
 
-
-#        if self.logMode >= self.LOG_MODE_PRINT:
-#            print(text)
-#        self.write(text)
 
 def printError(s):
     print(BRed + "Error: " + s + Color_Off)
@@ -116,7 +93,8 @@ def printInfo(s):
 
 
 def printDebug(s):
-    print(Color_Yellow + s + Color_Off)
+    # print(Color_Yellow + s + Color_Off)
+    print(s)
 
 
 # RBL: it is moving to pmconventions as loadConfig

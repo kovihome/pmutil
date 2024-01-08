@@ -82,8 +82,6 @@ class ReportProcessor:
             return self.airmasses[key]
         else:
             airmass = self.calcAirmass(ra, dec, obsDate)
-            # airmass = 1.0
-            # print(f"new airmass {key} -> {airmass}")
             self.airmasses[key] = airmass
             return airmass
 
@@ -126,8 +124,8 @@ class ReportProcessor:
             if str(m) == '-':
                 return None
 
-            magnitude = "%4.3f" % (float(m))
-            magerr = "%4.3f" % (float(e)) if e != '-' else self.NOT_AVAILABLE
+            magnitude = f"{float(m):4.3f}"
+            magerr = f"{float(e):4.3f}" if e != '-' else self.NOT_AVAILABLE
 
         flt = aavsoColor
         trans = 'NO'
@@ -154,9 +152,7 @@ class ReportProcessor:
     def convertToAAVSORecord(self, data):
         # (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype,
         #  cname, cmag, kname, kmag, airmass, group, chart, notes)
-        return '%s,%s,%s%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' % \
-            (data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8],
-             data[9], data[10], data[11], data[12], data[13], data[14], data[15])
+        return f'{data[0]},{data[1]},{data[2]}{data[3]},{data[4]},{data[5]},{data[6]},{data[7]},{data[8]},{data[9]},{data[10]},{data[11]},{data[12]},{data[13]},{data[14]},{data[15]}\n'
 
     def convertToAAVSORecords(self, pmt, colors):
         # self.tick()
@@ -164,15 +160,14 @@ class ReportProcessor:
 
         varMask = pmt['ROLE'] == 'V'
         vt = pmt[varMask]
-        aavsoResults = ''
+        aavsoResults = []
         for v in vt:
             for c in colors:
                 aavsoData = self.convertToAAVSOData(v, c, compStar)
                 if aavsoData:
                     aavso = self.convertToAAVSORecord(aavsoData)
-                    aavsoResults += aavso
+                    aavsoResults.append(aavso)
                     self.addToLCData(aavsoData)
-        # self.tick("convertToAAVSORecords")
         return aavsoResults
 
     def saveAAVSOReport(self, aavso, outFolder, obsName, postfix=""):
@@ -180,11 +175,11 @@ class ReportProcessor:
         fileName = r[-1]
 
         outFileName = outFolder + '/' + fileName + postfix + '.extended.aavso'
-        print("Print AAVSO extended report to the file", outFileName)
+        pm.printInfo(f"Save AAVSO extended report to the file {outFileName}")
         r = open(outFileName, 'w')
 
         r.write('#TYPE=Extended\n')
-        r.write('#OBSCODE=%s\n' % obsName)
+        r.write(f'#OBSCODE={obsName}\n')
         r.write('#SOFTWARE=pmutil v1.2\n')
         r.write('#DELIM=,\n')
         r.write('#DATE=JD\n')
@@ -235,11 +230,9 @@ class ReportProcessor:
                     if err > 1.0:
                         err = 1.0
                     lc[color][2].append(err)
-                    # print(f"{data[0]} {data[2]} {float(data[3]) if data[3] != 'na' else 0.0}")
                 else:
                     lc['f' + color][0].append(data[0])
                     lc['f' + color][1].append(float(data[2]))
-                    # print(f"{data[0]} <{data[2]}")
 
             plot = pm.Plot(1, self.opt["showGraphs"], self.opt['saveGraphs'])
             ax = plt.subplot(111)
@@ -256,7 +249,7 @@ class ReportProcessor:
                     plt.plot(lc['f' + color][0], lc['f' + color][1], color + 'v')
 
             lcfile = save_folder + ("/" if save_folder[-1] != '/' else "") + name + ".png"
-            print(f"Save LC of {name} into file {lcfile}")
+            pm.printDebug(f"Save LC of {name} into file {lcfile}")
             plot.showOrSave(lcfile)
 
     def findCompStar(self, results):
@@ -269,17 +262,8 @@ class ReportProcessor:
         hmgRi = pm.getTableComment(cmb, 'MgLimitRi')
         self.mgLimits = {'Gi': hmgGi, 'Bi': hmgBi, 'Ri': hmgRi}
 
-    # RBL
-    # def tick(self, text=None):
-    #     if text is None:
-    #         self.start = time.time()
-    #     else:
-    #         now = time.time()
-    #         print(f"{text} lasted {now - self.start} seconds")
-    #         self.start = now
-
     def processFiles(self, fileNames, postfix=""):
-        aavso = ''
+        aavso = []
         for fileName in fileNames:
             pmResult = loadCatalog(fileName)
             pmResult.add_index('AUID')
@@ -290,10 +274,12 @@ class ReportProcessor:
 
             self.getMgLimits(pmResult)
 
+
             aavso += self.convertToAAVSORecords(pmResult, ['Ri', 'Gi', 'Bi'])
+        aavso.sort()
 
         if self.opt['rpt'] == 'aavso':
-            self.saveAAVSOReport(aavso, self.opt['out'], self.opt['name'], postfix)
+            self.saveAAVSOReport(''.join(aavso), self.opt['out'], self.opt['name'], postfix)
 
     def process(self):
 
@@ -304,8 +290,6 @@ class ReportProcessor:
 
         seqFilenames = list(filter(lambda fn: "Seq_" in fn, self.opt['files']))
         cmbFilenames = list(filter(lambda fn: "Combined" in fn, self.opt['files']))
-
-        # print(self.opt['files'])
 
         if len(seqFilenames) > 0:
             self.processFiles(seqFilenames)
@@ -339,7 +323,7 @@ if __name__ == '__main__':
             try:
                 optlist, args = getopt.getopt(sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
             except getopt.GetoptError:
-                print('Invalid command line options')
+                pm.printError('Invalid command line options')
                 return
 
             for o, a in optlist:
@@ -351,7 +335,7 @@ if __name__ == '__main__':
                     if a == 'aavso':
                         self.opt['rpt'] = a
                     else:
-                        print("Invalid report type: " + a + ". Create default aavso extended report instead")
+                        pm.printError("Invalid report type: " + a + ". Create default aavso extended report instead")
                 elif o == '-n':
                     self.opt['name'] = a
 
