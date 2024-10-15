@@ -13,6 +13,10 @@ from glob import glob
 
 from astropy.table import Table
 
+PMUTIL_VERSION = "1.2.0"
+PMUTIL_VERSION_SHORT = "1.2"
+
+RAW_FILE_EXTENSIONS = ["cr2", "cr3"]
 
 class Discovery:
     BIAS_FOLDER = None

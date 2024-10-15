@@ -16,6 +16,7 @@ from os.path import exists, basename
 from astropy.table import Table
 
 import pmbase as pm
+from pmconventions import PMUTIL_VERSION
 from pmphot import Photometry
 from pmresult import ReportProcessor
 from pmmerge import CatalogMatcher
@@ -27,6 +28,7 @@ class Pipeline:
     AST_CFG = ''  # astrometry.net config file
     SEX_CFG = ''  # sextractor config file
     SOLVE_ARGS = ''  # astrometry.net command line arguments
+    SEXTRACTOR = pm.setup['SEXTRACTOR'] # sextractor command name
 
     def __init__(self, opt):
         self.opt = opt
@@ -116,8 +118,6 @@ class Pipeline:
     def do_astrometry(self, seqFile, astFile, photFolder):
         pm.printInfo(f"Make astrometry for {seqFile}")
         if not exists(astFile) or self.opt['overwrite']:
-            # print("%s/solve-field %s -D %s -N %s %s" % (pm.setup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
-            # pm.invoke("%s/solve-field %s -D %s -N %s %s" % (pm.setup['AST_BIN_FOLDER'], self.SOLVE_ARGS, photFolder, AST_FILE, f))
             astCommand = f"solve-field {self.SOLVE_ARGS} -D {photFolder} -N {astFile} {seqFile}"
             pm.printDebug(astCommand)
             pm.invoke(astCommand)
@@ -132,7 +132,7 @@ class Pipeline:
     def do_photometry(self, astFile, pmcatFile):
         pm.printInfo(f"Make photometry for {astFile}")
         if not exists(pmcatFile) or self.opt['overwrite']:
-            pmCommand = f"sextractor {astFile} -c {self.SEX_CFG} -CATALOG_NAME {pmcatFile} -CATALOG_TYPE ASCII_HEAD"
+            pmCommand = f"{self.SEXTRACTOR} {astFile} -c {self.SEX_CFG} -CATALOG_NAME {pmcatFile} -CATALOG_TYPE ASCII_HEAD"
             pm.printDebug(pmCommand)
             pm.invoke(pmCommand)
         else:
@@ -297,8 +297,7 @@ class Pipeline:
         # ## Common arguments (saturation level, image section & trimming, etc.):
         self.AST_CFG = pm.setup['CONFIG_FOLDER'] + "/astrometry.cfg"
         self.SEX_CFG = pm.setup['CONFIG_FOLDER'] + "/sex.cfg"
-        # SOLVE_ARGS="-O --config $AST_CFG --use-sextractor --sextractor-path sextractor -i ${PHOTDIR}/scamp.cat -n ${PHOTDIR}/scamp.cfg -j ${PHOTDIR}/scamp.ref -r -y -p"
-        self.SOLVE_ARGS = f"-O --config {self.AST_CFG} --use-source-extractor --source-extractor-path sextractor -r -y -p"
+        self.SOLVE_ARGS = f"-O --config {self.AST_CFG} --use-source-extractor --source-extractor-path {self.SEXTRACTOR} -r -y -p"
 
         ####################################
         # step 1. do photometry for all file
@@ -386,7 +385,7 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(pm.BGreen + "ppl-photometry, version 1.2.0 " + pm.Color_Off)
+        print(pm.BGreen + f"ppl-photometry, version {PMUTIL_VERSION}" + pm.Color_Off)
         print(pm.Blue + "Make photometry on calibrated FITS images." + pm.Color_Off)
         print()
 
