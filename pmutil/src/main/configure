@@ -141,8 +141,10 @@ ASTROMETRY_MINVERSION=0.81
 warn_version "$ASTROMETRY_VERSION" "$ASTROMETRY_MINVERSION" "Astrometry.net"
 
 # SExtractor
-
-SEXTRACTOR_VERSION=$(sextractor --version | head -n1 | cut -d" " -f3)
+SEXTRACTOR_VERSION=$(source_extractor --version | head -n1 | cut -d" " -f4)
+if [ -z "$SEXTRACTOR_VERSION" ]; then
+    SEXTRACTOR_VERSION=$(sextractor --version | head -n1 | cut -d" " -f3)
+fi
 SEXTRACTOR_MINVERSION=2.19.5
 warn_version "$SEXTRACTOR_VERSION" "$SEXTRACTOR_MINVERSION" "SExtractor"
 
