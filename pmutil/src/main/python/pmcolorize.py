@@ -2,47 +2,38 @@
 #
 # PmUtils/pmcolorize
 #
-'''
+"""
 Created on Feb 22, 2020
 
 @author: kovi
-'''
-from sys import argv
+"""
 from getopt import getopt, GetoptError
 from glob import glob
 from os import remove
 from os.path import isdir, exists
+from sys import argv
 
+import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image, ImageDraw
 from astropy.io import fits
 from astropy.stats import SigmaClip
-from astropy.visualization import make_lupton_rgb, simple_norm
+from astropy.visualization import make_lupton_rgb
 from matplotlib.image import imsave
-import matplotlib.pyplot as plt
 from photutils import Background2D, MedianBackground
-from PIL import Image, ImageDraw
+from skimage import exposure
 
-from pmbase import printError, printInfo, loadPplSetup, Blue, Color_Off, BGreen, invoke
-import pmconventions as pmc
 import img_scale
+import pmconventions as pmc
+import pmbase as pm
 
 
 class Colorize:
-
     opt = {}  # command line options
-    ppl = {}  # PPL setup from ppl-setup config file
 
     scaleMethods = ['linear', 'sqrt', 'log', 'asinh', 'hist']
 
     wcs = None
-
-#    wb = [1.15, 1.0, 0.79]   # for Canon EOS 1100D
-    wb = [1.25, 1.0, 0.96]  # for Canon EOS 1100D sRGB
-#   wb = [1.12, 1.0, 0.77]   # for Canon EOS 350D
-#   wb = [1.04, 1.0, 0.72]   # for Canon EOS 450D
-#   wb = [0.98, 1.0, 0.82]   # for Canon EOS 1300D
-#   wb = [1.01, 1.0, 0.87]   # for Canon EOS 5D Mark III
-#   wb = [1.20, 1.0, 0.72]   # for Canon EOS 60D
 
     SKY_SIGMA = 3.0
     SKY_CONVERGENCE = 0.01
@@ -50,14 +41,14 @@ class Colorize:
     SCALE_METHOD = 'linear'
 
     role2color = {
-        'V' : 'crimson',
-        'C' : 'gold',
-        'F' : 'grey',
-        'D' : 'lightskyblue',
-        'P' : 'grey',
-        'T' : 'forestgreen',
-        'M' : 'sandybrown'
-        }
+        'V': 'crimson',
+        'C': 'gold',
+        'F': 'grey',
+        'D': 'lightskyblue',
+        'P': 'grey',
+        'T': 'forestgreen',
+        'M': 'sandybrown'
+    }
 
     def __init__(self, opt):
         self.opt = opt
@@ -65,15 +56,16 @@ class Colorize:
             self.SCALE_METHOD = self.opt['scaleMethod']
 
     def doSubtractBackground(self, rgb):
-        sigma_clip = SigmaClip(sigma = 3.0)
+        sigma_clip = SigmaClip(sigma=3.0)
         bkg_estimator = MedianBackground()
         for j in range(3):
-            bkg = Background2D(rgb[j], (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
-#            bkg = Background2D(rgb[j], (100, 100), filter_size = (5, 5), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
-            #print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+            bkg = Background2D(rgb[j], (50, 50), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
+            # bkg = Background2D(rgb[j], (100, 100), filter_size = (5, 5), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
+            # print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
             rgb[j] -= bkg.background
-#            plt.imshow(bkg.background, origin='lower', cmap='Greys_r')
-#            plt.show()
+
+    #            plt.imshow(bkg.background, origin='lower', cmap='Greys_r')
+    #            plt.show()
 
     def doHistScaling(self, img):
         # Contrast stretching
@@ -82,51 +74,49 @@ class Colorize:
         return img_rescale
 
         # Equalization
-        #return exposure.equalize_hist(img)
+        # return exposure.equalize_hist(img)
 
         # Adaptive Equalization
-        #return exposure.equalize_adapthist(img, clip_limit=0.03)
+        # return exposure.equalize_adapthist(img, clip_limit=0.03)
 
     def doScaling(self, img, rgb):
         for j in range(3):
             smin, it = img_scale.sky_mean_sig_clip(rgb[j], self.SKY_SIGMA, self.SKY_CONVERGENCE)
-#            pxmax = max(rgb[j].flatten())
+            #            pxmax = max(rgb[j].flatten())
 
-            smax = int(self.SCALE_RANGE / (self.opt['scaling'] * self.wb[j]) + smin)
+            smax = int(self.SCALE_RANGE / self.opt['scaling'] + smin)
             smin = max(smin, 0)
-#            smax = 512
 
             p2, p98 = np.percentile(rgb[j], (2, 98))
 
             print(f"Scaling sky mean min={smin}, max={smax}, percentile min={p2}, max={p98}")
 
-#            hist, bin_edges = np.histogram(rgb[j], bins=256, range=(p2, p98))
+            #            hist, bin_edges = np.histogram(rgb[j], bins=256, range=(p2, p98))
 
             # configure and draw the histogram figure
-#            plt.figure()
-#            plt.title("Grayscale Histogram")
-#            plt.xlabel("grayscale value")
-#            plt.ylabel("pixel count")
-#            plt.xlim([0.0, 1.0])  # <- named arguments do not work here
+            #            plt.figure()
+            #            plt.title("Grayscale Histogram")
+            #            plt.xlabel("grayscale value")
+            #            plt.ylabel("pixel count")
+            #            plt.xlim([0.0, 1.0])  # <- named arguments do not work here
 
-#            plt.plot(hist)  # <- or here
-#            plt.show()
+            #            plt.plot(hist)  # <- or here
+            #            plt.show()
 
             if self.SCALE_METHOD == self.scaleMethods[0]:
-                img[:, :, j] = img_scale.linear(rgb[j], scale_min = smin, scale_max = smax)
+                img[:, :, j] = img_scale.linear(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[1]:
-                img[:, :, j] = img_scale.sqrt(rgb[j], scale_min = smin, scale_max = smax)
+                img[:, :, j] = img_scale.sqrt(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[2]:
-                img[:, :, j] = img_scale.log(rgb[j], scale_min = smin, scale_max = smax)
+                img[:, :, j] = img_scale.log(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[3]:
-                img[:, :, j] = img_scale.asinh(rgb[j], scale_min = smin, scale_max = smax)
+                img[:, :, j] = img_scale.asinh(rgb[j], scale_min=smin, scale_max=smax)
             elif self.SCALE_METHOD == self.scaleMethods[4]:
                 img[:, :, j] = self.doHistScaling(rgb[j])
-           
 
     def doScalingLupton(self, rgb, imgFileName):
-#        return make_lupton_rgb(rgb[0], rgb[1], rgb[2], stretch=(1/self.opt['scaling']), filename = imgFileName)
-        return make_lupton_rgb(rgb[0], rgb[1], rgb[2], filename = imgFileName)
+        #        return make_lupton_rgb(rgb[0], rgb[1], rgb[2], stretch=(1/self.opt['scaling']), filename = imgFileName)
+        return make_lupton_rgb(rgb[0], rgb[1], rgb[2], filename=imgFileName)
 
     def calcXY(self, rc, raName, decName):
         bf = self.opt['baseFolder'].rstrip('/')
@@ -136,13 +126,14 @@ class Colorize:
         rc.write(refFitsFile, overwrite=True)
 
         # 2. calculate ref objects' frame xy points
-        pmCatFileBase = bf + '/' + self.ppl['PHOT_FOLDER_NAME'] + '/Combined-Gi'
-        wcsFile = pmCatFileBase + '.wcs'      
+        pmCatFileBase = bf + '/' + pm.setup['PHOT_FOLDER_NAME'] + '/Combined-Gi'
+        wcsFile = pmCatFileBase + '.wcs'
         axyFile = pmCatFileBase + '.ref.axy'
         if not exists(wcsFile):
             return None
 
-        invoke(f"wcs-rd2xy -w {wcsFile} -i {refFitsFile} -o {axyFile} -R {raName} -D {decName}")  # -f option need argument
+        pm.invoke(
+                f"wcs-rd2xy -w {wcsFile} -i {refFitsFile} -o {axyFile} -R {raName} -D {decName}")  # -f option need argument
 
         remove(refFitsFile)
 
@@ -167,17 +158,17 @@ class Colorize:
 
         annImgFileName = imgFileName.replace('.jpg', '-ann.jpg')
         print(f"Create annotated image {annImgFileName}")
-        
+
         # load refcat file
         rc = pmc.loadRefcat(self.opt['baseFolder'])
         if rc is None:
-            printError(f'No ref.cat in the folder {self.folder} ; use ppl-refcat first.')
+            pm.printError(f"No ref.cat in the folder {self.opt['baseFolder']} ; use ppl-refcat first.")
             return
 
         # convert world coords to pixel coords
         rcxy = self.calcXY(rc, 'RA_DEG', 'DEC_DEG')
         if rcxy is None:
-            printError(f'No .wcs file in the photometry folder ; use ppl-photometry first.')
+            pm.printError(f'No .wcs file in the photometry folder ; use ppl-photometry first.')
             return
 
         # open original image
@@ -192,7 +183,7 @@ class Colorize:
                 y = c['Y']
                 r = 15
                 color = self.role2color[c['ROLE']]
-                draw.ellipse((x-r, y-r, x+r, y+r), outline=color, width=1)
+                draw.ellipse((x - r, y - r, x + r, y + r), outline=color, width=1)
 
         # save annotated image
         image.convert(mode='RGB').save(annImgFileName)
@@ -200,27 +191,27 @@ class Colorize:
     def saveImage(self, img, imgFileName):
         imsave(imgFileName, img)
         if self.opt['color'] == 'all':
-            printInfo("Color image %s created." % (imgFileName))
+            pm.printInfo(f"Color image {imgFileName} created.")
         else:
-            printInfo("Monochrome %s image %s created." % (self.opt['color'], imgFileName))
+            pm.printInfo(f"Monochrome {self.opt['color']} image {imgFileName} created.")
 
     def createImage(self, baseFolder, subFolder, ext, colors):
         # TODO: before addition, images should be reregistered with Gi as reference, for more exact alignment
 
         rgb = []
 
-        imgFileName = "%s/%s.jpg" % (baseFolder, baseFolder.split('/')[-1])
+        imgFileName = f"{baseFolder}/{baseFolder.split('/')[-1]}.jpg"
 
         for c in colors:
-            fitsFileName = "%s/%s/Combined-%s.%s" % (baseFolder, subFolder, c, ext)
-            print("%s color source image: %s" % (c, fitsFileName))
+            fitsFileName = f"{baseFolder}/{subFolder}/Combined-{c}.{ext}"
+            print(f"{c} color source image: {fitsFileName}")
             if not exists(fitsFileName):
-                printError("image file %s not exists." % (fitsFileName))
+                pm.printError(f"image file {fitsFileName} not exists.")
                 return
             hdu = fits.open(fitsFileName)
             rgb.append(hdu[0].data)
 
-        img = np.zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype = float)
+        img = np.zeros((rgb[1].shape[0], rgb[1].shape[1], 3), dtype=float)
 
         # TODO: with log method, save is failed: Floating point image RGB values must be in the 0..1 range.
         # need some normalization
@@ -234,24 +225,24 @@ class Colorize:
                 plt.imshow(img)
                 self.saveImage(img, imgFileName)
         except ValueError as e:
-            printError("creating color image with %s scaling mathod is failed: %s" % (self.SCALE_METHOD, str(e)))
+            pm.printError("creating color image with %s scaling mathod is failed: %s" % (self.SCALE_METHOD, str(e)))
             if self.SCALE_METHOD != self.scaleMethods[0]:
                 self.SCALE_METHOD = self.scaleMethods[0]
                 try:
                     self.doScaling(img, rgb)
                     self.saveImage(img, imgFileName)
                 except ValueError as ex:
-                    printError("creating color image with alternative %s scaling mathod is failed: %s" % (self.SCALE_METHOD, str(ex)))
+                    pm.printError("creating color image with alternative %s scaling mathod is failed: %s" % (
+                        self.SCALE_METHOD, str(ex)))
                     return
 
-        if self.opt['plot'] != None:
+        if self.opt['plot'] is not None:
             self.plotStars(img, imgFileName)
 
     def execute(self):
         print('Colorize.execute starts.')
-        self.ppl = loadPplSetup()
-        pmFolder = self.ppl['PHOT_FOLDER_NAME']
-        seqFolder = self.ppl['SEQ_FOLDER_NAME']
+        pmFolder = pm.setup['PHOT_FOLDER_NAME']
+        seqFolder = pm.setup['SEQ_FOLDER_NAME']
 
         baseFolderPattern = self.opt['baseFolder']
         print(f'baseFolderPattern: {baseFolderPattern}')
@@ -272,7 +263,6 @@ class Colorize:
 
 
 class MainApp:
-
     # TODO: wb should be command line option somehow
     opt = {
         'scaleMethod': 'linear',
@@ -280,16 +270,16 @@ class MainApp:
         'color': 'all',
         'baseFolder': None,
         'plot': None,
-        }
+    }
 
     def __init__(self, argv):
         self.argv = argv
-        pass
 
-    def printTitle(self):
+    @staticmethod
+    def printTitle():
         print()
-        print(BGreen + "ppl-colorize, version 1.2.0 " + Color_Off)
-        print(Blue + "Make color jpeg image from calibrated FITS images." + Color_Off)
+        print(pm.BGreen + f"ppl-colorize, version {pmc.PMUTIL_VERSION}" + pm.Color_Off)
+        print(pm.Blue + "Make color jpeg image from calibrated FITS images." + pm.Color_Off)
         print()
 
     def usage(self):
@@ -305,25 +295,25 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:m:h", ['color=', 'method=', 'scale=', 'plot=', 'help'])
+            optlist, args = getopt(self.argv[1:], "c:m:h", ['color=', 'method=', 'scale=', 'plot=', 'help'])
         except GetoptError:
-            printError ('Invalid command line options')
+            pm.printError('Invalid command line options')
             return
 
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
             elif o == '-m' or o == '--method':
-                if not a in Colorize.scaleMethods:
-                    printError("Invalid scaling method value: %s" % (a))
+                if a not in Colorize.scaleMethods:
+                    pm.printError(f"Invalid scaling method value: {a}")
                 self.opt['scaleMethod'] = a
             elif o == '--scale':
                 self.opt['scaling'] = float(a)
             elif o == '-c' or o == '--color':
                 if a in ['Gi', 'Bi', 'Ri']:
-                   self.opt['color'] = a
+                    self.opt['color'] = a
                 else:
-                   print("Invalid color code %s. Available color codes are: Gi, Bi, Ri")
+                    print(f"Invalid color code {a}. Available color codes are: Gi, Bi, Ri")
             elif o == '--plot':
                 self.opt['plot'] = a.upper()
             elif o == '-h' or o == '--help':
@@ -343,13 +333,12 @@ class MainApp:
         col = Colorize(self.opt)
         col.execute()
 
+
 # main program
 
 
 if __name__ == '__main__':
-
     app = MainApp(argv)
     app.run()
 
 # end main.
-

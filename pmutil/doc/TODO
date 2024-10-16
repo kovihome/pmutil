@@ -3,12 +3,13 @@ TODO
 
 +pplphotometry			547 451
 -pmstack	
--pplcalibration			pplSetup 575
--pmtranzi	
++pplcalibration			pplSetup 575 613
+-pmtranzi	        548
 +pmbase				451
 +pmresult			451 544 547
 +pmphot				451
 +pmmerge	        451
++NEW pmraw           613 (540)
 
 
 -----------
@@ -38,48 +39,47 @@ NEW IDEAS:
 - cosmetic: less output from photometry (sextractor) apps
 
 - kell egy script, ami osszegyujti az aavso riportokat egybe, a fokonyvtarba
+    - a pplphotometry-nek legyen egy kapcsoloja, ami ezt megcsinalja, ha nem egy folderen vegzi a fotometriat
 
 TECH UPGRADE:
 
-- astrometry.net upgrade
-
-	- !!! astrometry.net 0.81 needed
-
-- Upgrade to python 3.8+
++ Upgrade to python 3.8+
 
 - Upgrade ext packages:
 
 	Pkg			Lastest version		Actual version
 
-	RawTran			1.1	2019-01-21	0.3.8	2007-12-15	!!!
+	//RawTran			1.1	2019-01-21	0.3.8	2007-12-15	!!! does not support CR3 format
 
-	ExifTool		12.58	2023-03-15	10.80+			!!!
+	ExifTool		12.98	2024-10-08	12.76			    !!! min 10.82 for CR3 support
 
 	FITSH			0.9.4	2021-02-04	0.9.3	2019-02-06
 
-	Astrometry.net		0.93	2022-12-20	0.93	2022-12-20	OK
+	Astrometry.net	0.96	2024-09-14	0.96
 
-	SExtractor		2.23.1	2016-03-28	2.19.5	2013-12-14	!!!
+	SExtractor		2.28.0  2023-03-07	2.28.0
 
-	wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
+	//wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
 
-	python			3.8+			3.6				3.8+ kellene, de ez ubuntu 20.0-t igenyel
+	python			3.13.0  			3.12.3
 
-	python/astroalign	2.4.2	2023-02-21	2.4.1
+	python/astroalign	2.5.1	2023-10-14	2.4.1
 
-	python/astropy		5.2.1	2023-01-08	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+	python/astropy		6.1.0	2024-05-05	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.6	2022-03-23	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
+	python/astroquery	0.4.7	2024-03-09	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
-	python/matplotlib	3.7.1	2023-03-04	3.1.2			!!!
+	python/matplotlib	3.9.0	2024-05-16	3.1.2			!!!
 
-	python/numpy		1.24.2	2023-02-05	1.16.3			!!!
+	python/numpy		1.26.4	2024-02-05	1.16.3			!!!
 
-	python/Pillow		9.4.0	2023-01-02	5.1.0			!!!
+	python/Pillow		10.3.0	2024-04-01	5.1.0			!!!
 
-	python/photutils	1.6.0	2022-12-09	0.7.2			!!!
+	python/photutils	1.12.0	2024-04-12	0.7.2			!!!
 
-	python/scipy		1.10.1	2023-02-19	1.4.1			!!!
+	python/rawpy        0.23.1  2024-09-13  0.23.1
+
+	python/scipy		1.13.1	2024-05-23	1.4.1			!!!
 
 	python/xmltodict	0.13.0	2022-05-08	0.12.0
 
@@ -108,31 +108,82 @@ TECH UPGRADE:
 	grcollect ${TEMPDIR}/${SEQ_FILE_PREFIX}*.phot --col-base 2 --prefix ${TEMPDIR}/ --extension lc --max-memory 256m
 
 
-=== V 1.1 ==================================================
-
---- photometry ---------------------------------------------
-
-+(450) !!! standardization (s15n)
-
-	+ !!! mentes coeff file-ba
-
-		+ !!! ha ujra ugyan azt a kepet dolgozza fel, akkor ne irjon uj rekordot a coeff file-ba
-		  overwrite modban update-elje az ertekeket
-
-		+ !!! hianyzo adatok: field
-
-		+ ha egy nap tobb coff keszul, akkor az utolso felulirja az elozot, 
-			vagy atlagoljuk oket? utobbi esetben el kell tarolni, hogy hany adatbol keszult, azzel lehet atlagolni
-			nem irja felul, hibat ad, overwrite modban felulirja
-
-
 === V 1.2 ==================================================
 	Sorrend:
-		High: *451, *548, *575
+		High: *451, *548, *575, 613, *619
 		Med : *554
-		Low : *525, *544, 576, *580
+		Low : *525, *544, 576, *580, 620
+
+(619) !!! A sextractor neve source-extractor-ra valtozott, kerdes, hogy melyik verzioban?
+        Kell-e lekezelni a kulonbozo neveket, verzioellenorzes utan?
+        2.28.0 verzioban az uj nev van, az 2.19.5-ben meg a regi
+        Az astronomy.net is sextractort akar hivni, inkabb egy alias kell ra, ezt a configurate-ben lehetne megcsinalni
+            itt parameterkent lehet megadni a nevet
+        + ppl.cfg-be kerult a config ertek
+        + configure kezeli a ket nevet
 
 --- calibration --------------------------------------------
+
+(620) ha a calib folderekben csak a master image van, es overwrite modban fut a calibration, akkor elszall a kovetkezovel:
+
+      File "/home/kovi/bin/ppl-calibration", line 844, in <module>
+        app.run()
+      File "/home/kovi/bin/ppl-calibration", line 836, in run
+        ppl.execute()
+      File "/home/kovi/bin/ppl-calibration", line 628, in execute
+        self.processBias(self.BIAS_FOLDER, "BIAS")
+      File "/home/kovi/bin/ppl-calibration", line 531, in processBias
+        self.raw2fits(biasFolder)
+      File "/home/kovi/bin/ppl-calibration", line 193, in raw2fits
+        fp = os.path.basename(rawFiles[0])
+      IndexError: list index out of range
+
+      - ha overwrite mod volt megadva, de a master file-ok keszitesenel nincsenek RAW file-ok, csak a master,
+        akkor hasznalja a master file-t, es irjon egy warning-ot
+
+      - legyen egy opcio parcialis overwrite-ra, amikor a calib kepeket nem csinalja meg ujra, ha letezik a master.
+
+(613) CR3 kepek kezelese
+
+    + rawtran nem tamogatja a CR3 formatumot, kell valamit talalni helyette. libraw talan jo lehet
+
+    + exiftool 10.82+ upgrade szukseges
+
+    + rawpy 0.13.1 nem tamogatja a CR3 formatumot, 0.22.0 pedig python 3.7-et igenyel
+
+    + pmraw:
+
+        + parameterezes: filenev, colors, extra fits headers
+
+        + horizontalisan tukrozi a kepet
+
+        + FITS headers:
+
+            + white balance, amit a pmcolorize tud hasznalni
+
+            / APERTURE -> #453
+
+            / FOCUS: hiba -> #453
+
+            + XPIKSZ, YPIKSZ: hiba
+
+            + FILTER: parameterbol
+
+            + IMAGETYP: filenevbol
+
+            + CREATOR: pmutils version parameterbol
+
+            + DATE-*: CR2-ben nincs TimeStamp tag, csak CreateDate, de ebben csak egesz mp-ek vannak
+
+    + tesztelni kell, hogy nem okoz-e hibat, hogy a DATE-OBS most tartalmaz szazadmp-eket is
+
+    + nincs-e valahol beegetve a cr2 kiterjesztes?
+
+    + az Ri kepeken feltunoen keves a csillag
+
+    + minden kepen van nehany max erteku pixel, de nem latni, hogy hol
+
+    + a raw -> fits konverzio figyelembe veszi a camera wb-t, a szines kep keszitesenel mar nem kell meg egyszer
 
 (580) hibas light image jelolese filenevben
 
@@ -140,7 +191,19 @@ TECH UPGRADE:
 
 (575) 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
 
+(540) BUG: a rawfit tukrozi a kepet
+
+	/ valszeg a dcraw -t 0 opcio megoldja
+
+	- 2-es opcioval a CR2 meg mindig tukrozott, pedig mintha a CR3-nal jo lett volna
+
+	- kerdes, hogy ha a tavcso tukrozi a kepet, akkor azt hogy tudjuk meghatarozni? lehet, hogy kellene egy opcio a tukrozesre
+
 --- photometry ---------------------------------------------
+
+(606) Check star kezelese
+	    - check star kereses es fotometria, keruljon a catalog-ba is
+        - convertToAAVSOData: check star kezelés (nem itt kell megvalósítani, itt csak használja)
 
 (554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
@@ -235,9 +298,9 @@ TECH UPGRADE:
 
 		+ ha a refcat-ban szerepel, de a kepen nem, akkor hozza kell adni a cmb-hez MATCH_FLAG = 'N' ertekkel
 
-		- !!! Ha nem 3 szin van megadva
+		+ TESZT: Ha nem 3 szin van megadva
 
-		- mergeExclusions: nem lett befejezve
+		- !!! mergeExclusions: nem lett befejezve
 
 		- NEW: debug kiiratasok --debug modban
 
@@ -259,16 +322,14 @@ TECH UPGRADE:
 
         + BUG: EX Dra: ZTF J180122.06+674151.5 - tobb eszleles 120 mg alatti
 
-        - BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
+        - !!! BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
 
         + BUG: EX Dra: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
 
-        - BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
+        - !!! BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 	            az std rendben van, a tobbit kell megnezni
 
-	    - process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
-
-	    - check star kereses es fotometria, keruljon a catalog-ba is
+	    + process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
 
 	pmresult:
 
@@ -282,8 +343,6 @@ TECH UPGRADE:
 
         - calcAirMass: observer location legyen a konfigban, vagy helység vagy koordináta, legyen base függvény,
             ami a koordinátát adja vissza
-
-        - convertToAAVSOData: check star kezelés (nem itt kell megvalósítani, itt csak használja)
 
 
 		+ combined catalog fields:
@@ -376,7 +435,7 @@ TECH UPGRADE:
 
 	Sorrend:
 		High: 517, 549
-		Med : 491, 540, 493
+		Med : 491, 493
 		Low : 528, 546, 461, 535, 543
 
 
@@ -500,6 +559,8 @@ TECH UPGRADE:
 
 (472) A RAW -> FITS konverziónál ne csak CR2 file-okat tudjon konvertálni
 
+    - A pmconventions.RAW_FILE_EXTENSIONS listaban szerepelnek a lehetseges extension-ok, de uj extension felvetelenel tesztelni kell.
+
 --- photometry ---------------------------------------------
 
 (516) AST: 20090717_ez_aql eseteben sikertelen az asztrometria, B es G szinben, R-ben is eszmeletlen sokaig tart
@@ -532,10 +593,6 @@ TECH UPGRADE:
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
-
-(540) BUG: a rawfit tukrozi a kepet
-
-	valszeg a dcraw -t 0 opcio megoldja
 
 (531) calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 

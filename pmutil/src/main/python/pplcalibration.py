@@ -2,44 +2,41 @@
 #
 # PmUtils/pplcalibration
 #
-import os
-'''
+"""
 Created on Mar 1, 2020
 
 @author: kovi
-'''
+"""
 
-from getopt import getopt, GetoptError
-from sys import argv
-from datetime import datetime, timedelta
 import glob
-from os import makedirs
-from os.path import isdir, exists, basename, expanduser
-from shutil import copyfile
+import os
+import os.path
 import time
+from datetime import datetime
+from getopt import getopt, GetoptError
+from shutil import copyfile
+from sys import argv
 
-import numpy as np
-from astropy.table import Table
+import astroalign as aa
 from astropy.io import fits
 from astropy.stats import SigmaClip
-import astroalign as aa
 from photutils import Background2D, MedianBackground
 
-from pmbase import printError, printWarning, printInfo, printDebug, saveCommand, loadPplSetup, invoke, Blue, Color_Off, BGreen, getFitsHeaders, getFitsHeader, setFitsHeaders, findInFile, subtractFitsBackground, assureFolder
-from pmdisco import Discovery
-from pmhotpix import BadPixelDetector, BadPixelEliminator
+import pmbase as pm
+import pmconventions as pmc
+from pmhotpix import BadPixelEliminator
+from pmraw import RawConverter
 
 
 class Pipeline:
-
     opt = {}  # command line options
-    pplSetup = {}  # PPL setup from ppl-setup config file
+
     badPixels = {}
 
     # Common arguments (saturation level, image section & trimming, etc.):
     COMMON_ARGS = "--saturation 16000 --trim"
 
-    FLATLIB_FOLDER = expanduser("~/.pmlib/flat")
+    FLATLIB_FOLDER = os.path.expanduser("~/.pmlib/flat")
 
     TEMPDIR = "temp"
 
@@ -56,7 +53,7 @@ class Pipeline:
         self.opt = opt
 
     def discoverFolders(self):
-        disco = Discovery(self.opt, self.pplSetup)
+        disco = pmc.Discovery(self.opt, pm.setup)
         disco.discover()
         self.BIAS_FOLDER = disco.BIAS_FOLDER
         self.DARK_FOLDER = disco.DARK_FOLDER
@@ -66,23 +63,8 @@ class Pipeline:
         self.LIGHT_FOLDERS = disco.LIGHT_FOLDERS
 
     def imSizeArg(self, fitsFileName):
-        h = getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
-        return "--image 0:0:%d:%d" % (int(h['NAXIS1']) - 1, int(h['NAXIS2']) - 1)
-
-    def lt2ut(self, utcDate):
-        if utcDate:
-            s = utcDate
-            t = time.strptime(s, '%Y-%m-%dT%H:%M:%S')
-            d = datetime(*time.gmtime(time.mktime(t))[:6])
-        else:
-            d = datetime.utcnow()
-        if d.microsecond > 500000:
-            td = timedelta(microseconds = 1000000 - d.microsecond)
-            d = d + td
-        else:
-            td = timedelta(microseconds = d.microsecond)
-            d = d - td
-        return d.isoformat()
+        h = pm.getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
+        return f"--image 0:0:{int(h['NAXIS1']) - 1:d}:{int(h['NAXIS2']) - 1:d}"
 
     def sumDateObs(self, targetFile, sourceFiles):
         e_sum = 0
@@ -90,114 +72,95 @@ class Pipeline:
         t_min = None
         count = 0
         for sourceFile in sourceFiles:
-            h = getFitsHeaders(sourceFile, ['DATE-OBS', 'EXPTIME'])
-            t = time.mktime(time.strptime(h['DATE-OBS'], '%Y-%m-%dT%H:%M:%S'))
+            h = pm.getFitsHeaders(sourceFile, ['DATE-OBS', 'EXPTIME'])
+            t = time.mktime(time.strptime(h['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f'))
             e = int(h['EXPTIME'])
             e_sum = e_sum + e
             m_sum = m_sum + (t + e / 2) * e
-            if t_min == None or t < t_min:
+            if t_min is None or t < t_min:
                 t_min = t
             count += 1
 
         m_avg = m_sum / e_sum
         d = datetime(*time.gmtime(m_avg)[:6])
         t_obs = datetime(*time.gmtime(t_min)[:6])
-        headers = { 
-            'DATE-OBS' : t_obs.isoformat(), 
-            'EXPTIME'  : e_sum, 
-            'DATE-MID' : (d.isoformat(), 'Effective center of time of observation'),
-            'NCOMBINE' : (count, 'number of images used for stacking'),
-            'MCOMBINE' : ('sum', 'combination mode')
+        headers = {
+            'DATE-OBS': t_obs.isoformat(),
+            'EXPTIME': e_sum,
+            'DATE-MID': (d.isoformat(), 'Effective center of time of observation'),
+            'NCOMBINE': (count, 'number of images used for stacking'),
+            'MCOMBINE': ('sum', 'combination mode')
         }
-        setFitsHeaders(targetFile, headers)
-        print(f'observation start time: {t_obs.isoformat()}, observation center time: {d.isoformat()}, cumulated exptime: {str(e_sum)} sec')
+        pm.setFitsHeaders(targetFile, headers)
+        print(
+                f'observation start time: {t_obs.isoformat()}, observation center time: {d.isoformat()}, cumulated '
+                f'exptime: {str(e_sum)} sec')
 
     def invoked(self, cmd):
         if self.opt['debug']:
-            printDebug(cmd)
-        result = invoke(cmd)
+            pm.printDebug(cmd)
+        result = pm.invoke(cmd)
         if result.startswith('ERROR:'):
-            printError(result[len('ERROR: '):])
+            pm.printError(result[len('ERROR: '):])
         elif self.opt['debug']:
-            printDebug(result)
+            pm.printDebug(result)
         return result
 
-    def raw2fitsFile(self, rawfile, color):
-        FITS_NAME = "%s-%s.fits" % (rawfile[:rawfile.rfind('.')], color)
-        if self.opt['overwrite'] and exists(FITS_NAME):
-            os.remove(FITS_NAME)
-
-        if not exists(FITS_NAME):
-            print("%s -> %s" % (rawfile, FITS_NAME))
-
-            # convert raw image to fits
-            # TODO: use invoke, parse options with ' or " correctly, or use preparsed options
-            os.system("rawtran -c %s -o %s -B 16 -C '-4 -D -t 0' -X '-q 3 -w' %s" % (color, FITS_NAME, rawfile))
-
-            # read image temperature from raw file
-            exif = invoke("exiftool -s -g %s" % (rawfile))
-            IMAGETEMP = None
-            for line in exif.split('\n'):
-                if line.startswith('CameraTemperature'):
-                    IMAGETEMP = line.split(':')[1].strip()
-                    break
-
-            # add extra headers for fits file
-            h = getFitsHeaders(FITS_NAME, ['INSTRUME', 'TELESCOP', 'DATE-OBS'])
-            hx = {}
-
-            if IMAGETEMP:
-                # write image temperature to fits file
-                hx['CCD-TEMP'] = (IMAGETEMP, 'CCD Temperature (Celsius)')
-
-            if self.opt['imageTime'] == 'LT':
-                # convert observation time from local time to UT
-                IMAGE_DATE = h['DATE-OBS']
-                IMAGE_DATE_UTC = self.lt2ut(IMAGE_DATE)
-                hx['DATE-OBS'] = IMAGE_DATE_UTC
-                hx['DATE-IMG'] = (IMAGE_DATE, 'Original image date (in local time)')
-
-            if 'INSTRUME' not in h:
-                # write camera name to fits file
-                hx['INSTRUME'] = (self.pplSetup['DEF_CAMERA'] if 'DEF_CAMERA' in self.pplSetup else 'Generic Camera', 'Camera manufacturer and model')
-
-            if 'TELESCOP' not in h:
-                # write telescope name to fits file
-                hx['TELESCOP'] = (self.pplSetup['DEF_TELESCOPE'] if 'DEF_TELESCOPE' in self.pplSetup else 'Generic Telescope', 'Telescope manufacturer and model')
-
-            setFitsHeaders(FITS_NAME, hx)
-
-        else:
-            print("%s file already exists." % (FITS_NAME))
+    def def_fits_headers(self, imtype):
+        hx = {'CREATOR': f"pmutil {pmc.PMUTIL_VERSION_SHORT}", 'IMAGETYP': imtype}
+        if 'DEF_NAMECODE' in pm.setup:
+            hx['OBSERVER'] = pm.setup['DEF_NAMECODE']
+        if 'DEF_CAMERA' in pm.setup and pm.setup['DEF_CAMERA'] != 'Generic Camera':
+            hx['INSTRUME'] = pm.setup['DEF_CAMERA']
+        if 'DEF_TELESCOPE' in pm.setup and pm.setup['DEF_TELESCOPE'] != 'Generic Telescope':
+            hx['TELESCOP'] = pm.setup['DEF_TELESCOPE']
+        return hx
 
     def raw2fits(self, folder):
-        # list of raw CR2 file in the input directory
-        rawFiles = glob.glob(folder + "/*.cr2")
+        # list of raw files in the input directory
+        rawFiles = []
+        for ext in pmc.RAW_FILE_EXTENSIONS:
+            rawFiles.extend(glob.glob(folder + f"/*.{ext}"))
         rawFiles.sort()
 
+        if len(rawFiles) == 0:
+            return
+
+        # determine image type from filename
+        fp = os.path.basename(rawFiles[0])
+        fn: str = os.path.splitext(fp)[0]
+        imtype = fn.split('_')[0].upper()
+        if imtype not in ["LIGHT", "DARK", "BIAS", "FLAT"]:
+            imtype = "LIGHT"
+
+        hx = self.def_fits_headers(imtype)
+
         # for all raw file do the conversion
+        raw_converter = RawConverter(self.opt, hx)
         for rawfile in rawFiles:
-            for color in self.opt['color']:
-                self.raw2fitsFile(rawfile, color)
+            # for color in self.opt['color']:
+            #     self.raw2fitsFile(rawfile, color)
+            raw_converter.convert(rawfile)
 
     def makeMasterBias(self, biasFolder, color):
-        BIAS_PATTERN = "%s/%s*-%s.fits" % (biasFolder, self.pplSetup['BIAS_FILE_PREFIX'], color)
+        BIAS_PATTERN = f"{biasFolder}/{pm.setup['BIAS_FILE_PREFIX']}*-{color}.fits"
         BIASLIST = glob.glob(BIAS_PATTERN)
         BIASLIST.sort()
 
-        masterBiasFile = "%s/%s-%s.fits" % (biasFolder, self.pplSetup['MASTER_BIAS_FILE'], color)
+        masterBiasFile = f"{biasFolder}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
 
         if len(BIASLIST) == 0:
             return 1
 
-        print("%s -> %s" % (BIAS_PATTERN, masterBiasFile))
+        print(f"{BIAS_PATTERN} -> {masterBiasFile}")
 
         # Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-        R_BIASLIST = list(map(lambda x: self.TEMPDIR + '/' + basename(x), BIASLIST))
+        R_BIASLIST = list(map(lambda x: self.TEMPDIR + '/' + os.path.basename(x), BIASLIST))
 
         # The calibration of the individual bias frames, followed by their combination into a single master image:
-        invoke("ficalib -i %s %s %s -o %s" % (' '.join(BIASLIST), self.COMMON_ARGS, self.imSizeArg(BIASLIST[0]), ' '.join(R_BIASLIST)))
-        invoke("ficombine %s --mode median -o %s" % (' '.join(R_BIASLIST), masterBiasFile))
+        pm.invoke(
+                f"ficalib -i {' '.join(BIASLIST)} {self.COMMON_ARGS} {self.imSizeArg(BIASLIST[0])} -o {' '.join(R_BIASLIST)}")
+        pm.invoke(f"ficombine {' '.join(R_BIASLIST)} --mode median -o {masterBiasFile}")
 
         # cleanup: remove temp files
         for f in R_BIASLIST:
@@ -208,38 +171,39 @@ class Pipeline:
     def makeMasterDark(self, darkFolder, biasFolder, color):
 
         # Names of the individual files storing the raw bias, dark, flat and object frames:
-        DARK_PATTERN = "%s/%s*-%s.fits" % (darkFolder, self.pplSetup['DARK_FILE_PREFIX'], color)
+        DARK_PATTERN = f"{darkFolder}/{pm.setup['DARK_FILE_PREFIX']}*-{color}.fits"
         DARKLIST = glob.glob(DARK_PATTERN)
         DARKLIST.sort()
 
-        masterDarkFile = "%s/%s-%s.fits" % (darkFolder, self.pplSetup['MASTER_DARK_FILE'], color)
-        masterBiasFile = "%s/%s-%s.fits" % (biasFolder, self.pplSetup['MASTER_BIAS_FILE'], color)
+        masterDarkFile = f"{darkFolder}/{pm.setup['MASTER_DARK_FILE']}-{color}.fits"
+        masterBiasFile = f"{biasFolder}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
 
         if len(DARKLIST) == 0:
             return 1
 
-        print("%s -> %s" % (DARK_PATTERN, masterDarkFile))
+        print(f"{DARK_PATTERN} -> {masterDarkFile}")
 
         # Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-        R_DARKLIST = list(map(lambda x: self.TEMPDIR + '/' + basename(x), DARKLIST))
+        R_DARKLIST = list(map(lambda x: self.TEMPDIR + '/' + os.path.basename(x), DARKLIST))
 
         # The calibration of the individual bias frames, followed by their combination into a single master image:
-        invoke("ficalib -i %s %s %s -o %s --input-master-bias %s" % (' '.join(DARKLIST), self.COMMON_ARGS, self.imSizeArg(DARKLIST[0]), ' '.join(R_DARKLIST), masterBiasFile))
-        invoke("ficombine %s --mode median -o %s" % (' '.join(R_DARKLIST), masterDarkFile))
+        pm.invoke(
+                f"ficalib -i {' '.join(DARKLIST)} {self.COMMON_ARGS} {self.imSizeArg(DARKLIST[0])} -o {' '.join(R_DARKLIST)} --input-master-bias {masterBiasFile}")
+        pm.invoke(f"ficombine {' '.join(R_DARKLIST)} --mode median -o {masterDarkFile}")
 
         # Calculate average ccd temperature from .cr2 files, and set it into the master dark
         tsum = 0
         count = 0
         for f in DARKLIST:
-            hdr = getFitsHeader(f, 'CCD-TEMP')
+            hdr = pm.getFitsHeader(f, 'CCD-TEMP')
             if hdr:
                 ccdtemp = int()
                 tsum += ccdtemp
                 count += 1
         if count > 0:
-            AVGTEMP = (tsum + (count / 2)) / count
-            print("average dark temperature: %d C" % (AVGTEMP))
-            setFitsHeaders(masterDarkFile, { 'CCD-TEMP': ("%d." % (AVGTEMP), "CCD Temperature (Celsius)") })
+            AVGTEMP = int((tsum + (count / 2)) / count)
+            print(f"average dark temperature: {AVGTEMP:d} C")
+            pm.setFitsHeaders(masterDarkFile, {'CCD-TEMP': (f"{AVGTEMP:d}.", "CCD Temperature (Celsius)")})
 
         # cleanup: remove temp files
         for f in R_DARKLIST:
@@ -249,25 +213,26 @@ class Pipeline:
 
     def makeMasterFlat(self, flatfolder, biasFolder, darkFolder, color):
         # Names of the individual files storing the raw bias, dark, flat and object frames:
-        FLAT_PATTERN = "%s/%s*-%s.fits" % (flatfolder, self.pplSetup['FLAT_FILE_PREFIX'], color)
+        FLAT_PATTERN = f"{flatfolder}/{pm.setup['FLAT_FILE_PREFIX']}*-{color}.fits"
         FLATLIST = glob.glob(FLAT_PATTERN)
         FLATLIST.sort()
 
-        masterFlatFile = "%s/%s-%s.fits" % (flatfolder, self.pplSetup['MASTER_FLAT_FILE'], color)
-        masterDarkFile = "%s/%s-%s.fits" % (darkFolder, self.pplSetup['MASTER_DARK_FILE'], color)
-        masterBiasFile = "%s/%s-%s.fits" % (biasFolder, self.pplSetup['MASTER_BIAS_FILE'], color)
+        masterFlatFile = f"{flatfolder}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+        masterDarkFile = f"{darkFolder}/{pm.setup['MASTER_DARK_FILE']}-{color}.fits"
+        masterBiasFile = f"{biasFolder}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
 
         if len(FLATLIST) == 0:
             return 1
 
-        print("%s -> %s" % (FLAT_PATTERN, masterFlatFile))
+        print(f"{FLAT_PATTERN} -> {masterFlatFile}")
 
         # Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-        R_FLATLIST = list(map(lambda x: self.TEMPDIR + '/' + basename(x), FLATLIST))
+        R_FLATLIST = list(map(lambda x: self.TEMPDIR + '/' + os.path.basename(x), FLATLIST))
 
         # The calibration of the individual flat frames, followed by their combination into a single master image:
-        invoke("ficalib -i %s %s %s --post-scale 20000 -o %s --input-master-bias %s --input-master-dark %s" % (' '.join(FLATLIST), self.COMMON_ARGS, self.imSizeArg(FLATLIST[0]), ' '.join(R_FLATLIST), masterBiasFile, masterDarkFile))
-        invoke("ficombine %s --mode median -o %s" % (' '.join(R_FLATLIST), masterFlatFile))
+        pm.invoke(
+                f"ficalib -i {' '.join(FLATLIST)} {self.COMMON_ARGS} {self.imSizeArg(FLATLIST[0])} --post-scale 20000 -o {' '.join(R_FLATLIST)} --input-master-bias {masterBiasFile} --input-master-dark {masterDarkFile}")
+        pm.invoke(f"ficombine {' '.join(R_FLATLIST)} --mode median -o {masterFlatFile}")
 
         # remove temp files
         for f in R_FLATLIST:
@@ -276,34 +241,37 @@ class Pipeline:
         return 0
 
     def getFitsHeadersForFlat(self, fitsFile):
-        h = getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", "DATE-OBS"])
-        instrument = (h["INSTRUME"] if "INSTRUME" in h else self.pplSetup["DEF_CAMERA"]).translate({ord(c): '_' for c in " /."})
-        telescope = (h["TELESCOP"] if "TELESCOP" in h else self.pplSetup["DEF_TELESCOPE"]).translate({ord(c): '_' for c in " /."})
+        h = pm.getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", "DATE-OBS"])
+        instrument = (h["INSTRUME"] if "INSTRUME" in h else pm.setup["DEF_CAMERA"]).translate(
+                {ord(c): '_' for c in " /."})
+        telescope = (h["TELESCOP"] if "TELESCOP" in h else pm.setup["DEF_TELESCOPE"]).translate(
+                {ord(c): '_' for c in " /."})
         date = h["DATE-OBS"].split('T')[0].translate({ord(c): None for c in ":-"})
         return instrument, telescope, date
 
     def saveMasterFlat(self, flatFolder, color):
-        flatFileName = "%s/%s-%s.fits" % (flatFolder, self.pplSetup['MASTER_FLAT_FILE'], color)
+        flatFileName = f"{flatFolder}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
         instrument, telescope, date = self.getFitsHeadersForFlat(flatFileName)
-        flatLibFolder = assureFolder(self.FLATLIB_FOLDER)
-        libFlatFileName = "%s/%s-%s-%s-%s-%s.fits" % (flatLibFolder, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, date, color)
+        flatLibFolder = pm.assureFolder(self.FLATLIB_FOLDER)
+        libFlatFileName = f"{flatLibFolder}/{pm.setup['MASTER_FLAT_FILE']}-{instrument}-{telescope}-{date}-{color}.fits"
         copyfile(flatFileName, libFlatFileName)
         print(f'Master flat {flatFileName} was saved into flat library as {libFlatFileName}')
 
-    def findBestLibraryFlat (self, color, lightFileName):
+    def findBestLibraryFlat(self, color, lightFileName):
         instrument, telescope, date = self.getFitsHeadersForFlat(lightFileName)
-        masterFlatList = glob.glob("%s/%s-%s-%s-*-%s.fits" % (self.FLATLIB_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, color))
+        masterFlatList = glob.glob(
+                f"{self.FLATLIB_FOLDER}/{pm.setup['MASTER_FLAT_FILE']}-{instrument}-{telescope}-*-{color}.fits")
         idate = int(date)
         date = None
         delta = 999
         for flat in masterFlatList:
             d = flat.split('/')[-1].split('-')[-2]
             dd = idate - int(d)
-            if dd >= 0 and dd < delta:
+            if 0 <= dd < delta:
                 date = d
                 delta = dd
         if date is not None:
-            return "%s/%s-%s-%s-%s-%s.fits" % (self.FLATLIB_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], instrument, telescope, date, color)
+            return f"{self.FLATLIB_FOLDER}/{pm.setup['MASTER_FLAT_FILE']}-{instrument}-{telescope}-{date}-{color}.fits"
         else:
             return None
 
@@ -315,63 +283,63 @@ class Pipeline:
                 if libraryFlat is not None:
                     return libraryFlat
                 # fallback to local master flat
-                localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
-                return localFlat if exists(localFlat) else None
+                localFlat = f"{self.FLAT_FOLDER}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+                return localFlat if os.path.exists(localFlat) else None
 
             else:
                 # user given flat folder (-m)
-                folderFlat = "%s/%s-%s.fits" % (self.opt['masterFlat'], self.pplSetup['MASTER_FLAT_FILE'], color)
-                if exists(folderFlat):
+                folderFlat = f"{self.opt['masterFlat']}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+                if os.path.exists(folderFlat):
                     return folderFlat
                 # fallback to local flat
-                localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
-                if exists(localFlat):
+                localFlat = f"{self.FLAT_FOLDER}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+                if os.path.exists(localFlat):
                     return localFlat
                 # fallback to library flat
                 return self.findBestLibraryFlat(color, lightFileName)
 
         else:
             # local master flat
-            localFlat = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
-            if exists(localFlat):
+            localFlat = f"{self.FLAT_FOLDER}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+            if os.path.exists(localFlat):
                 return localFlat
             # fallback to library flat
             return self.findBestLibraryFlat(color, lightFileName)
 
     def calibrate(self, lightFolder, calibFolder, color):
         # Names of the individual files storing the raw bias, dark, flat and object frames:
-        LIGHT_PATTERN = "%s/%s*-%s.fits" % (lightFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
+        LIGHT_PATTERN = f"{lightFolder}/{pm.setup['LIGHT_FILE_PREFIX']}*-{color}.fits"
         IOBJLIST = glob.glob(LIGHT_PATTERN)
         IOBJLIST.sort()
         if len(IOBJLIST) == 0:
             return 1
 
         # get calibration master images
-        MB = "%s/%s-%s.fits" % (self.BIAS_FOLDER, self.pplSetup['MASTER_BIAS_FILE'], color)
-        MD = "%s/%s-%s.fits" % (self.DARK_FOLDER, self.pplSetup['MASTER_DARK_FILE'], color)
-#        MF = "%s/%s-%s.fits" % (self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'], color)
+        MB = f"{self.BIAS_FOLDER}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
+        MD = f"{self.DARK_FOLDER}/{pm.setup['MASTER_DARK_FILE']}-{color}.fits"
+        #        MF = "%s/%s-%s.fits" % (self.FLAT_FOLDER, pm.setup['MASTER_FLAT_FILE'], color)
         MF = self.locateMasterFlat(color, IOBJLIST[0])
         print(f'Master flat: {MF}')
 
         # echo "$1/${LIGHT_FILE_PREFIX}*-$3.fits -> $2/${LIGHT_FILE_PREFIX}*-$3.fits"
-        CALIB_PATTERN = "%s/%s*-%s.fits" % (calibFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
-        print("%s -> %s" % (LIGHT_PATTERN, CALIB_PATTERN))
+        CALIB_PATTERN = f"{calibFolder}/{pm.setup['LIGHT_FILE_PREFIX']}*-{color}.fits"
+        print(f"{LIGHT_PATTERN} -> {CALIB_PATTERN}")
 
         # Calibrated images: all the images have the same name but put into a separate directory ($TARGET):
-        R_IOBJLIST = list(map(lambda x: calibFolder + '/' + basename(x), IOBJLIST))
+        R_IOBJLIST = list(map(lambda x: calibFolder + '/' + os.path.basename(x), IOBJLIST))
 
         # The calibration of the object images:
-        self.invoked("ficalib -i %s %s %s -o %s --input-master-bias %s --input-master-dark %s --input-master-flat %s" % (' '.join(IOBJLIST), self.COMMON_ARGS, self.imSizeArg(IOBJLIST[0]), ' '.join(R_IOBJLIST), MB, MD, MF))
+        self.invoked(
+                f"ficalib -i {' '.join(IOBJLIST)} {self.COMMON_ARGS} {self.imSizeArg(IOBJLIST[0])} -o {' '.join(R_IOBJLIST)} --input-master-bias {MB} --input-master-dark {MD} --input-master-flat {MF}")
 
         # post process calibrated images
-        print("Subtract background for %s" % (CALIB_PATTERN))
+        print(f"Subtract background for {CALIB_PATTERN}")
         bpe = BadPixelEliminator()
         bpe.loadBadPixelsForDark(MD, color)
 
         for fitsFileName in R_IOBJLIST:
-
             # subtract background
-            subtractFitsBackground(fitsFileName)
+            pm.subtractFitsBackground(fitsFileName)
 
             # remove bad pixels
             bpe.process(fitsFileName)
@@ -396,63 +364,88 @@ class Pipeline:
         return self.subtractBackground(refImage)
 
     def subtractBackground(self, image):
-        sigma_clip = SigmaClip(sigma = 3.0)
+        sigma_clip = SigmaClip(sigma=3.0)
         bkg_estimator = MedianBackground()
-        bkg = Background2D(image, (50, 50), filter_size = (3, 3), sigma_clip = sigma_clip, bkg_estimator = bkg_estimator)
-        print("Bkg median: %7.4f, RMS median: %7.4f" % (bkg.background_median, bkg.background_rms_median))
+        bkg = Background2D(image, (50, 50), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
+        print(f"Bkg median: {bkg.background_median:7.4f}, RMS median: {bkg.background_rms_median:7.4f}")
         image -= bkg.background
         return image
 
+    def alignAndCombine(self, imageList, refImage, imageFileNameList):
+        stackedImage = None
+        for n, image in enumerate(imageList):
+            #            print(f'Register image {imageFileNameList[n]}')
+            if '_bad' in imageFileNameList[n]:
+                pm.printWarning(f"Image {imageFileNameList[n]} is assigned as bad; exclude from stacking")
+                continue
+            try:
+                alignedImage, footprint = aa.register(image, refImage, detection_sigma=12)
+                if stackedImage is None:
+                    stackedImage = alignedImage
+                else:
+                    stackedImage = stackedImage + alignedImage
+            except Exception as e:
+                pm.printWarning(f'Registration failed on image {imageFileNameList[n]}; exclude from stacking')
+                print(f'Exception type={type(e)}, {str(e)}')
+
+        return self.subtractBackground(stackedImage)
+
+    def loadImageForAlign(self, fitsName):
+        hdul = fits.open(fitsName)
+        return hdul[0].data.byteswap().newbyteorder()
 
     def registrate(self, calibFolder, seqFolder, color):
 
         # names of the images files to registrate
-        CALIB_PATTERN = "%s/%s*-%s.fits" % (calibFolder, self.pplSetup['LIGHT_FILE_PREFIX'], color)
+        CALIB_PATTERN = f"{calibFolder}/{pm.setup['LIGHT_FILE_PREFIX']}*-{color}.fits"
         COBJLIST = glob.glob(CALIB_PATTERN)
         COBJLIST.sort()
         if len(COBJLIST) == 0:
             return 1
 
-        COMBINED_FILE = "%s/Combined-%s.fits" % (seqFolder, color)
+        COMBINED_FILE = f"{seqFolder}/Combined-{color}.fits"
 
         # load images
         fitsList = []
         for f in COBJLIST:
-            hdul = fits.open(f)
-            fitsList.append(hdul[0].data.byteswap().newbyteorder())
+            fitsList.append(self.loadImageForAlign(f))
 
-        # search for reference image by the best average FWHM
-        refIndex = int(len(fitsList)/2) # TODO
-
-	# align
-        alignedImages = self.alignImages(fitsList, refIndex)
+        # select reference image
+        # TODO: search for reference image by the best average FWHM
+        refIndex = int(len(fitsList) / 2)
+        refImage = fitsList[refIndex]  # TODO: select ref image more sophisticated
 
         # create a sequence of combined frames
         cc = self.opt['countCombine']
         if cc != 0:
-            for a in range(0, len(alignedImages), cc):
-                seqRefIndex = int(cc/2)
-                combinedImage = self.combineImages(alignedImages[a:a+cc], seqRefIndex)
+            for a in range(0, len(fitsList), cc):
+                print(f'Stack sequence {a} to {a + cc}')
+                #                seqRefIndex = int(a+cc/2)
+                #                seqRefImage = fitsList[seqRefIndex]
+                combinedImage = self.alignAndCombine(fitsList[a:a + cc], refImage, COBJLIST[a:a + cc])
 
-                fi = "%03d" % (a / cc)
-                combined = "%s/%s%s-%s.fits" % (seqFolder, self.pplSetup['SEQ_FILE_PREFIX'], fi, color)
-                print("combine " + combined)
-                hdul = fits.open(COBJLIST[seqRefIndex], mode='update')
+                fi = f"{a / cc:03d}"
+                combined = f"{seqFolder}/{pm.setup['SEQ_FILE_PREFIX']}{fi}-{color}.fits"
+                print("Combine " + combined)
+                hdul = fits.open(COBJLIST[refIndex], mode='update')
                 hdul[0].data = combinedImage
                 hdul.writeto(combined, overwrite=True)
                 hdul.close()
 
                 self.sumDateObs(combined, COBJLIST[a:a + cc])
 
+        # search for reference image by the best average FWHM
+        #        refImage = fitsList[int(len(fitsList)/2)] # TODO
+
         # create a combined frame of all images
-        print("combine %s -> %s" % (CALIB_PATTERN, COMBINED_FILE))
-        combinedImage = self.combineImages(alignedImages, refIndex)
-        hdul = fits.open(COBJLIST[refIndex], mode='update')
-        hdul[0].data = combinedImage
+        print(f"Combine {CALIB_PATTERN} -> {COMBINED_FILE}")
+        combinedImage = self.alignAndCombine(fitsList, refImage, COBJLIST)
 
         # TODO add new FITS headers
         #   source FITS file names
         #   clipping area
+        hdul = fits.open(COBJLIST[refIndex], mode='update')
+        hdul[0].data = combinedImage
         hdul.writeto(COMBINED_FILE, overwrite=True)
         hdul.close()
 
@@ -461,60 +454,59 @@ class Pipeline:
         # cleanup - remove temp files
         #  nothing to delete
 
-
     def mastersExist(self, folder, prefix):
         for color in self.opt['color']:
-            MB = "%s/%s-%s.fits" % (folder, prefix, color)
-            if not exists(MB):
+            MB = f"{folder}/{prefix}-{color}.fits"
+            if not os.path.exists(MB):
                 return False
         return True
 
     def processBias(self, biasFolder, title):
-        ex = self.mastersExist(biasFolder, self.pplSetup['MASTER_BIAS_FILE'])
+        ex = self.mastersExist(biasFolder, pm.setup['MASTER_BIAS_FILE'])
         if self.opt['overwrite'] or not ex:
-            printInfo(title + ": Convert bias RAW files to FITS.")
+            pm.printInfo(title + ": Convert bias RAW files to FITS.")
             self.raw2fits(biasFolder)
 
-            printInfo(title + ": Create master bias file.")
+            pm.printInfo(title + ": Create master bias file.")
             for color in self.opt['color']:
                 self.makeMasterBias(biasFolder, color)
         else:
-            printInfo(title + ": Master bias file(s) are already created.")
+            pm.printInfo(title + ": Master bias file(s) are already created.")
         # TODO: cleanup - delete bias FITS files
 
     def processDark(self, darkFolder, biasFolder, title):
-        ex = self.mastersExist(darkFolder, self.pplSetup['MASTER_DARK_FILE'])
+        ex = self.mastersExist(darkFolder, pm.setup['MASTER_DARK_FILE'])
         if self.opt['overwrite'] or not ex:
-            printInfo(title + ": Convert dark RAW files to FITS.")
+            pm.printInfo(title + ": Convert dark RAW files to FITS.")
             self.raw2fits(darkFolder)
 
-            printInfo(title + ": Create master dark file(s).")
-            
+            pm.printInfo(title + ": Create master dark file(s).")
+
             for color in self.opt['color']:
                 self.makeMasterDark(darkFolder, biasFolder, color)
         else:
-            printInfo(title + ": Master dark file(s) are already created.")
+            pm.printInfo(title + ": Master dark file(s) are already created.")
         # TODO: cleanup - delete dark FITS files
 
     def processFlat(self, flatFolder, biasFolder, darkFolder, title):
-        printInfo(title + ": Convert flat RAW files to FITS.")
+        pm.printInfo(title + ": Convert flat RAW files to FITS.")
         self.raw2fits(flatFolder)
 
-        printInfo(title + ": Create master flat file(s).")
+        pm.printInfo(title + ": Create master flat file(s).")
         for color in self.opt['color']:
             self.makeMasterFlat(flatFolder, biasFolder, darkFolder, color)
             if self.opt['saveFlat']:
                 self.saveMasterFlat(flatFolder, color)
 
     def processCalibration(self, lightFolder, calibFolder, title):
-        printInfo(title + ": Convert light RAW files to FITS.")
+        pm.printInfo(title + ": Convert light RAW files to FITS.")
         self.raw2fits(lightFolder)
 
-        printInfo(title + ": Create calibrated light file(s).")
+        pm.printInfo(title + ": Create calibrated light file(s).")
 
         # Create dir for the calibrated images, if not exists
-        if not exists(calibFolder):
-            makedirs(calibFolder)
+        if not os.path.exists(calibFolder):
+            os.makedirs(calibFolder)
 
         for color in self.opt['color']:
             self.calibrate(lightFolder, calibFolder, color)
@@ -522,11 +514,11 @@ class Pipeline:
 
     def processRegistration(self, calibFolder, seqFolder, title):
 
-        printInfo(title + ": Register and stack calibrated light file(s).")
+        pm.printInfo(title + ": Register and stack calibrated light file(s).")
 
         # Create the sequence dir, if not exists
-        if not exists(seqFolder):
-            makedirs(seqFolder)
+        if not os.path.exists(seqFolder):
+            os.makedirs(seqFolder)
 
         self.REF = None
 
@@ -540,21 +532,20 @@ class Pipeline:
         ##########################
         # step 0. setup photometry
         ##########################
-        self.pplSetup = loadPplSetup()
 
         self.discoverFolders()
 
         if self.opt['masterFlat'] is not None and self.opt['masterFlat'] != 'flatlib':
-            if not isdir(self.opt['masterFlat']):
-                printError("Master-flat folder %s not exists." % (self.opt['masterFlat']))
+            if not os.path.isdir(self.opt['masterFlat']):
+                pm.printError("Master-flat folder %s not exists." % (self.opt['masterFlat']))
                 exit(1)
             else:
                 hasMaster = True
                 for c in self.opt['color']:
-                    mfc = "%s/%s-%s.fits" % (self.opt['masterFlat'], self.pplSetup['MASTER_FLAT_FILE'], c)
+                    mfc = "%s/%s-%s.fits" % (self.opt['masterFlat'], pm.setup['MASTER_FLAT_FILE'], c)
                     print(mfc)
-                    if not exists(mfc):
-                        printError("No %s master-flat file in the directory %s" % (c, self.opt['masterFlat']))
+                    if not os.path.exists(mfc):
+                        pm.printError("No %s master-flat file in the directory %s" % (c, self.opt['masterFlat']))
                         hasMaster = False
                 if hasMaster:
                     self.FLAT_FOLDER = self.opt['masterFlat']
@@ -563,46 +554,45 @@ class Pipeline:
                     exit(1)
 
         # create the temp dir, if not exists
-        if not exists(self.TEMPDIR):
-            makedirs(self.TEMPDIR)
+        if not os.path.exists(self.TEMPDIR):
+            os.makedirs(self.TEMPDIR)
 
         ####################################
         # step 1. create master bias frame
         ####################################
 
         if not self.opt['flatOnly']:
-
             self.processBias(self.BIAS_FOLDER, "BIAS")
 
-        ####################################
-        # step 2. create master dark frame
-        ####################################
+            ####################################
+            # step 2. create master dark frame
+            ####################################
 
             self.processDark(self.DARK_FOLDER, self.BIAS_FOLDER, "DARK")
 
         if not self.opt['useMasterFlat']:
 
             # process flat bias, flat dark and flat, only if flat master is not exist
-            ex = self.mastersExist(self.FLAT_FOLDER, self.pplSetup['MASTER_FLAT_FILE'])
+            ex = self.mastersExist(self.FLAT_FOLDER, pm.setup['MASTER_FLAT_FILE'])
             if self.opt['overwrite'] or not ex:
 
-        ############################################################################
-        # step 3. create master flat bias frame, if it is differs from master bias
-        ############################################################################
+                ############################################################################
+                # step 3. create master flat bias frame, if it is differs from master bias
+                ############################################################################
                 self.processBias(self.FLAT_BIAS_FOLDER, "FLAT BIAS")
 
-        ############################################################################
-        # step 4. create master flat dark frame, if it is differs from master dark
-        ############################################################################
+                ############################################################################
+                # step 4. create master flat dark frame, if it is differs from master dark
+                ############################################################################
                 self.processDark(self.FLAT_DARK_FOLDER, self.FLAT_BIAS_FOLDER, "FLAT DARK")
 
-        ##############################
-        # step 5. create master flat
-        ##############################
+                ##############################
+                # step 5. create master flat
+                ##############################
                 self.processFlat(self.FLAT_FOLDER, self.FLAT_BIAS_FOLDER, self.FLAT_DARK_FOLDER, "FLAT")
 
             else:
-                printInfo("FLAT: Master flat file(s) are already created.")
+                pm.printInfo("FLAT: Master flat file(s) are already created.")
 
         ##################################
         # step 6. calibrate light frames
@@ -610,39 +600,37 @@ class Pipeline:
         if not self.opt['flatOnly']:
 
             for lf in self.LIGHT_FOLDERS:
-
-                cf = lf.replace(self.pplSetup['LIGHT_FOLDER_NAME'], self.pplSetup['CALIB_FOLDER_NAME'])
+                cf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['CALIB_FOLDER_NAME'])
 
                 self.processCalibration(lf, cf, "CALIBRATE")
 
-        ###############################################
-        # step 7. registrate and combine light frames
-        ###############################################
+                ###############################################
+                # step 7. registrate and combine light frames
+                ###############################################
 
-                sf = lf.replace(self.pplSetup['LIGHT_FOLDER_NAME'], self.pplSetup['SEQ_FOLDER_NAME'])
+                sf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['SEQ_FOLDER_NAME'])
 
                 self.processRegistration(cf, sf, "REGISTRATE")
 
         print()
-        print(Blue + "Calibration is ready." + Color_Off)
+        print(pm.Blue + "Calibration is ready." + pm.Color_Off)
 
 
 class MainApp:
-
     opt = {
-        'color' : ['Gi'],          # photometry band, mandatory
-        'countCombine' : 0,        # number of images to combine in a sequence
-        'flatOnly' : False,        # create master flat only
-        'saveFlat' : False,        # save master flat into flat library
-        'useMasterFlat'  : False,  # 
-        'imageTime' : 'LT',        #
-        'masterFlat' : None,       # 'flatlib' or path for master flat
-        'onError'   : 'noop',      # mg calculation method: comp, gcx, lfit
-        'overwrite': False,        # force to overwrite existing results, optional
-        'baseFolder': None,        # base folder, optional
-        'calibFolder': None,       # optional folder for calibration frames (bias, dark, flat)
-        'debug': False,            # debug mode
-        }
+        'color': ['Gi'],  # photometry band, mandatory
+        'countCombine': 0,  # number of images to combine in a sequence
+        'flatOnly': False,  # create master flat only
+        'saveFlat': False,  # save master flat into flat library
+        'useMasterFlat': False,  #
+        'imageTime': 'LT',  #
+        'masterFlat': None,  # 'flatlib' or path for master flat
+        'onError': 'noop',  # mg calculation method: comp, gcx, lfit
+        'overwrite': False,  # force to overwrite existing results, optional
+        'baseFolder': None,  # base folder, optional
+        'calibFolder': None,  # optional folder for calibration frames (bias, dark, flat)
+        'debug': False,  # debug mode
+    }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
 
@@ -652,17 +640,18 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(BGreen + "ppl-calibration, version 1.2.0" + Color_Off)
-        print(Blue + "Calibrate a set of RAW or FITS images." + Color_Off)
+        print(f"{pm.BGreen}ppl-calibration, version {pmc.PMUTIL_VERSION}{pm.Color_Off}" )
+        print(pm.Blue + "Calibrate a set of RAW or FITS images." + pm.Color_Off)
         print()
 
     def usage(self):
         print("Usage: ppl-calibration [OPTIONS]... [BASE_FOLDER]")
-        print("Make calibration process for raw or fits images.")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
-        print("  -c,  --color arg               set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
-        print("  -n,  --count-combine n         set number of frames to combine in the sequence, 0 means all frames, default is 0")
+        print(
+                "  -c,  --color arg               set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
+        print(
+                "  -n,  --count-combine n         set number of frames to combine in the sequence, 0 means all frames, default is 0")
         print("  -f,  --flat                    make master flat frame only")
         print("  -F,  --save-flat               save master flat into flat library")
         print("  -m,  --master-flat folder      use the given master-flat folder")
@@ -670,7 +659,8 @@ class MainApp:
         print("  -t,  --image-time LT|UT        specify orignal image time zone, LT=local time, UT=universal time")
         print("       --calib-folder folder     alternative folder for calibration frames (bias, dark, flat)")
         print("  -w,  --overwrite               force to overwrite existing results")
-        print("  -e,  --on-error noop|skip|stop specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all")
+        print(
+                "  -e,  --on-error noop|skip|stop specify what to do on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all")
         print("       --debug                   print useful debugging informations ; reserve temp folder content")
         print("  -h,  --help                    print this page")
         print()
@@ -683,9 +673,12 @@ class MainApp:
 
     def processCommands(self):
         try:
-            optlist, args = getopt (self.argv[1:], "c:n:fFm:Mt:we:h", ['color=', 'count-combine=', 'flat', 'save-flat', 'master-flat=', 'use-flat', 'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'alt-stack',  'debug'])
+            optlist, args = getopt(self.argv[1:], "c:n:fFm:Mt:we:h",
+                                   ['color=', 'count-combine=', 'flat', 'save-flat', 'master-flat=', 'use-flat',
+                                    'image-time=', 'overwrite', 'on-error=', 'help', 'calib-folder=', 'alt-stack',
+                                    'debug'])
         except GetoptError:
-            printError('Invalid command line options.')
+            pm.printError('Invalid command line options.')
             return
 
         for o, a in optlist:
@@ -693,8 +686,8 @@ class MainApp:
                 a = a[1:]
             elif o == '-c' or o == '--color':
                 color = a.lower()
-                if not color in self.availableBands:
-                    printError('Invalid color: %s, use on of these: Gi, g, Bi, b, Ri, r, all' % (a))
+                if color not in self.availableBands:
+                    pm.printError(f'Invalid color: {a}, use on of these: Gi, g, Bi, b, Ri, r, all')
                     exit(1)
                 if color == 'all':
                     self.opt['color'] = ['Gi', 'Ri', 'Bi']
@@ -706,13 +699,15 @@ class MainApp:
                 self.opt['saveFlat'] = True
             elif o == '-m' or o == '--master-flat':
                 self.opt['useMasterFlat'] = True
-                if self.opt['masterFlat'] != None:
-                    printWarning ('Cannot use both flat folder and flat library in the same time; flat folder will be used.')
+                if self.opt['masterFlat'] is not None:
+                    pm.printWarning(
+                            'Cannot use both flat folder and flat library in the same time; flat folder will be used.')
                 self.opt['masterFlat'] = a
             elif o == '-M' or o == '--use-flat':
                 self.opt['useMasterFlat'] = True
-                if self.opt['masterFlat'] != None:
-                    printWarning ('Cannot use both flat folder and flat library in the same time; flat folder will be used.')
+                if self.opt['masterFlat'] is not None:
+                    pm.printWarning(
+                            'Cannot use both flat folder and flat library in the same time; flat folder will be used.')
                 else:
                     self.opt['masterFlat'] = 'flatlib'
             elif o == '-n' or o == '--count-combine':
@@ -721,15 +716,16 @@ class MainApp:
                 if a in ['LT', 'UT']:
                     self.opt['imageTime'] = a
                 else:
-                    printWarning("Bad image time zone value: %s, using default %s instead." % (a, self.opt['imageTime']))
+                    pm.printWarning(
+                            "Bad image time zone value: %s, using default %s instead." % (a, self.opt['imageTime']))
             elif o == '-e' or o == '--on-error':
-                if not a in ['noop', 'skip', 'stop']:
-                    printWarning("Bad on-error instruction; available values are: noop, stop, skip.")
+                if a not in ['noop', 'skip', 'stop']:
+                    pm.printWarning("Bad on-error instruction; available values are: noop, stop, skip.")
                 else:
                     self.opt['onError'] = a
             elif o == '--calib-folder':
-                if not isdir(a):
-                    printError("%s is not a folder. Calibration folder option is ignored." % (a))
+                if not os.path.isdir(a):
+                    pm.printError(f"{a} is not a folder. Calibration folder option is ignored.")
                 else:
                     self.opt['calibFolder'] = a
             elif o == '-w' or o == '--overwrite':
@@ -740,23 +736,23 @@ class MainApp:
                 self.usage()
                 exit(0)
 
-
         # checking invalid options
         if self.opt['flatOnly'] and self.opt['useMasterFlat']:
             self.opt['useMasterFlat'] = False
             self.opt['masterFlat'] = None
-            printWarning('Options -m or -M are useless when -f option is set.')
+            pm.printWarning('Options -m or -M are useless when -f option is set.')
         if self.opt['saveFlat'] and self.opt['useMasterFlat']:
             self.opt['saveFlat'] = False
-            printWarning('Option -F is inconsistent with options -m or -M; master flat will not be saved into flat library.')
+            pm.printWarning(
+                    'Option -F is inconsistent with options -m or -M; master flat will not be saved into flat library.')
 
         if len(args) > 0:
             self.opt['baseFolder'] = args[0]
             if args[0].endswith('/'):
                 self.opt['baseFolder'] = args[0][:-1]
 
-            if not isdir(self.opt['baseFolder']):
-                printError("Base folder %s not exists or not a directory." % (self.opt['baseFolder']))
+            if not os.path.isdir(self.opt['baseFolder']):
+                pm.printError("Base folder %s not exists or not a directory." % (self.opt['baseFolder']))
                 exit(1)
             else:
                 print("base folder: %s" % (self.opt['baseFolder']))
@@ -769,7 +765,7 @@ class MainApp:
     def run(self):
         self.printTitle()
         self.processCommands()
-        saveCommand(self.opt['baseFolder'], self.argv, 'calibration')
+        pm.saveCommand(self.opt['baseFolder'], self.argv, 'calibration')
 
         start = datetime.now()
 
@@ -777,11 +773,10 @@ class MainApp:
         ppl.execute()
 
         exectime = (datetime.now() - start).total_seconds()
-        print("%sexecution time was %d seconds.%s" % (Blue, exectime, Color_Off))
+        print("%sexecution time was %d seconds.%s" % (pm.Blue, exectime, pm.Color_Off))
 
 
 if __name__ == '__main__':
-
     app = MainApp(argv)
     app.run()
 

@@ -80,8 +80,8 @@ warn_version() {
 	
 	for (( j = 0; j < $num; j += 1 )) ; do
 		local a=${actver[$j]}
-		local m=${minver[$j]}
-		if [ ${actver[$j]} -lt ${minver[$j]} ]; then
+#		local m=${minver[$j]}
+		if [ "${actver[$j]}" -lt "${minver[$j]}" ]; then
 			print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
 			return
 		fi
@@ -100,7 +100,7 @@ print_info "Checking external dependecies."
 # python3
 
 PYTHON3_VERSION=$(python3 --version | head -n1 | cut -d" " -f2)
-PYTHON3_MINVERSION=3.6.0
+PYTHON3_MINVERSION=3.8.0
 warn_version "$PYTHON3_VERSION" "$PYTHON3_MINVERSION" "python3"
 
 # python3 modules
@@ -122,16 +122,16 @@ FITSH_VERSION=$(ficalib --version | head -n1 | cut -d"(" -f2 | cut -d"@" -f1)
 FITSH_MINVERSION=0.9.3
 warn_version "$FITSH_VERSION" "$FITSH_MINVERSION" "FITSH"
 
-# RawTran
+# RawTran - remove from version 1.2
 
-RAWTRAN_VERSION=$(rawtran --version | head -n1 | cut -d"," -f2)
-RAWTRAN_MINVERSION=0.3.8
-warn_version "$RAWTRAN_VERSION" "$RAWTRAN_MINVERSION" "rawtran"
+#RAWTRAN_VERSION=$(rawtran --version | head -n1 | cut -d"," -f2)
+#RAWTRAN_MINVERSION=0.3.8
+#warn_version "$RAWTRAN_VERSION" "$RAWTRAN_MINVERSION" "rawtran"
 
 # ExifTool
 
 EXIFTOOL_VERSION=$(exiftool -ver | head -n1)
-EXIFTOOL_MINVERSION=10.80
+EXIFTOOL_MINVERSION=10.82
 warn_version "$EXIFTOOL_VERSION" "$EXIFTOOL_MINVERSION" "exiftool"
 
 # Astrometry.net solve_field
@@ -167,14 +167,14 @@ assert_source_exist() {
 
 copy_source() {
 	assert_source_exist "$1"
-	cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/$2
+	cp "${BASE_FOLDER}"/"$1" "${DEST_FOLDER}"/"$2"
 }
 
 create_link() {
 	# $1 - src
 	# $2 - dest
-	if [ ! -L "${DEST_FOLDER}"/$2 ]; then
-		ln -s "${DEST_FOLDER}"/$1 "${DEST_FOLDER}"/$2
+	if [ ! -L "${DEST_FOLDER}"/"$2" ]; then
+		ln -s "${DEST_FOLDER}"/"$1" "${DEST_FOLDER}"/"$2"
 	fi
 }
 
@@ -233,4 +233,3 @@ copy_config "sex.param"
 copy_config "astrometry.cfg"
 
 print_info "Configure pmutil successfully ended."
-
