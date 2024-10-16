@@ -1,17 +1,16 @@
 ## pmutil
 
-**pmutil** is several bash and python scripts, which helps perform full fotometry pipeline. It is based on mainly the FITSH, Astrometry.net and SExtractor pakcages.
+**pmutil** performs full fotometry pipeline. It is based on mainly the FITSH, Astrometry.net and SExtractor packages and run on Linux based machines.
 
 # Preconditions
 
-These scripts run on Linux, and they have some dependecies:
+Before installing pmutil, you need the packages to be installed:
 
-- **python3** 3.6+ for .py scripts
-- python packages: **astroalign**, **astropy**, **astroquery**, **matplotlib**, **numpy**, **Pillow**, **photutils**, **scipy**, **xmltodict**
+- **python3** 3.8+ for .py scripts
+- python packages: **astroalign**, **astropy**, **astroquery**, **matplotlib**, **numpy**, **Pillow**, **photutils**, **rawpy**, **scipy**, **xmltodict**
 - **FITSH** 0.9.3+ (https://fitsh.net)
-- **RawTran** 0.3.8+ (http://integral.physics.muni.cz/rawtran/)
-- **ExifTool** 10.80+ (https://sourceforge.net/projects/exiftool/)
-- **Astrometry.net** 0.77+ (http://astrometry.net)
+- **ExifTool** 10.82+ (https://sourceforge.net/projects/exiftool/)
+- **Astrometry.net** 0.81+ (http://astrometry.net)
 - **SExtractor** 2.19.5+ (http://www.astromatic.net/software/sextractor)
 - **wcstools** 3.9.5+ (http://tdc-www.harvard.edu/software/wcstools/)
 
