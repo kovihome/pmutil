@@ -197,7 +197,9 @@ class Pipeline:
         for f in DARKLIST:
             hdr = pm.getFitsHeader(f, 'CCD-TEMP')
             if hdr:
-                ccdtemp = int()
+                if ' ' in hdr:
+                    hdr = hdr.split()[0]
+                ccdtemp = int(hdr)
                 tsum += ccdtemp
                 count += 1
         if count > 0:
