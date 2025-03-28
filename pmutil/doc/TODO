@@ -3,7 +3,7 @@ TODO
 
 +pplphotometry			547 451
 -pmstack	
-+pplcalibration			pplSetup 575 613
++pplcalibration			pplSetup +++575 613
 -pmtranzi	        548
 +pmbase				451
 +pmresult			451 544 547
@@ -33,6 +33,9 @@ NEW PHOTOMETRY BUGS:
 
 NEW IDEAS:
 
+- tqdm: progress bar
+    - a calibration-nel nem tudom hasznalni, mert kulso hivasok
+
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
 	--debug modban
 
@@ -51,37 +54,37 @@ TECH UPGRADE:
 
 	//RawTran			1.1	2019-01-21	0.3.8	2007-12-15	!!! does not support CR3 format
 
-	ExifTool		12.98	2024-10-08	12.76			    !!! min 10.82 for CR3 support
+	ExifTool		13.25	2025-03-11	12.76			    !!! min 10.82 for CR3 support
 
 	FITSH			0.9.4	2021-02-04	0.9.3	2019-02-06
 
-	Astrometry.net	0.96	2024-09-14	0.96
+	Astrometry.net	0.97	2024-12-02	0.96
 
-	SExtractor		2.28.0  2023-03-07	2.28.0
+	SExtractor		2.28.2  2025-01-19	2.28.0
 
 	//wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
 
-	python			3.13.0  			3.12.3
+	python			3.13.2  2025-02-04	3.12.3
 
-	python/astroalign	2.5.1	2023-10-14	2.4.1
+	python/astroalign	2.6.1	2024-11-15	2.4.1
 
-	python/astropy		6.1.0	2024-05-05	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+	python/astropy		7.0.1	2025-02-06	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.7	2024-03-09	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
+	python/astroquery	0.4.9	2025-01-25	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
-	python/matplotlib	3.9.0	2024-05-16	3.1.2			!!!
+	python/matplotlib	3.10.1	2025-02-27	3.1.2			!!!
 
-	python/numpy		1.26.4	2024-02-05	1.16.3			!!!
+	python/numpy		2.2.3	2025-02-13	1.16.3			!!!
 
-	python/Pillow		10.3.0	2024-04-01	5.1.0			!!!
+	python/pillow		11.1.0	2025-01-02	5.1.0			!!!
 
-	python/photutils	1.12.0	2024-04-12	0.7.2			!!!
+	python/photutils	2.2.0	2025-02-18	0.7.2			!!!
 
-	python/rawpy        0.23.1  2024-09-13  0.23.1
+	python/rawpy        0.24.0  2024-12-14  0.23.1
 
-	python/scipy		1.13.1	2024-05-23	1.4.1			!!!
+	python/scipy		1.15.2	2025-02-17	1.4.1			!!!
 
-	python/xmltodict	0.13.0	2022-05-08	0.12.0
+	python/xmltodict	0.14.2	2024-10-16	0.12.0
 
 + photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
 
@@ -143,7 +146,7 @@ TECH UPGRADE:
 
       - legyen egy opcio parcialis overwrite-ra, amikor a calib kepeket nem csinalja meg ujra, ha letezik a master.
 
-(613) CR3 kepek kezelese
++++(613) CR3 kepek kezelese
 
     + rawtran nem tamogatja a CR3 formatumot, kell valamit talalni helyette. libraw talan jo lehet
 
@@ -189,7 +192,12 @@ TECH UPGRADE:
 
 	- Doc: hibas kepek kezelese
 
-(575) 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
++++ (575) 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
+
+    + a calibration resznel a calibrated kepek utan nagyon sokaig varakozik, mit csinalhat olyankor? (miutan kiirta a hot pixeleket)
+        Background elimination, az eleg lassu
+    
+    + out of memory
 
 (540) BUG: a rawfit tukrozi a kepet
 

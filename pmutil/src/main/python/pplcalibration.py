@@ -73,7 +73,8 @@ class Pipeline:
         count = 0
         for sourceFile in sourceFiles:
             h = pm.getFitsHeaders(sourceFile, ['DATE-OBS', 'EXPTIME'])
-            t = time.mktime(time.strptime(h['DATE-OBS'], '%Y-%m-%dT%H:%M:%S.%f'))
+            fmt = '%Y-%m-%dT%H:%M:%S.%f' if h['DATE-OBS'].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
+            t = time.mktime(time.strptime(h['DATE-OBS'], fmt))
             e = int(h['EXPTIME'])
             e_sum = e_sum + e
             m_sum = m_sum + (t + e / 2) * e
@@ -369,18 +370,19 @@ class Pipeline:
         sigma_clip = SigmaClip(sigma=3.0)
         bkg_estimator = MedianBackground()
         bkg = Background2D(image, (50, 50), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
-        print(f"Bkg median: {bkg.background_median:7.4f}, RMS median: {bkg.background_rms_median:7.4f}")
+        pm.printDebug(f"Bkg median: {bkg.background_median:7.4f}, RMS median: {bkg.background_rms_median:7.4f}")
         image -= bkg.background
         return image
 
-    def alignAndCombine(self, imageList, refImage, imageFileNameList):
+    def alignAndCombine(self, refImage, imageFileNameList):
         stackedImage = None
-        for n, image in enumerate(imageList):
+        for n, imageFileName in enumerate(imageFileNameList):
             #            print(f'Register image {imageFileNameList[n]}')
             if '_bad' in imageFileNameList[n]:
                 pm.printWarning(f"Image {imageFileNameList[n]} is assigned as bad; exclude from stacking")
                 continue
             try:
+                image = self.loadImageForAlign(imageFileName)
                 alignedImage, footprint = aa.register(image, refImage, detection_sigma=12)
                 if stackedImage is None:
                     stackedImage = alignedImage
@@ -407,26 +409,19 @@ class Pipeline:
 
         COMBINED_FILE = f"{seqFolder}/Combined-{color}.fits"
 
-        # load images
-        fitsList = []
-        for f in COBJLIST:
-            fitsList.append(self.loadImageForAlign(f))
-
         # select reference image
         # TODO: search for reference image by the best average FWHM
-        refIndex = int(len(fitsList) / 2)
-        refImage = fitsList[refIndex]  # TODO: select ref image more sophisticated
+        refIndex = int(len(COBJLIST) / 2)
+        refImage = self.loadImageForAlign(COBJLIST[refIndex])  # TODO: select ref image more sophisticated
 
         # create a sequence of combined frames
         cc = self.opt['countCombine']
         if cc != 0:
-            for a in range(0, len(fitsList), cc):
+            for a in range(0, len(COBJLIST), cc):
                 print(f'Stack sequence {a} to {a + cc}')
-                #                seqRefIndex = int(a+cc/2)
-                #                seqRefImage = fitsList[seqRefIndex]
-                combinedImage = self.alignAndCombine(fitsList[a:a + cc], refImage, COBJLIST[a:a + cc])
+                combinedImage = self.alignAndCombine(refImage, COBJLIST[a:a + cc])
 
-                fi = f"{a / cc:03d}"
+                fi = f"{int(a/cc):03d}"
                 combined = f"{seqFolder}/{pm.setup['SEQ_FILE_PREFIX']}{fi}-{color}.fits"
                 print("Combine " + combined)
                 hdul = fits.open(COBJLIST[refIndex], mode='update')
@@ -441,7 +436,7 @@ class Pipeline:
 
         # create a combined frame of all images
         print(f"Combine {CALIB_PATTERN} -> {COMBINED_FILE}")
-        combinedImage = self.alignAndCombine(fitsList, refImage, COBJLIST)
+        combinedImage = self.alignAndCombine(refImage, COBJLIST)
 
         # TODO add new FITS headers
         #   source FITS file names
