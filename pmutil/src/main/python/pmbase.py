@@ -19,7 +19,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.time import Time
 from astropy.stats import SigmaClip
-from photutils import Background2D, MedianBackground
+from photutils.background import Background2D, MedianBackground
 import matplotlib.pyplot as plt
 
 Color_Off = '\033[0m'  # Text Reset

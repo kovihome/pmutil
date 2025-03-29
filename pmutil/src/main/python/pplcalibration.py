@@ -20,7 +20,7 @@ from sys import argv
 import astroalign as aa
 from astropy.io import fits
 from astropy.stats import SigmaClip
-from photutils import Background2D, MedianBackground
+from photutils.background import Background2D, MedianBackground
 
 import pmbase as pm
 import pmconventions as pmc
@@ -117,7 +117,15 @@ class Pipeline:
             hx['TELESCOP'] = pm.setup['DEF_TELESCOPE']
         return hx
 
-    def raw2fits(self, folder):
+    def raw2fits(self, folder:str) -> int:
+        """
+        Convert all RAW images in a folder into FITS format.
+        FITS images is creating in the same folder.
+        Args:
+            folder (str): The folder name containing RAW images.
+        Returns:
+            int: number of RAW file converted, 0 if there are no RAW files in the folder at all.
+        """
         # list of raw files in the input directory
         rawFiles = []
         for ext in pmc.RAW_FILE_EXTENSIONS:
@@ -125,7 +133,7 @@ class Pipeline:
         rawFiles.sort()
 
         if len(rawFiles) == 0:
-            return
+            return 0
 
         # determine image type from filename
         fp = os.path.basename(rawFiles[0])
@@ -138,12 +146,15 @@ class Pipeline:
 
         # for all raw file do the conversion
         raw_converter = RawConverter(self.opt, hx)
-        for rawfile in rawFiles:
+        for n, rawfile in enumerate(rawFiles):
+            print(f"Convert {n+1} of {len(rawFiles)}\r", end="")
             # for color in self.opt['color']:
             #     self.raw2fitsFile(rawfile, color)
             raw_converter.convert(rawfile)
 
-    def makeMasterBias(self, biasFolder, color):
+        return len(rawFiles)
+
+    def makeMasterBias(self, biasFolder:str, color:str) -> int:
         BIAS_PATTERN = f"{biasFolder}/{pm.setup['BIAS_FILE_PREFIX']}*-{color}.fits"
         BIASLIST = glob.glob(BIAS_PATTERN)
         BIASLIST.sort()
@@ -462,11 +473,15 @@ class Pipeline:
         ex = self.mastersExist(biasFolder, pm.setup['MASTER_BIAS_FILE'])
         if self.opt['overwrite'] or not ex:
             pm.printInfo(title + ": Convert bias RAW files to FITS.")
-            self.raw2fits(biasFolder)
-
-            pm.printInfo(title + ": Create master bias file.")
-            for color in self.opt['color']:
-                self.makeMasterBias(biasFolder, color)
+            raw_count = self.raw2fits(biasFolder)
+            if raw_count == 0 and not ex:
+                pm.printError(f"No Bias RAW images was found in folder {biasFolder}")
+            elif raw_count == 0 and self.opt['overwrite'] and ex:
+                pm.printWarning(f"No Bias RAW images was found in folder {biasFolder}, but Master Bias images exist.")
+            else:
+                pm.printInfo(title + ": Create master bias file.")
+                for color in self.opt['color']:
+                    self.makeMasterBias(biasFolder, color)
         else:
             pm.printInfo(title + ": Master bias file(s) are already created.")
         # TODO: cleanup - delete bias FITS files
@@ -475,25 +490,30 @@ class Pipeline:
         ex = self.mastersExist(darkFolder, pm.setup['MASTER_DARK_FILE'])
         if self.opt['overwrite'] or not ex:
             pm.printInfo(title + ": Convert dark RAW files to FITS.")
-            self.raw2fits(darkFolder)
-
-            pm.printInfo(title + ": Create master dark file(s).")
-
-            for color in self.opt['color']:
-                self.makeMasterDark(darkFolder, biasFolder, color)
+            raw_count = self.raw2fits(darkFolder)
+            if raw_count == 0 and not ex:
+                pm.printError(f"No Dark RAW images was found in folder {darkFolder}")
+            elif raw_count == 0 and self.opt['overwrite'] and ex:
+                pm.printWarning(f"No Dark RAW images was found in folder {darkFolder}, but Master Dark images exist.")
+            else:
+                pm.printInfo(title + ": Create master dark file(s).")
+                for color in self.opt['color']:
+                    self.makeMasterDark(darkFolder, biasFolder, color)
         else:
-            pm.printInfo(title + ": Master dark file(s) are already created.")
+            pm.printInfo(title + ": Master Dark file(s) are already created.")
         # TODO: cleanup - delete dark FITS files
 
     def processFlat(self, flatFolder, biasFolder, darkFolder, title):
         pm.printInfo(title + ": Convert flat RAW files to FITS.")
-        self.raw2fits(flatFolder)
-
-        pm.printInfo(title + ": Create master flat file(s).")
-        for color in self.opt['color']:
-            self.makeMasterFlat(flatFolder, biasFolder, darkFolder, color)
-            if self.opt['saveFlat']:
-                self.saveMasterFlat(flatFolder, color)
+        raw_count = self.raw2fits(flatFolder)
+        if raw_count == 0:
+            pm.printError(f"No Flat RAW images was found in folder {darkFolder}")
+        else:
+            pm.printInfo(title + ": Create master flat file(s).")
+            for color in self.opt['color']:
+                self.makeMasterFlat(flatFolder, biasFolder, darkFolder, color)
+                if self.opt['saveFlat']:
+                    self.saveMasterFlat(flatFolder, color)
 
     def processCalibration(self, lightFolder, calibFolder, title):
         pm.printInfo(title + ": Convert light RAW files to FITS.")
@@ -574,14 +594,16 @@ class Pipeline:
             if self.opt['overwrite'] or not ex:
 
                 ############################################################################
-                # step 3. create master flat bias frame, if it is differs from master bias
+                # step 3. create master flat bias frame, if it differs from master bias
                 ############################################################################
-                self.processBias(self.FLAT_BIAS_FOLDER, "FLAT BIAS")
+                if self.opt['flatOnly'] or self.FLAT_BIAS_FOLDER != self.BIAS_FOLDER:
+                    self.processBias(self.FLAT_BIAS_FOLDER, "FLAT BIAS")
 
                 ############################################################################
-                # step 4. create master flat dark frame, if it is differs from master dark
+                # step 4. create master flat dark frame, if it differs from master dark
                 ############################################################################
-                self.processDark(self.FLAT_DARK_FOLDER, self.FLAT_BIAS_FOLDER, "FLAT DARK")
+                if self.opt['flatOnly'] or self.FLAT_DARK_FOLDER != self.DARK_FOLDER:
+                    self.processDark(self.FLAT_DARK_FOLDER, self.FLAT_BIAS_FOLDER, "FLAT DARK")
 
                 ##############################
                 # step 5. create master flat

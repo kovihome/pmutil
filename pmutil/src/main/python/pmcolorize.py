@@ -20,7 +20,7 @@ from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy.visualization import make_lupton_rgb
 from matplotlib.image import imsave
-from photutils import Background2D, MedianBackground
+from photutils.background import Background2D, MedianBackground
 from skimage import exposure
 
 import img_scale
@@ -239,6 +239,12 @@ class Colorize:
         if self.opt['plot'] is not None:
             self.plotStars(img, imgFileName)
 
+    def areCombinedImagesExists(self, folder:str, ext:str, colors: list[str]) -> bool:
+        for color in colors:
+            if not exists(f"{folder}/Combined-{color}.{ext}"):
+                return False
+        return True
+
     def execute(self):
         print('Colorize.execute starts.')
         pmFolder = pm.setup['PHOT_FOLDER_NAME']
@@ -256,10 +262,12 @@ class Colorize:
         print(f'colors: {colors}')
 
         for folder in baseFolders:
-            if isdir(folder + '/' + pmFolder):
+            if isdir(folder + '/' + pmFolder) and self.areCombinedImagesExists(folder + '/' + pmFolder, 'ast.fits', colors):
                 self.createImage(folder, pmFolder, 'ast.fits', colors)
-            elif isdir(folder + '/' + seqFolder):
+            elif isdir(folder + '/' + seqFolder) and self.areCombinedImagesExists(folder + '/' + seqFolder, 'fits', colors):
                 self.createImage(folder, seqFolder, 'fits', colors)
+            else:
+                pm.printError(f"No combined FITS images exist in folders {pmFolder} or {seqFolder}")
 
 
 class MainApp:

@@ -73,6 +73,9 @@ class RawConverter:
         elif "SubSecDateTimeOriginal" in exif:
             dt_str = exif["SubSecDateTimeOriginal"]
             dt = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S.%f")  # datetime object
+        elif "DateTimeOriginal" in exif:
+            dt_str = exif["DateTimeOriginal"]
+            dt = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")  # datetime object
 
         if dt_str is not None:
             dt_s = dt.replace(tzinfo=None).isoformat().rstrip('0')
@@ -186,7 +189,7 @@ class RawConverter:
         fileBaseName = rawFilename[:rawFilename.rindex('.')]
 
         # Load the CR3 image using rawpy
-        print(f"Converting {rawFilename} to {fileBaseName}-*.fits")
+        # print(f"Converting {rawFilename} to {fileBaseName}-*.fits")
         with rawpy.imread(rawFilename) as raw:
             # Postprocess the raw image to get a numpy array, with half size and no demosaic
             rgb = raw.postprocess(half_size=True, output_bps=16, output_color=rawpy.ColorSpace.XYZ, user_flip=2,

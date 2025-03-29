@@ -1,15 +1,15 @@
-TODO
-----
+pmutil TODO
+-----------
 
-+pplphotometry			547 451
++pplphotometry		547 451
 -pmstack	
-+pplcalibration			pplSetup +++575 613
++pplcalibration		pplSetup 613
 -pmtranzi	        548
 +pmbase				451
 +pmresult			451 544 547
 +pmphot				451
 +pmmerge	        451
-+NEW pmraw           613 (540)
++NEW pmraw          613 (540)
 
 
 -----------
@@ -20,14 +20,9 @@ TODO
 
 NEW CALIBRATION BUGS:
 
+-NEW: pmraw.convert save all color channel, regardless what is set on the command line
+
 NEW PHOTOMETRY BUGS:
-
-+NEW: A riport keszites nagyon lassu, az airmass kiszamolasa tart sokaig
-        convertToAAVSORecords futasido 7 mp korul (korabban 20 mp volt)
-        airmass nelkul: 0.002 mp
-        ossz futasido: 250 mp / 38 mp (29 kep)
-
-+NEW: A graph megjelenitesnel/mentesenel lehetne title, hogy tudjuk, hogy mi van a graph-on
 
 -NEW: Ha az astrometria hibara fut, akkor ne akarja az .aavso file-t elkesziteni
 
@@ -45,8 +40,6 @@ NEW IDEAS:
     - a pplphotometry-nek legyen egy kapcsoloja, ami ezt megcsinalja, ha nem egy folderen vegzi a fotometriat
 
 TECH UPGRADE:
-
-+ Upgrade to python 3.8+
 
 - Upgrade ext packages:
 
@@ -86,8 +79,6 @@ TECH UPGRADE:
 
 	python/xmltodict	0.14.2	2024-10-16	0.12.0
 
-+ photutils hasznalata: https://photutils.readthedocs.io/en/stable/index.html
-
 - SCAMP: grmatch helyett
 
 / fiphot: sextractor helyett
@@ -113,38 +104,11 @@ TECH UPGRADE:
 
 === V 1.2 ==================================================
 	Sorrend:
-		High: *451, *548, *575, 613, *619
+		High: *451, *548, +++613
 		Med : *554
-		Low : *525, *544, 576, *580, 620
-
-(619) !!! A sextractor neve source-extractor-ra valtozott, kerdes, hogy melyik verzioban?
-        Kell-e lekezelni a kulonbozo neveket, verzioellenorzes utan?
-        2.28.0 verzioban az uj nev van, az 2.19.5-ben meg a regi
-        Az astronomy.net is sextractort akar hivni, inkabb egy alias kell ra, ezt a configurate-ben lehetne megcsinalni
-            itt parameterkent lehet megadni a nevet
-        + ppl.cfg-be kerult a config ertek
-        + configure kezeli a ket nevet
+		Low : *525, *544, 576, *580
 
 --- calibration --------------------------------------------
-
-(620) ha a calib folderekben csak a master image van, es overwrite modban fut a calibration, akkor elszall a kovetkezovel:
-
-      File "/home/kovi/bin/ppl-calibration", line 844, in <module>
-        app.run()
-      File "/home/kovi/bin/ppl-calibration", line 836, in run
-        ppl.execute()
-      File "/home/kovi/bin/ppl-calibration", line 628, in execute
-        self.processBias(self.BIAS_FOLDER, "BIAS")
-      File "/home/kovi/bin/ppl-calibration", line 531, in processBias
-        self.raw2fits(biasFolder)
-      File "/home/kovi/bin/ppl-calibration", line 193, in raw2fits
-        fp = os.path.basename(rawFiles[0])
-      IndexError: list index out of range
-
-      - ha overwrite mod volt megadva, de a master file-ok keszitesenel nincsenek RAW file-ok, csak a master,
-        akkor hasznalja a master file-t, es irjon egy warning-ot
-
-      - legyen egy opcio parcialis overwrite-ra, amikor a calib kepeket nem csinalja meg ujra, ha letezik a master.
 
 +++(613) CR3 kepek kezelese
 
@@ -192,13 +156,6 @@ TECH UPGRADE:
 
 	- Doc: hibas kepek kezelese
 
-+++ (575) 20200909_EX_Dra kalibracio, 300 kep, az align fazisban azt irta ki, hogy 'Killed', es megallt.
-
-    + a calibration resznel a calibrated kepek utan nagyon sokaig varakozik, mit csinalhat olyankor? (miutan kiirta a hot pixeleket)
-        Background elimination, az eleg lassu
-    
-    + out of memory
-
 (540) BUG: a rawfit tukrozi a kepet
 
 	/ valszeg a dcraw -t 0 opcio megoldja
@@ -214,8 +171,6 @@ TECH UPGRADE:
         - convertToAAVSOData: check star kezelés (nem itt kell megvalósítani, itt csak használja)
 
 (554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
-
-+++(547) sequence eseten ne csak a Seq-bol csinal riportot, hanem a Combined-bol is, de mas file-nevvel
 
 (544) Sequence eseten a pm file-ba kellene tenni C-K ertekeket is. lehetne olyan kapcsolo, ami megjeleniti a sequence-t fenygorben, es ezen megjelenne a C-K is
     + mg tengely cimkei nem jok, tul surun vannak
@@ -242,35 +197,6 @@ TECH UPGRADE:
 	- transients
 
 	- !!! pillow 5.3.0 needed
-
-+++(489) Referencia katalógus tartalmazzon mezőcsillagokat is
-
-	+ TODO:
-		+1. comp + var koordinatak listaba (Table: ra, dec)
-                +2. astroquery.xmatch UCAC4 xref lista lekerdezese
-		+3. UCAC4 mezocsillagok lekerdezese
-		+4. xref talalatok kikommentezese a listaban (auid felul is irhato, mert ki van kommentezve)
-
-	+ mg limit
-
-	+ CONFIGURE: astroquery dependency check (v0.4+)
-
-	+ Doc: If you use astroquery, please cite the paper Ginsburg, Sipőcz, Brasseur et al 2019.	
-
-		- https://arxiv.org/pdf/1901.04520.pdf
-
-		- https://github.com/astropy/astroquery/blob/master/astroquery/CITATION
-
-	+ az astroquery az 1. importnal letoltott sok mindent, de elszallt valami kulcs hianyan, ezt fel kellene terkepezni, documentalni, 
-		es valami eszkozt csinalni, ami nem futas kozben szall el, hanem install idoben megoldja
-
-		ModuleNotFoundError: No module named 'keyring.util.escape'
-
-		pip3 install --upgrade keyrings.alt
-
-	+ setup: mg limit for field stars
-
-		DEF_FIELD_STAR_MG_LIMIT = 17.0
 
 (451) whole frame photometry
 
@@ -444,7 +370,7 @@ TECH UPGRADE:
 	Sorrend:
 		High: 517, 549
 		Med : 491, 493
-		Low : 528, 546, 461, 535, 543
+		Low : 546, 461, 535, 543
 
 
 --- calibration --------------------------------------------
@@ -452,8 +378,6 @@ TECH UPGRADE:
 (543) CALIB: ha a ref keresésnél az fwhm túl nagy, akkor ignorálja a képet
 
 	- ugy tunik, hogy az fwhm minden kepnel nagyjabol ugyan akkora, ez nem mondja meg, ha egy kep rossz
-
-(528) calib: overwrite modban, ha flat is van, de nincs flat-bias es flat-dark, a master-bias es a master-dark 2x keszul el
 
 --- photometry ---------------------------------------------
 
