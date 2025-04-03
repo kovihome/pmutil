@@ -389,8 +389,8 @@ class Pipeline:
         stackedImage = None
         for n, imageFileName in enumerate(imageFileNameList):
             #            print(f'Register image {imageFileNameList[n]}')
-            if '_bad' in imageFileNameList[n]:
-                pm.printWarning(f"Image {imageFileNameList[n]} is assigned as bad; exclude from stacking")
+            if "_bad" in imageFileName:
+                pm.printWarning(f"Image {imageFileName} is assigned as bad; exclude from stacking")
                 continue
             try:
                 image = self.loadImageForAlign(imageFileName)
@@ -400,8 +400,11 @@ class Pipeline:
                 else:
                     stackedImage = stackedImage + alignedImage
             except Exception as e:
-                pm.printWarning(f'Registration failed on image {imageFileNameList[n]}; exclude from stacking')
-                print(f'Exception type={type(e)}, {str(e)}')
+                pm.printWarning(f"Registration failed on image {imageFileName}; exclude from stacking")
+                print(f"Exception type={type(e)}, {str(e)}")
+                # assign as bad image
+                badImageFileName = imageFileName.replace(".fits", "_bad.fits")
+                os.rename(imageFileName, badImageFileName)
 
         return self.subtractBackground(stackedImage)
 

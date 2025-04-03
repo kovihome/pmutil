@@ -20,7 +20,7 @@ pmutil TODO
 
 NEW CALIBRATION BUGS:
 
--NEW: pmraw.convert save all color channel, regardless what is set on the command line
+-NEW: !!! pmraw.convert save all color channel, regardless what is set on the command line
 
 NEW PHOTOMETRY BUGS:
 
@@ -44,8 +44,6 @@ TECH UPGRADE:
 - Upgrade ext packages:
 
 	Pkg			Lastest version		Actual version
-
-	//RawTran			1.1	2019-01-21	0.3.8	2007-12-15	!!! does not support CR3 format
 
 	ExifTool		13.25	2025-03-11	12.76			    !!! min 10.82 for CR3 support
 
@@ -104,57 +102,21 @@ TECH UPGRADE:
 
 === V 1.2 ==================================================
 	Sorrend:
-		High: *451, *548, +++613
+		High: *451, *548
 		Med : *554
-		Low : *525, *544, 576, *580
+		Low : *525, *544, 576
 
 --- calibration --------------------------------------------
 
 +++(613) CR3 kepek kezelese
 
-    + rawtran nem tamogatja a CR3 formatumot, kell valamit talalni helyette. libraw talan jo lehet
-
-    + exiftool 10.82+ upgrade szukseges
-
-    + rawpy 0.13.1 nem tamogatja a CR3 formatumot, 0.22.0 pedig python 3.7-et igenyel
-
     + pmraw:
 
-        + parameterezes: filenev, colors, extra fits headers
-
-        + horizontalisan tukrozi a kepet
-
         + FITS headers:
-
-            + white balance, amit a pmcolorize tud hasznalni
 
             / APERTURE -> #453
 
             / FOCUS: hiba -> #453
-
-            + XPIKSZ, YPIKSZ: hiba
-
-            + FILTER: parameterbol
-
-            + IMAGETYP: filenevbol
-
-            + CREATOR: pmutils version parameterbol
-
-            + DATE-*: CR2-ben nincs TimeStamp tag, csak CreateDate, de ebben csak egesz mp-ek vannak
-
-    + tesztelni kell, hogy nem okoz-e hibat, hogy a DATE-OBS most tartalmaz szazadmp-eket is
-
-    + nincs-e valahol beegetve a cr2 kiterjesztes?
-
-    + az Ri kepeken feltunoen keves a csillag
-
-    + minden kepen van nehany max erteku pixel, de nem latni, hogy hol
-
-    + a raw -> fits konverzio figyelembe veszi a camera wb-t, a szines kep keszitesenel mar nem kell meg egyszer
-
-(580) hibas light image jelolese filenevben
-
-	- Doc: hibas kepek kezelese
 
 (540) BUG: a rawfit tukrozi a kepet
 
