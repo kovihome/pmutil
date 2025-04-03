@@ -8,23 +8,13 @@ Created on Mar 03, 2021
 @author: kovi
 """
 
-# from sys import argv
-# from getopt import getopt, GetoptError
-# from os import remove
-# from os.path import isdir, exists
-# from glob import glob
-# from datetime import datetime
-
-
-from requests.exceptions import ConnectionError
-from astroquery.vizier import Vizier
-from astroquery.xmatch import XMatch
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
-from astropy.coordinates import SkyCoord
-
-from pmbase import hexa2deg, deg2hexa
+from astroquery.vizier import Vizier
+from astroquery.xmatch import XMatch
+from requests.exceptions import ConnectionError
+import pmbase as pm
 
 
 class Refcat(Table):
@@ -50,8 +40,8 @@ class Refcat(Table):
             fdec = float(row[mapping['DEC_DEG']])
             ra = "%12.8f" % fra
             dec = "%+12.8f" % fdec
-            sra = deg2hexa(fra / 15.0)
-            sdec = deg2hexa(fdec)
+            sra = pm.deg2hexa(fra / 15.0)
+            sdec = pm.deg2hexa(fdec)
             if not sdec.startswith('-') and not sdec.startswith('+'):
                 sdec = "+" + sdec
             auid = '%03d-FFF-%03d' % (n_auid // 1000, n_auid % 1000)
@@ -76,7 +66,8 @@ class VizUCAC4:
         t = Refcat()
         try:
             result = self.viz.query_region(target, width=size * u.arcmin)
-        except ConnectionError:
+        except ConnectionError as ce:
+            pm.printError(ce)
             return None
         t.load(result[0], self.catName, self.cs)
         return t
@@ -85,7 +76,8 @@ class VizUCAC4:
         try:
             return XMatch.query(cat1=srcTable, cat2='vizier:' + self.catFull, max_distance=5 * u.arcsec,
                                 colRA1=raColName, colDec1=decColName, colRA2='RAJ2000', colDec2='DEJ2000')
-        except ConnectionError:
+        except ConnectionError as ce:
+            pm.printError(ce)
             return None
 
 

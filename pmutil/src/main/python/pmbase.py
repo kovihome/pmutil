@@ -344,7 +344,9 @@ def guess(path):
     for s in r:
         if '_' in s:
             f = s
-    target_s = f.split('_', 1)[1]
+        elif '-' in s:
+            f = s.replace('-', '_')
+    target_s = f.split('_', 1)[1] if f is not None else 'nothing'
     cats = glob('/home/kovi/.pmlib/cat/' + target_s + '*')
     if len(cats) > 0:
         cat = min(cats, key=len) if len(cats) > 1 else cats[0]

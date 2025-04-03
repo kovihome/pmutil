@@ -168,7 +168,7 @@ class MainApp:
             if c in self.opt['fileName']:
                 color = c
 
-        if self.opt['use'] == None:
+        if self.opt['use'] is None:
 
             bpd = BadPixelDetector()
             bpd.execute(self.opt['fileName'], color)
@@ -187,4 +187,3 @@ if __name__ == '__main__':
     app.run()
 
 # end main.
-

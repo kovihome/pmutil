@@ -288,8 +288,8 @@ class RefCat:
         v = VizUCAC4(mgLimit)
         t = v.query(target, fieldSize)
         xt = v.xmatch(self.xmatchTable, 'RA_DEG', 'DEC_DEG')
-        if not t or not xt:
-            printError("Accessing Vizier service if failed.")
+        if t is None or xt is None:
+            pm.printError("Accessing Vizier service if failed.")
             return
 
         matchCount = 0
@@ -344,7 +344,7 @@ class RefCat:
                     pm.printInfo("Image center: %s %s" % (sCoords[0], sCoords[1]))
                 else:
                     sCoordsSexa = self.getPair(line.split('(')[2].split(')')[0])
-                    coords = [ pm.hexa2deg(sCoordSexa[0]) * 15.0, pm.hexa2deg(sCoordSexa[1]) ]
+                    coords = [ pm.hexa2deg(sCoordsSexa[0]) * 15.0, pm.hexa2deg(sCoordsSexa[1]) ]
                     pm.printInfo("Image center: %s %s" % (sCoordsSexa[0], sCoordsSexa[1]))
             elif line.startswith("Field size"):
                 sFieldSize = self.getPair(line.split(':')[1].split('a')[0], 'x')

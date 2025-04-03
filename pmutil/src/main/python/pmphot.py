@@ -269,7 +269,7 @@ class Photometry:
         ep = 0.0
         N = 0
         for pmr in comps:
-            if pmr[self.mvf[color]] != '-' and r['VIZ_FLAG'] == '---':
+            if pmr[self.mvf[color]] != '-' and pmr['VIZ_FLAG'] == '---':
                 mi.append(float(pmr[self.mif[color]]))
                 mv.append(float(pmr[self.mvf[color]]))
                 ei = float(pmr[self.eif[color]])
@@ -288,7 +288,7 @@ class Photometry:
         coef = pm.linfit(mi, mv, er)
         ep = np.sqrt(ep / float(N))
 
-        pm.printDebug('polyfit result:', coef, 'error:', ep)
+        pm.printDebug(f"polyfit result: {coef} error: {ep}")
 
         self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower(), title="Inst {color}i vs. Cat {stdcolor}")
 
@@ -345,7 +345,7 @@ class Photometry:
             mi = []
             mv = []
             for pmr in comps:
-                if pmr[self.mvf[color]] != '-' and r['VIZ_FLAG'] == '---':
+                if pmr[self.mvf[color]] != '-' and pmr['VIZ_FLAG'] == '---':
                     mi.append(float(pmr[self.mif[color]]))
                     mv.append(float(pmr[self.mvf[color]]))
 
@@ -649,9 +649,8 @@ class Photometry:
         compStars = cmb[compStarMask]
 
         # find best comp star in Gi frame
-        color = 'Gi'  # TODO: what if no Gi color, just G, g, gi, or V ?
-        # indexGi = self.opt['color'].index(color)
-        fitsFileName = cmbFileName.replace('.cmb', '-Gi.ast.fits')
+        color = 'Gi' if 'Gi' in self.opt['color'] else self.opt['color'][0]
+        fitsFileName = cmbFileName.replace('.cmb', f'-{color}.ast.fits')
         pm.printDebug(f'.ast.fits file name: {fitsFileName}')
         self.loadFitsHeaders(fitsFileName)
         pm.printDebug(f' Headers: {self.fits}')
@@ -672,6 +671,8 @@ class Photometry:
             # standardization
             coeffs = None
 
+            print("************** files")
+            print(self.opt['files'])
             target = pm.guess(self.opt['files'][0])['target']
 
             if self.opt['makeCoeffs']:
