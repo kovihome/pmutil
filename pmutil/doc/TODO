@@ -24,6 +24,9 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
+-NEW: Ha Sequence fotometria fut --save-graph opcioval, akkor csak egy peldany mentodik el az ensemble_parameters es
+    a magnitude_limit kepekbol. Ilyenkor indexelni kellene ezeket is, es a Combined-hoz tartozo lenne az index nelkuli.
+
 -NEW: Ha az astrometria hibara fut, akkor ne akarja az .aavso file-t elkesziteni
 
 NEW IDEAS:
@@ -186,6 +189,8 @@ TECH UPGRADE:
 
 		+ csak a mg limit folottiek kerulnek az uj tablaba, a limit a szorasokbol szamitodik
 
+		    - ebben lehet hiba, mintha az RX Lyr ezert tunne el a kombinalt catalogbol
+
 		- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
 
 		- addRefcatData: ha a distance túl nagy, akkor dobja el (bad match)
@@ -223,7 +228,11 @@ TECH UPGRADE:
         + BUG: EX Dra: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
 
         - !!! BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
-	            az std rendben van, a tobbit kell megnezni
+	            az std rendben van, a tobbit kell megnezni (20190612)
+
+	            - most egyaltalan nem jelenik meg a Combined.cmb katalogusban. A kepen latszik, bar halvany.
+
+	            - ha a hmg alatt van, akkor a commentbe oda kellene irni a mert mg-t es hibat tanulsagkeppen
 
 	    + process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
 

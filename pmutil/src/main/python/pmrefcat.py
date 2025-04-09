@@ -2,11 +2,11 @@
 #
 # PmUtils/pmrefcat
 #
-'''
+"""
 Created on Jan 1, 2020
 
 @author: kovi
-'''
+"""
 
 from sys import argv
 from getopt import getopt, GetoptError
@@ -47,15 +47,15 @@ class RefCat:
         self.opt = opt
 
     def loadVspPhotometryData(self, objectName, ra = None, dec = None, fov = defFov):
-        '''
+        """
         star*: name of the star to plot. You must provide EITHER the star parameter OR ra and dec parameters (see below)
         ra*: right ascension
         dec*: declination
         fov*: field of view, in arcminutes.
         maglimit*: magnitude limit for the chart; stars fainter than the maglimit will not be plotted.
         other: other variable stars to mark on the chart. Omit or leave blank for none, "gcvs" for GCVS variables, "all" for all variables
-        '''
-        if objectName != None:
+        """
+        if objectName is not None:
             ids = "star=%s" % (urllib.parse.quote_plus(objectName))
         else:
             ids = "ra=%s&dec=%s" % (pm.deg2hexa(ra/15.0), pm.deg2hexa(dec))
@@ -123,18 +123,18 @@ class RefCat:
                 break
 
     def loadVsxCatalogData(self, objectName, ra = None, dec = None, fov = defFov, auidOnly = True):
-        '''
+        """
         &coords   The central J2000 RA/DEC coordinates for a radius search, expressed sexagesimally (by default), or in decimal degrees if format is set to d. Northern hemisphere coordinates must have the plus () sign URL-encoded as %2B. Space characters between all other figures must be replaced with the URL whitespace character (). The order argument (which see) must also be included in the query string with its value set to 9 in order to prompt VSX to display distances from the central coordinates in the results listing. Default is empty string (no radius search).
         &ident    Object identification for name searches. Space characters must be replaced with the URL whitespace character (+). Other special characters may also need to be URL-encoded. Default is empty string (no name search).
         &format   Explicit specification for format of coords. For sexagesimal, this value should be s. For decimal degrees, this value should be d. Default is s (sexagesimal).
         &geom     The geometry for central coordinate-based searches. For radius searches, this value should be r. For box searches, this value should be b. Default is r (radius search).
         &size     For box searches (geom=b), the width of the box. For radius searches (geom=r), the radius of the circle. Expressed in the units specified by unit (see next). Default is 10.0.
         &unit     The unit of measurement used for the value given in size (see above). For arc degrees, this value should be 1. For arc minutes, this value should be 2. For arc seconds, this value should be 3. Default is 2 (arc minutes).
-        '''
-        if objectName != None:
+        """
+        if objectName is not None:
             # https://www.aavso.org/vsx/index.php?view=results.csv&ident=R+Car
-            vsxUrl = "https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident=%s" % (urllib.parse.quote_plus(objectName))
-            ids = "star=%s" % (urllib.parse.quote_plus(objectName))
+            vsxUrl = f"https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident={urllib.parse.quote_plus(objectName)}"
+            # ids = "star=%s" % (urllib.parse.quote_plus(objectName))
             f = request.urlopen(vsxUrl)
             respJson = f.read().decode('UTF-8')
             resp = json.loads(respJson)
@@ -155,7 +155,7 @@ class RefCat:
         respVOTable = f.read().decode('UTF-8')
         votable = xmltodict.parse(respVOTable)
         tableData = votable['VOTABLE']['RESOURCE']['TABLE']['DATA']['TABLEDATA']
-        if tableData == None:
+        if tableData is None:
             pm.printWarning('No VSX data for this field')
             return
         trs = tableData['TR']
@@ -165,10 +165,10 @@ class RefCat:
         for tr in trs:
             # [None, 'PS1-3PI J185203.12+325154.5', 'Lyr', '283.01304000,32.86516000', 'RRAB', '16.810', 'r', '0.400', 'r', '57000.85600', None, '0.839122', None, None, None]
             auid = tr['TD'][0]
-            if auid == None:
+            if auid is None:
                 if auidOnly:
                     continue
-                auid = '999-VAR-%03d' % (nrUnknown)
+                auid = '999-VAR-%03d' % nrUnknown
                 nrUnknown = nrUnknown + 1
                 tr['TD'][0] = auid
             role = 'V'
@@ -191,53 +191,53 @@ class RefCat:
         for tr in trs:
 
             auid = tr['TD'][0]
-            if auid == None:
+            if auid is None:
                 if auidOnly:
                     continue
-                auid = '999-VAR-%03d' % (nrUnknown)
+                auid = f'999-VAR-{nrUnknown:03d}'
                 nrUnknown = nrUnknown + 1
-            role = 'V'
+            # role = 'V'
             raDeg, decDeg = tr['TD'][3].split(',')
             ra = pm.deg2hexa(float(raDeg) / 15.0)
             dec = pm.deg2hexa(float(decDeg))
             label = tr['TD'][1]
             constell = tr['TD'][2]
             vartype = tr['TD'][4]
-            if vartype == None:
+            if vartype is None:
                 vartype = "-"
             period = tr['TD'][11]
             maxmg = tr['TD'][5]
-            if tr['TD'][6] != None:
+            if tr['TD'][6] is not None:
                 maxmg += tr['TD'][6]
             minmg = tr['TD'][7]
-            if tr['TD'][8] != None:
+            if tr['TD'][8] is not None:
                 minmg += tr['TD'][8]
 
             s = "#" + label.ljust(29) + auid.ljust(14) + ra.ljust(15) + dec.ljust(14) + constell.ljust(4) + vartype.ljust(11) + period.ljust(11) + maxmg + " - " + minmg
             self.cache.append(s)
             count = count + 1
-        print("%d variable stars were found in VSX database" % (count))
+        print(f"{count} variable stars were found in VSX database")
 
-    def loadStdFieldData(self, stdFieldName):
+    def loadStdFieldData(self):
         saName = self.opt['stdFieldName']
         configFolder = pm.setup["CONFIG_FOLDER"]
-        if configFolder == None:
+        if configFolder is None:
             configFolder = "$HOME/.pmlib"
 
         # load stdArea file
         saFieldsFile = configFolder + "/landolt_fields.txt"
         if not exists(saFieldsFile):
-            pm.printError("Landolt standard field catalog file %s not found" % (saFieldsFile))
+            pm.printError(f"Landolt standard field catalog file {saFieldsFile} not found")
             return 'NoFile'
         saFields = Table.read(saFieldsFile, format = 'ascii')
 
         # find std area
         rows = list(filter(lambda r: r['FIELD_NAME'] == saName, saFields))
         if len(rows) == 0:
-            pm.printError("No field name %s found in standard area file %s." % (saName, saFieldsFile))
+            pm.printError(f"No field name {saName} found in standard area file {saFieldsFile}.")
             return 'NoField'
         sa = rows[0]
-        pm.printInfo("StdArea: %s, Coords: %s %s, NumStars: %d, Comment: %s" % (saName, sa['RA_2000'], sa['DEC_2000'], sa['NS'], sa['COMMENT']))
+        pm.printInfo(f"StdArea: {saName}, Coords: {sa['RA_2000']} {sa['DEC_2000']}, NumStars: {sa['NS']:d}, Comment: {sa['COMMENT']}")
 
         self.opt['ra'] = pm.hexa2deg(sa['RA_2000']) * 15.0
         self.opt['dec'] = pm.hexa2deg(sa['DEC_2000'])
@@ -246,7 +246,7 @@ class RefCat:
         # load stdStars file
         saStarsFile = configFolder + "/landolt_stars.txt"
         if not exists(saStarsFile):
-            pm.printError("Landolt standard stars catalog file %s not found" % (saStarsFile))
+            pm.printError(f"Landolt standard stars catalog file {saStarsFile} not found")
             return 'NoFile'
         saStars = Table.read(saStarsFile, format = 'ascii')
 
@@ -259,19 +259,19 @@ class RefCat:
         # write stars to catalog file
         nrUnknown = 1
         for star in stars:
-            auid = '999-STD-%03d' % (nrUnknown)
+            auid = f'999-STD-{nrUnknown:03d}'
             nrUnknown = nrUnknown + 1
             role = "C"
             ra = star['RA_2000']
             raDeg = "%10.8f" % (pm.hexa2deg(ra) * 15.0)
             dec = star['DEC_2000']
-            decDeg = "%+10.8f" % (pm.hexa2deg(dec))
+            decDeg = f"{pm.hexa2deg(dec):+10.8f}"
             mv = float(star['MAG_V'])
             ev = float(star['ERR_V'])
             magB = "%+6.4f" % (float(star['MAG_BV']) + mv)
             errB = "%+7.4f" % (max(ev, float(star['ERR_BV'])))
-            magV = "%+6.4f" % (mv)
-            errV = "%+7.4f" % (ev)
+            magV = "%+6.4f" % mv
+            errV = "%+7.4f" % ev
             magR = "%+6.4f" % (mv - float(star['MAG_VR']))
             errR = "%+7.4f" % (max(ev, float(star['ERR_VR'])))
             label = saName + ":" + star['STAR']
@@ -319,7 +319,7 @@ class RefCat:
 
     def determineCoordsFromImage(self, imageFileName):
         configFolder = pm.setup["CONFIG_FOLDER"]
-        if configFolder == None:
+        if configFolder is None:
             configFolder = "$HOME/.pmlib"
         SOLVE_ARGS = "-O --config " + configFolder + "/astrometry.cfg --use-sextractor --sextractor-path sextractor -r -y -p"
 
@@ -328,14 +328,14 @@ class RefCat:
         pm.invoke("cp " + imageFileName + " temp/src.fits")
 
         astFolder = pm.setup["AST_BIN_FOLDER"]
-        if astFolder == None:
+        if astFolder is None:
             astFolder = "/usr/local/astrometry/bin"
 
         astResult = pm.invoke(astFolder + "/solve-field " + SOLVE_ARGS + " -D temp -N temp/ast.fits temp/src.fits")
 
         r = astResult.split('\n')
         coords = [0.0, 0.0]
-        sCoordsSexa = ["00:00:00", "+00:00:00"]
+        # sCoordsSexa = ["00:00:00", "+00:00:00"]
         for line in r:
             if line.startswith("Field center"):
                 if line.find("RA,Dec") > -1:
@@ -379,19 +379,19 @@ class RefCat:
                     missing = False
                     break
             if missing:
-                self.writeRecord(auid, rec['ROLE'], rec['RA'], "%10.8f" % (rec['RA_DEG']), rec['DEC'], "%+10.8f" % (rec['DEC_DEG']), \
-                    "-", "-", "-", "-", "-", "-", label)
+                self.writeRecord(auid, rec['ROLE'], rec['RA'], "%10.8f" % (rec['RA_DEG']), rec['DEC'], "%+10.8f" % (rec['DEC_DEG']),
+                                 "-", "-", "-", "-", "-", "-", label)
                 for cmt in [ x for x in self.origRefcat.meta['comments'] if x.startswith(label) ]:
                     self.cache.append(f"#{cmt}")
                 print(f"Update: preserve user added variable {auid} {label}")
         
 
     def execute(self):
-        if self.opt['mgLimit'] == None:
+        if self.opt['mgLimit'] is None:
             ml = float(pm.setup['DEF_FIELD_STAR_MG_LIMIT'])
-            self.opt['mgLimit'] = ml if ml > 0.0 and ml < 25.0 else 17.0
+            self.opt['mgLimit'] = ml if 0.0 < ml < 25.0 else 17.0
 
-        if self.opt['image'] != None:
+        if self.opt['image'] is not None:
             coords = self.determineCoordsFromImage (self.opt['image'])
             self.opt['ra'] = coords[0]
             self.opt['dec'] = coords[1]
@@ -403,9 +403,9 @@ class RefCat:
         if not exists(outFileName):
             makedirs(outFileName)
 
-        if self.opt['object'] != None:
+        if self.opt['object'] is not None:
             outFileName += self.opt['object'].lower().replace(' ', '_') + '.cat'
-        elif self.opt['stdFieldName'] != None:
+        elif self.opt['stdFieldName'] is not None:
             outFileName += self.opt['stdFieldName'].lower().replace(' ', '_') + '.cat'
         else:
             s_ra = pm.deg2hexa(self.opt['ra'] / 15.0)
@@ -422,15 +422,15 @@ class RefCat:
 
             self.writeRecord('AUID', 'ROLE', 'RA', 'RA_DEG', 'DEC', 'DEC_DEG', 'MAG_B', 'ERR_B', 'MAG_V', 'ERR_V', 'MAG_R', 'ERR_R', 'LABEL')
 
-            if self.opt['object'] != None:
+            if self.opt['object'] is not None:
 
                 self.loadVspPhotometryData(self.opt['object'], fov = self.opt['field'])
 
                 self.loadVsxCatalogData(self.opt['object'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
 
-            elif self.opt['stdFieldName'] != None:
+            elif self.opt['stdFieldName'] is not None:
 
-                error = self.loadStdFieldData(self.opt['stdFieldName'])
+                error = self.loadStdFieldData()
 
                 if not error:
                     self.loadVsxCatalogData(None, ra = self.opt['ra'], dec = self.opt['dec'], fov = self.opt['field'], auidOnly = self.opt['auidOnly'])
@@ -444,7 +444,7 @@ class RefCat:
             # collect field stars
             if self.opt['fieldStars']:
 
-                if self.opt['object'] != None:
+                if self.opt['object'] is not None:
                     target = self.opt['object']
                 else:
                     target = SkyCoord(ra=self.opt['ra'], dec=self.opt['dec'], unit=(u.deg, u.deg), frame='icrs')
@@ -463,11 +463,11 @@ class RefCat:
             outFile.write('### fov: ' + str(self.opt['field']) + ' arcmin\n')
             outFile.close()
 
-            pm.printInfo("Reference catalog file %s created." % (outFileName))
+            pm.printInfo(f"Reference catalog file {outFileName} created.")
 
         else:
 
-            pm.printInfo("Reference catalog file %s is exists." % (outFileName))
+            pm.printInfo(f"Reference catalog file {outFileName} is exists.")
 
         if self.opt['folder']:
 
@@ -554,7 +554,7 @@ class MainApp:
                 if a.isdigit():
                     self.opt['field'] = int(a)
                 else:
-                    pm.printError("Invalid field size parameter: %s. Use default 60 arcmin instead." % (a))
+                    pm.printError(f"Invalid field size parameter: {a}. Use default 60 arcmin instead.")
             elif o == '-a' or o == '--all':
                 self.opt['auidOnly'] = False
             elif o == '-r' or o == '--field-stars':
@@ -570,7 +570,7 @@ class MainApp:
                 except ValueError:
                     err = True
                 if err:
-                   pm.printError("Invalid mg limit: %s. Use default instead." % (a))
+                   pm.printError(f"Invalid mg limit: {a}. Use default instead.")
                 fieldStarsIndicated = True
             elif o == '-u' or o == '--update':
                 self.opt['update'] = True
@@ -589,19 +589,19 @@ class MainApp:
             if not self.opt['folder'].endswith('/'):
                 self.opt['folder'] += '/'
 
-        if self.opt['object'] == None and self.opt['coords'] == None and self.opt['stdFieldName'] == None and self.opt['image'] == None:
+        if self.opt['object'] is None and self.opt['coords'] is None and self.opt['stdFieldName'] is None and self.opt['image'] is None:
             pm.printError("Either object name (-o), coordinates (-c), standard field name (-n) or image file (-i) must be given.")
             exit(1)
 
-        if self.opt['coords'] != None:
+        if self.opt['coords'] is not None:
             c = self.opt['coords'].split(',', maxsplit = 2)
             ok = True
             if len(c) != 2:
                 ok = False
             else:
-                if re.fullmatch("(\d){2}:(\d){2}:(\d){2}(\.\d)*", c[0]) == None:
+                if re.fullmatch("(\\d){2}:(\\d){2}:(\\d){2}(\\.\\d)*", c[0]) is None:
                     ok = False
-                if re.fullmatch("[+-]*(\d){2}:(\d){2}:(\d){2}(\.\d)*", c[1]) == None:
+                if re.fullmatch("[+-]*(\\d){2}:(\\d){2}:(\\d){2}(\\.\\d)*", c[1]) is None:
                     ok = False
             if not ok:
                 pm.printError("Invalid coordinate format")

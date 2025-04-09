@@ -81,15 +81,15 @@ class Logger:
 
 
 def printError(s):
-    print(BRed + "Error: " + s + Color_Off)
+    print(f"{BRed}Error: {s}{Color_Off}")
 
 
 def printWarning(s):
-    print(BGreen + "Warning: " + s + Color_Off)
+    print(f"{BGreen}Warning: {s}{Color_Off}")
 
 
 def printInfo(s):
-    print(BCyan + s + Color_Off)
+    print(f"{BCyan}{s}{Color_Off}")
 
 
 def printDebug(s):
@@ -117,7 +117,7 @@ def loadPplSetup():
 
 
 def invoke(cmd):
-    if pmlog:
+    if pmlog is not None:
         pmlog.write('invoke: ' + cmd)
     r = cmd.split()
     try:
@@ -129,8 +129,7 @@ def invoke(cmd):
 
 def invokep(cmds):
     r = cmds[0].split()
-    p = []
-    p.append(subprocess.Popen(r, stdout=subprocess.PIPE))
+    p = [subprocess.Popen(r, stdout=subprocess.PIPE)]
     j = 0
     for cmd in cmds[1:]:
         r = cmd.split()
@@ -246,7 +245,6 @@ def assureFolder(folder):
 
 
 def discoverFolders(baseFolder, folderName):
-    folders = []
     if baseFolder is not None:
         folders = glob('*' + baseFolder + '*/' + folderName + '*')
     else:

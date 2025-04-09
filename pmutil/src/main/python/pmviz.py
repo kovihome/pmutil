@@ -67,7 +67,7 @@ class VizUCAC4:
         try:
             result = self.viz.query_region(target, width=size * u.arcmin)
         except ConnectionError as ce:
-            pm.printError(ce)
+            pm.printError(str(ce))
             return None
         t.load(result[0], self.catName, self.cs)
         return t
@@ -77,7 +77,7 @@ class VizUCAC4:
             return XMatch.query(cat1=srcTable, cat2='vizier:' + self.catFull, max_distance=5 * u.arcsec,
                                 colRA1=raColName, colDec1=decColName, colRA2='RAJ2000', colDec2='DEJ2000')
         except ConnectionError as ce:
-            pm.printError(ce)
+            pm.printError(str(ce))
             return None
 
 
