@@ -70,28 +70,42 @@ echo
 ##############################
 
 warn_version() {
-	readarray -td. actver <<<"$1" 
-	readarray -td. minver <<<"$2" 
 
-	local num=${#actver[@]}
-	if [ ${#minver[@]} -lt "$num" ]; then
-		num=${#minver[@]}
+	if [ -z "$1" ]; then
+		print_warning "$3 not installed."
+		return
 	fi
+
+	if dpkg --compare-versions "$1" ge "$2"; then
+		echo "$3 version '$1' OK."
+	else
+		print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
+	fi
+
+
+	# readarray -td. actver <<<"$1" 
+	# readarray -td. minver <<<"$2" 
+
+	# local num=${#actver[@]}
+	# if [ ${#minver[@]} -lt "$num" ]; then
+	#	num=${#minver[@]}
+	#fi
 	
-	for (( j = 0; j < $num; j += 1 )) ; do
-		local a=${actver[$j]}
-#		local m=${minver[$j]}
-		if [ "${actver[$j]}" -lt "${minver[$j]}" ]; then
-			print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
-			return
-		fi
-	done 
+	#for (( j = 0; j < $num; j += 1 )) ; do
+	#	local a=${actver[$j]}
+	#	local m=${minver[$j]}
+        #        echo "actual: '$a', minimal: '$m'"
+	#	if [ "${actver[$j]}" -lt "${minver[$j]}" ]; then
+	#		print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
+	#		return
+	#	fi
+	#done 
 	
-	echo "$3 version '$1' OK."
+	#echo "$3 version '$1' OK."
 }
 
 warn_py_module() {
-	local PY_VERSION=$(pip3 list 2> /dev/null | grep "$1" | sed 's/[^0-9\.]//g')
+	local PY_VERSION=$(pip3 list 2> /dev/null | grep -i "$1 " | sed 's/[^0-9\.]//g')
 	warn_version "$PY_VERSION" "$2" "python3/$1"
 }
 
@@ -107,18 +121,18 @@ warn_version "$PYTHON3_VERSION" "$PYTHON3_MINVERSION" "python3"
 
 warn_py_module "astroalign" "2.4"
 warn_py_module "astropy" "4.0"
-warn_py_module "astropquery" "0.4"
+warn_py_module "astroquery" "0.4"
 warn_py_module "matplotlib" "3.1"
 warn_py_module "numpy" "1.18"
 warn_py_module "photutils" "0.7"
-warn_py_module "Pillow" "5.3"
+warn_py_module "pillow" "5.3"
 warn_py_module "regions" "0.5"
 warn_py_module "scipy" "1.4"
 warn_py_module "xmltodict" "0.12"
 
 # FITSH
 
-FITSH_VERSION=$(ficalib --version | head -n1 | cut -d"(" -f2 | cut -d"@" -f1)
+FITSH_VERSION=$(ficalib --version | head -n1 | cut -d" " -f2)
 FITSH_MINVERSION=0.9.3
 warn_version "$FITSH_VERSION" "$FITSH_MINVERSION" "FITSH"
 
@@ -141,7 +155,7 @@ ASTROMETRY_MINVERSION=0.81
 warn_version "$ASTROMETRY_VERSION" "$ASTROMETRY_MINVERSION" "Astrometry.net"
 
 # SExtractor
-SEXTRACTOR_VERSION=$(source_extractor --version | head -n1 | cut -d" " -f4)
+SEXTRACTOR_VERSION=$(source-extractor --version | head -n1 | cut -d" " -f4)
 if [ -z "$SEXTRACTOR_VERSION" ]; then
     SEXTRACTOR_VERSION=$(sextractor --version | head -n1 | cut -d" " -f3)
 fi
@@ -193,10 +207,14 @@ copy_source "python/pmclean.py" "pmclean.py"
 copy_source "python/pmbase.py" "pmbase.py"
 copy_source "python/pmdisco.py" "pmdisco.py"
 copy_source "python/pmphot.py" "pmphot.py"
-copy_source "python/pmfilter.py" "pmfilter.py"
+#copy_source "python/pmfilter.py" "pmfilter.py"
 copy_source "python/pmresult.py" "pmresult.py" 
 copy_source "python/img_scale.py" "img_scale.py"
 copy_source "python/pmhotpix.py" "pmhotpix.py"
+copy_source "python/pmconventions.py" "pmconventions.py"
+copy_source "python/pmmerge.py" "pmmerge.py"
+copy_source "python/pmraw.py" "pmraw.py"
+copy_source "python/pmviz.py" "pmviz.py"
 
 create_link "pplphotometry.py" "ppl-photometry"
 create_link "pplcalibration.py" "ppl-calibration"
@@ -204,7 +222,7 @@ create_link "pmrefcat.py" "ppl-refcat"
 create_link "pmclean.py" "ppl-clean"
 create_link "pmcolorize.py" "ppl-colorize"
 
-chmod 0755 "${DEST_FOLDER}/*"
+chmod 0755 ${DEST_FOLDER}/*
 
 #############################
 # copy external config files
