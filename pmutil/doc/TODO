@@ -111,15 +111,22 @@ TECH UPGRADE:
 
 --- calibration --------------------------------------------
 
-+++(613) CR3 kepek kezelese
+(650) Kalibrált 3D FITS file-ok kezelése (Seestar)
 
-    + pmraw:
+    - 3D FITS csatornakra bontasa (pmfits)
 
-        + FITS headers:
+    - Opcionalisan Flat
 
-            / APERTURE -> #453
+    - EXPTIME rendbetetele (pmfits)
 
-            / FOCUS: hiba -> #453
+    - Light azonositas:
+        - RAW -> 3 x FITS -> Light folder (pmraw)
+        - FITS3D no calibration -> 3 x FITS -> Light folder (pmfits)
+        - FITS3D precalibrated, no flat -> 3 x FITS -> Calibrated folder (pmfits)
+        - FITS3D precalibrated, flatted -> 3 x FITS -> Sequence folder (pmfits)
+        - FITS no calibration -> do nothing -> Light folder
+        - FITS precalibrated, no flat -> copy -> Calibrated folder
+        - FITS precalibrated, flatted -> copy -> Sequence folder
 
 (540) BUG: a rawfit tukrozi a kepet
 

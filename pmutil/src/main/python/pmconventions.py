@@ -2,11 +2,11 @@
 #
 # PmUtils/pmconventions (renamed from pmdisco)
 #
-'''
+"""
 Created on Mar 2, 2020
 
 @author: kovi
-'''
+"""
 from os import getenv
 from os.path import isdir, exists
 from glob import glob
@@ -17,6 +17,8 @@ PMUTIL_VERSION = "1.2.0"
 PMUTIL_VERSION_SHORT = "1.2"
 
 RAW_FILE_EXTENSIONS = ["cr2", "cr3"]
+
+FITS_FILE_EXTENSIONS = ["fits", "fit", "fts"]
 
 class Discovery:
     BIAS_FOLDER = None
@@ -33,31 +35,27 @@ class Discovery:
         self.calibFolder = opt['calibFolder']
         self.ppl = pplSetup
 
-    def findFolders(self, baseFolder, folderName):
-        FOLDERS = None
-        if baseFolder:
-            FOLDERS = glob('*' + baseFolder + '*/' + folderName)
-        else:
-            FOLDERS = glob(folderName)
-        return FOLDERS
+    @staticmethod
+    def findFolders(baseFolder, folderName):
+        return glob('*' + baseFolder + '*/' + folderName) if baseFolder is not None else glob(folderName)
 
     def discoverFolder(self, baseFolder, folderName, title):
         FOLDERS = self.findFolders(baseFolder, folderName)
 
         if len(FOLDERS) == 0:
-            print("Error: no %s folder found; add one, and rerun this script." % (title))
+            print(f"Error: no {title} folder found; add one, and rerun this script.")
             exit(1)
 
         if len(FOLDERS) != 1:
-            print("Error: more than one %s folder found; remove on of them, and rerun this script." % (title))
+            print(f"Error: more than one {title} folder found; remove on of them, and rerun this script.")
             print("  --> " + ' '.join(FOLDERS))
             exit(1)
 
         if not isdir(FOLDERS[0]):
-            print("Error: %s folder %s is not exist ot not a directory." % (title, FOLDERS[0]))
+            print(f"Error: {title} folder {FOLDERS[0]} is not exist ot not a directory.")
             exit(1)
 
-        print("%s folder discovered: %s" % (title, FOLDERS[0]))
+        print(f"{title} folder discovered: {FOLDERS[0]}")
         return FOLDERS[0]
 
     # discover Bias folder
@@ -81,7 +79,7 @@ class Discovery:
             FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
                                                  self.ppl['FLAT_BIAS_FOLDER_NAME'])
             if len(FLAT_BIAS_FOLDERS) > 1:
-                print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Bias'))
+                print(f"Error: more than one {'Flat Bias'} folder found; remove on of them, and rerun this script.")
                 print("  --> " + ' '.join(FLAT_BIAS_FOLDERS))
                 exit(1)
 
@@ -91,13 +89,13 @@ class Discovery:
                 self.FLAT_BIAS_FOLDER = self.BIAS_FOLDER
             else:
                 self.FLAT_BIAS_FOLDER = FLAT_BIAS_FOLDERS[0]
-            print("Flat Bias folder discovered: %s" % (self.FLAT_BIAS_FOLDER))
+            print(f"Flat Bias folder discovered: {self.FLAT_BIAS_FOLDER}")
 
             # discover flat dark folder
             FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
                                                  self.ppl['FLAT_DARK_FOLDER_NAME'])
             if len(FLAT_DARK_FOLDERS) > 1:
-                print("Error: more than one %s folder found; remove on of them, and rerun this script." % ('Flat Dark'))
+                print(f"Error: more than one {'Flat Dark'} folder found; remove on of them, and rerun this script.")
                 print("  --> " + ' '.join(FLAT_DARK_FOLDERS))
                 exit(1)
 
@@ -107,7 +105,7 @@ class Discovery:
                 self.FLAT_DARK_FOLDER = self.DARK_FOLDER
             else:
                 self.FLAT_DARK_FOLDER = FLAT_DARK_FOLDERS[0]
-            print("Flat Bias folder discovered: %s" % (self.FLAT_DARK_FOLDER))
+            print(f"Flat Bias folder discovered: {self.FLAT_DARK_FOLDER}")
 
             # discover flat folder
             self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder,

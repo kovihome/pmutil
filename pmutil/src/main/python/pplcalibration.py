@@ -27,6 +27,11 @@ import pmconventions as pmc
 from pmhotpix import BadPixelEliminator
 from pmraw import RawConverter
 
+# FITS header names
+FITS_HEADER_NAXIS = "NAXIS"
+FITS_HEADER_DATE_OBS = "DATE-OBS"
+FITS_HEADER_EXPTIME = "EXPTIME"
+FITS_HEADER_STACKCNT = "STACKCNT"
 
 class Pipeline:
     opt = {}  # command line options
@@ -72,10 +77,10 @@ class Pipeline:
         t_min = None
         count = 0
         for sourceFile in sourceFiles:
-            h = pm.getFitsHeaders(sourceFile, ['DATE-OBS', 'EXPTIME'])
-            fmt = '%Y-%m-%dT%H:%M:%S.%f' if h['DATE-OBS'].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
-            t = time.mktime(time.strptime(h['DATE-OBS'], fmt))
-            e = int(h['EXPTIME'])
+            h = pm.getFitsHeaders(sourceFile, [FITS_HEADER_DATE_OBS, FITS_HEADER_EXPTIME])
+            fmt = '%Y-%m-%dT%H:%M:%S.%f' if h[FITS_HEADER_DATE_OBS].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
+            t = time.mktime(time.strptime(h[FITS_HEADER_DATE_OBS], fmt))
+            e = int(h[FITS_HEADER_EXPTIME])
             e_sum = e_sum + e
             m_sum = m_sum + (t + e / 2) * e
             if t_min is None or t < t_min:
@@ -86,10 +91,11 @@ class Pipeline:
         d = datetime(*time.gmtime(m_avg)[:6])
         t_obs = datetime(*time.gmtime(t_min)[:6])
         headers = {
-            'DATE-OBS': t_obs.isoformat(),
-            'EXPTIME': e_sum,
+            FITS_HEADER_DATE_OBS: t_obs.isoformat(),
+            FITS_HEADER_EXPTIME: e_sum,
             'DATE-MID': (d.isoformat(), 'Effective center of time of observation'),
             'NCOMBINE': (count, 'number of images used for stacking'),
+            FITS_HEADER_STACKCNT: (count, 'number of images used for stacking'),
             'MCOMBINE': ('sum', 'combination mode')
         }
         pm.setFitsHeaders(targetFile, headers)
@@ -255,12 +261,12 @@ class Pipeline:
         return 0
 
     def getFitsHeadersForFlat(self, fitsFile):
-        h = pm.getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", "DATE-OBS"])
+        h = pm.getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", FITS_HEADER_DATE_OBS])
         instrument = (h["INSTRUME"] if "INSTRUME" in h else pm.setup["DEF_CAMERA"]).translate(
                 {ord(c): '_' for c in " /."})
         telescope = (h["TELESCOP"] if "TELESCOP" in h else pm.setup["DEF_TELESCOPE"]).translate(
                 {ord(c): '_' for c in " /."})
-        date = h["DATE-OBS"].split('T')[0].translate({ord(c): None for c in ":-"})
+        date = h[FITS_HEADER_DATE_OBS].split('T')[0].translate({ord(c): None for c in ":-"})
         return instrument, telescope, date
 
     def saveMasterFlat(self, flatFolder, color):
@@ -547,6 +553,54 @@ class Pipeline:
 
         # TODO: cleanup - delete light FITS files
 
+    def indetifyLights(self, folder:str) -> dict:
+        identification = {
+            "type": "",
+            "extension": "",
+            "calibration": "no"
+        }
+        # identify lights as RAW images
+        for ext in pmc.RAW_FILE_EXTENSIONS:
+            rawFiles = glob.glob(f"{folder}/*.{ext}")
+            if len(rawFiles) > 0:
+                identification["type"] = "raw"
+                identification["extension"] = ext
+                identification["pre"] = False
+                identification["flat"] = False
+                identification["stack"] = False
+                return identification
+
+        # identify lights as FITS images
+        for ext in pmc.FITS_FILE_EXTENSIONS:
+            fitsFiles = glob.glob(f"{folder}/*.{ext}")
+            if len(fitsFiles) > 0:
+                identification["type"] = "fits"
+                identification["extension"] = ext
+                identification["pre"] = False
+                identification["flat"] = False
+                identification["stack"] = False
+                break
+
+        if identification["type"] == "fits":
+
+            # get FITS headers
+            headers = pm.getFitsHeaders(fitsFiles[0], [FITS_HEADER_NAXIS, FITS_HEADER_STACKCNT])
+
+            # check 3D or single channel fits
+            if int(headers[FITS_HEADER_NAXIS]) == 3:
+                identification["type"] = "fits3d"
+
+            # check precalibration
+            if FITS_HEADER_STACKCNT in headers:
+                identification["stack"] = True
+                identification["pre"] = True  # not 100% sure, but for Seestar is OK
+
+            # check flat existence
+            if (self.FLAT_FOLDER is None or self.FLAT_FOLDER == "") and not self.opt["useMasterFlat"] and self.opt["masterFlat"] is None:
+                identification["flat"] = True
+
+        return identification
+
     def execute(self):
 
         ##########################
@@ -555,7 +609,10 @@ class Pipeline:
 
         self.discoverFolders()
 
-        if self.opt['masterFlat'] is not None and self.opt['masterFlat'] != 'flatlib':
+        ident = self.indetifyLights(self.LIGHT_FOLDERS[0])
+        print(f"Light identification: {ident}")
+
+        if not ident["flat"] and self.opt['masterFlat'] is not None and self.opt['masterFlat'] != 'flatlib':
             if not os.path.isdir(self.opt['masterFlat']):
                 pm.printError("Master-flat folder %s not exists." % (self.opt['masterFlat']))
                 exit(1)
@@ -577,11 +634,11 @@ class Pipeline:
         if not os.path.exists(self.TEMPDIR):
             os.makedirs(self.TEMPDIR)
 
-        ####################################
-        # step 1. create master bias frame
-        ####################################
+        if not self.opt['flatOnly'] and not ident["pre"]:
+            ####################################
+            # step 1. create master bias frame
+            ####################################
 
-        if not self.opt['flatOnly']:
             self.processBias(self.BIAS_FOLDER, "BIAS")
 
             ####################################
@@ -590,7 +647,7 @@ class Pipeline:
 
             self.processDark(self.DARK_FOLDER, self.BIAS_FOLDER, "DARK")
 
-        if not self.opt['useMasterFlat']:
+        if not self.opt['useMasterFlat'] and not ident["flat"]:
 
             # process flat bias, flat dark and flat, only if flat master is not exist
             ex = self.mastersExist(self.FLAT_FOLDER, pm.setup['MASTER_FLAT_FILE'])
@@ -616,23 +673,22 @@ class Pipeline:
             else:
                 pm.printInfo("FLAT: Master flat file(s) are already created.")
 
-        ##################################
-        # step 6. calibrate light frames
-        ##################################
         if not self.opt['flatOnly']:
 
             for lf in self.LIGHT_FOLDERS:
-                cf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['CALIB_FOLDER_NAME'])
-
-                self.processCalibration(lf, cf, "CALIBRATE")
+                ##################################
+                # step 6. calibrate light frames
+                ##################################
+                if not ident["pre"]:
+                    cf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['CALIB_FOLDER_NAME'])
+                    self.processCalibration(lf, cf, "CALIBRATE")
 
                 ###############################################
                 # step 7. registrate and combine light frames
                 ###############################################
-
-                sf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['SEQ_FOLDER_NAME'])
-
-                self.processRegistration(cf, sf, "REGISTRATE")
+                if not ident["stack"]:
+                    sf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['SEQ_FOLDER_NAME'])
+                    self.processRegistration(cf, sf, "REGISTRATE")
 
         print()
         print(pm.Blue + "Calibration is ready." + pm.Color_Off)
