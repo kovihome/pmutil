@@ -20,7 +20,61 @@ pmutil TODO
 
 NEW CALIBRATION BUGS:
 
+-NEW: ha teljes éjszakát akarok feldolgozni, akkor nem találja a Bias foldert. Egyik esetben sem működik.
+
+	kovi@ubuntu:~/photometry/20250703$ ppl-calibration -c all -F -e skip --debug ./
+
+	kovi@ubuntu:~/photometry$ ppl-calibration -c all -F -e skip --debug 20250703/
+	
+	Error: no Bias folder found; add one, and rerun this script.
+
+-NEW: valszeg ugyanezért, ha megadom a calib-foldert, akkor meg a light folderek megtalálásával van gondja
+
+	kovi@ubuntu:~/photometry$ ppl-calibration -c all -F -e skip --debug --calib-folder 20250703/20250703 20250703/
+	
+	Light folders discovered:
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-calibration", line 930, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-calibration", line 922, in run
+	    ppl.execute()
+	  File "/home/kovi/bin/ppl-calibration", line 681, in execute
+	    ident = self.identifyRawFrames(self.LIGHT_FOLDERS[0])
+	                                   ~~~~~~~~~~~~~~~~~~^^^
+	IndexError: list index out of range
+	
+-NEW: Light file prefix
+
+    - a Light file-oknak volt egy prefix-e, amit az EKOS tett oda (objektumnév), emiatt a konverzió lement, de a kalibráció már nem, üres maradt a könyvtár, semmi hibajelzés
+	
+	- a VControl doksiban az EKOS kezelésnél le kell írni, hogy hogy kell pontosan beállítani a neveket
+		
+	- esetleg a kalibrációt fel kell készíteni a prefixre, az is lehet alternatíva, hogy az EKOS prefixxel, de egy könyvtárba teszi a Light képeket	
+	
+-NEW: az egyik kép _bad lett, ezért nem találta, de fura hiba lett az eredménye:
+
+	akkor van, amikor csak az egyik csatornát gondolja bad-nek
+
+	Exception: [Errno 2] No such file or directory: '20250703_rx_lyr/Calibrated/Light_002-Ri.fits'
+	Traceback (most recent call last):
+	  File "/home/kovi/bin/ppl-calibration", line 933, in <module>
+	    app.run()
+	  File "/home/kovi/bin/ppl-calibration", line 925, in run
+	    ppl.execute()
+	  File "/home/kovi/bin/ppl-calibration", line 763, in execute
+	    self.processRegistration(cf, sf, "REGISTRATE")
+	  File "/home/kovi/bin/ppl-calibration", line 587, in processRegistration
+	    self.registrate(calibFolder, seqFolder, color)
+	  File "/home/kovi/bin/ppl-calibration", line 495, in registrate
+	    self.sumDateObs(COMBINED_FILE, COBJLIST)
+	  File "/home/kovi/bin/ppl-calibration", line 97, in sumDateObs
+	    fmt = '%Y-%m-%dT%H:%M:%S.%f' if h[FITS_HEADER_DATE_OBS].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
+	                                    ~^^^^^^^^^^^^^^^^^^^^^^
+	TypeError: 'NoneType' object is not subscriptable
+
 -NEW: !!! pmraw.convert save all color channel, regardless what is set on the command line
+
+-NEW: mintha a Logger.debug() nem jól múködne, --debug estén sem írja ki a szöveget
 
 NEW PHOTOMETRY BUGS:
 
@@ -141,6 +195,8 @@ TECH UPGRADE:
 (606) Check star kezelese
 	    - check star kereses es fotometria, keruljon a catalog-ba is
         - convertToAAVSOData: check star kezelés (nem itt kell megvalósítani, itt csak használja)
+
++(555) OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
 
 (554) lehet, hogy std esetben is kellene instr mg-ket számolni, illetve a kétféle számolást két külön aavso file-ba tenni
 
@@ -544,8 +600,6 @@ TECH UPGRADE:
 	SA35		  16	   +45			40			18
 	SA38		  19	   +45			20			16
 	SA41		  22	   +45			30			13
-
-(555) OBSERVER fits header, ha van, akkor ezt lehet hasznalni a -n opcio helyett
 
 (552) STD: average coeff szamolasa
 

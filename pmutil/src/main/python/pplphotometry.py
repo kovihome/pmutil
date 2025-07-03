@@ -24,6 +24,8 @@ from pmmerge import CatalogMatcher
 
 class Pipeline:
     opt = {}  # command line options
+    
+    obsCode = 'XYZ'
 
     AST_CFG = ''  # astrometry.net config file
     SEX_CFG = ''  # sextractor config file
@@ -222,7 +224,7 @@ class Pipeline:
             'saveCoeffs': self.opt['makeStd'],
             'showGraphs': self.opt['showGraphs'],
             'saveGraphs': self.opt['saveGraphs'],
-            'observer': self.opt['nameCode'],
+            'observer': self.obsCode, # self.opt['nameCode'],
             'files': [cmbFileName],
         }
         phot = Photometry(pmopt)
@@ -281,6 +283,23 @@ class Pipeline:
         s = glob(f"{seqFolder}/*.fits")
         b = [basename(x).split('-')[0] for x in s]
         return list(set(b))
+        
+    def getObserverNamecode(self, seqFolder):
+        if self.opt['nameCode'] is not None:
+            pm.printDebug(f"Using observer code {self.opt['nameCode']} from command line.")
+            return self.opt['nameCode']
+        s = glob(f"{seqFolder}/*.fits")
+        if len(s) > 0:
+            fitsObsName = pm.getFitsHeader(s[0], 'OBSERVER')
+            if fitsObsName is not None:
+                pm.printDebug(f"Using observer code {fitsObsName} from FITS header.")
+                return fitsObsName
+        setupObsName = pm.setup['DEF_NAMECODE']
+        if setupObsName is not None:
+            pm.printDebug(f"Using default observer code {setupObsName} from setup")
+            return setupObsName
+        pm.printWarning('No observer code was given. Use \'XYZ\' instead.')
+        return 'XYZ'
 
     def execute(self):
 
@@ -293,6 +312,8 @@ class Pipeline:
             pm.printError(f'No sequence folder found in base folder {self.opt["baseFolder"]}')
             exit(1)
         pm.printDebug(f"Sequence folders discovered: {seqFolders}")
+        
+        self.obsCode = self.getObserverNamecode(seqFolders[0])
 
         # ## Common arguments (saturation level, image section & trimming, etc.):
         self.AST_CFG = pm.setup['CONFIG_FOLDER'] + "/astrometry.cfg"
@@ -341,7 +362,7 @@ class Pipeline:
             opt = {
                 'out': REPORT_FOLDER,  # output folder
                 'rpt': 'aavso',  # report format, default: aavso extended
-                'name': self.opt['nameCode'],  # observer name code
+                'name': self.obsCode, # self.opt['nameCode'],  # observer name code
                 'method': self.opt['method'],  # mg calculation method, comp - single com star, gcx/lfit - ensemble
                 'showGraphs': self.opt['showGraphs'],
                 'saveGraphs': self.opt['saveGraphs'],
@@ -481,9 +502,9 @@ class MainApp:
             if args[0].endswith('/'):
                 self.opt['baseFolder'] = args[0][:-1]
 
-        if self.opt['nameCode'] is None:
-            pm.printWarning('No observer code was given. Use \'XYZ\' instead.')
-            self.opt['nameCode'] = 'XYZ'
+#        if self.opt['nameCode'] is None:
+#            pm.printWarning('No observer code was given. Use \'XYZ\' instead.')
+#            self.opt['nameCode'] = 'XYZ'
 
         print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
 

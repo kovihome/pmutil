@@ -105,7 +105,7 @@ class Discovery:
                 self.FLAT_DARK_FOLDER = self.DARK_FOLDER
             else:
                 self.FLAT_DARK_FOLDER = FLAT_DARK_FOLDERS[0]
-            print(f"Flat Bias folder discovered: {self.FLAT_DARK_FOLDER}")
+            print(f"Flat Dark folder discovered: {self.FLAT_DARK_FOLDER}")
 
             # discover flat folder
             self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder,
@@ -148,3 +148,4 @@ def loadConfig():
 def loadRefcat(baseFolder):
     refcatFileName = baseFolder.rstrip('/') + '/ref.cat'
     return Table.read(refcatFileName, format='ascii') if exists(refcatFileName) else None
+    

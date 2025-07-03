@@ -41,7 +41,7 @@ def sky_median_sig_clip(input_arr, sig_fract, percent_fract, max_iter = 100):
 		indices = numpy.where((work_arr < upper_limit) & (work_arr > lower_limit))
 		work_arr = work_arr[indices]
 		new_sky = numpy.median(work_arr)
-	return (new_sky, iteration)
+	return new_sky, iteration
 
 
 def sky_mean_sig_clip(input_arr, sig_fract, percent_fract, max_iter = 100):
@@ -76,7 +76,7 @@ def sky_mean_sig_clip(input_arr, sig_fract, percent_fract, max_iter = 100):
 		indices = numpy.where((work_arr < upper_limit) & (work_arr > lower_limit))
 		work_arr = work_arr[indices]
 		new_sky = numpy.mean(work_arr)
-	return (new_sky, iteration)
+	return new_sky, iteration
 
 
 def linear(inputArray, scale_min = None, scale_max = None):
@@ -95,9 +95,9 @@ def linear(inputArray, scale_min = None, scale_max = None):
 # 	print ("img_scale : linear")
 	imageData = numpy.array(inputArray, copy = True)
 
-	if scale_min == None:
+	if scale_min is None:
 		scale_min = imageData.min()
-	if scale_max == None:
+	if scale_max is None:
 		scale_max = imageData.max()
 
 	imageData = imageData.clip(min = scale_min, max = scale_max)
@@ -127,9 +127,9 @@ def sqrt(inputArray, scale_min = None, scale_max = None):
 # 	print ("img_scale : sqrt")
 	imageData = numpy.array(inputArray, copy = True)
 
-	if scale_min == None:
+	if scale_min is None:
 		scale_min = imageData.min()
-	if scale_max == None:
+	if scale_max is None:
 		scale_max = imageData.max()
 
 	imageData = imageData.clip(min = scale_min, max = scale_max)
@@ -159,9 +159,9 @@ def log(inputArray, scale_min = None, scale_max = None):
 # 	print ("img_scale : log")
 	imageData = numpy.array(inputArray, copy = True)
 
-	if scale_min == None:
+	if scale_min is None:
 		scale_min = imageData.min()
-	if scale_max == None:
+	if scale_max is None:
 		scale_max = imageData.max()
 	factor = math.log10(scale_max - scale_min)
 	indices0 = numpy.where(imageData < scale_min)
@@ -197,9 +197,9 @@ def asinh(inputArray, scale_min = None, scale_max = None, non_linear = 2.0):
 # 	print ("img_scale : asinh")
 	imageData = numpy.array(inputArray, copy = True)
 
-	if scale_min == None:
+	if scale_min is None:
 		scale_min = imageData.min()
-	if scale_max == None:
+	if scale_max is None:
 		scale_max = imageData.max()
 	factor = numpy.arcsinh((scale_max - scale_min) / non_linear)
 	indices0 = numpy.where(imageData < scale_min)
@@ -207,7 +207,6 @@ def asinh(inputArray, scale_min = None, scale_max = None, non_linear = 2.0):
 	indices2 = numpy.where(imageData > scale_max)
 	imageData[indices0] = 0.0
 	imageData[indices2] = 1.0
-	imageData[indices1] = numpy.arcsinh((imageData[indices1] - \
-	scale_min) / non_linear) / factor
+	imageData[indices1] = numpy.arcsinh((imageData[indices1] - scale_min) / non_linear) / factor
 
 	return imageData

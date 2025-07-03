@@ -2,11 +2,11 @@
 #
 # PmUtils/pmdisco
 #
-'''
+"""
 Created on Mar 2, 2020
 
 @author: kovi
-'''
+"""
 from os.path import isdir
 import glob
 
