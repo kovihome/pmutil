@@ -7,6 +7,7 @@ Created on Feb 22, 2020
 
 @author: kovi
 """
+import shutil
 from getopt import getopt, GetoptError
 from sys import argv
 from datetime import datetime
@@ -258,9 +259,13 @@ class Pipeline:
             for color in self.opt['color']:
                 seqFile = f"{seqFolder}/{baseFile}-{color}.fits"
                 astFile = f"{photFolder}/{baseFile}-{color}.ast.fits"
-                # pmcatFile = f"{photFolder}/{baseFile}-{color}.cat"
 
-                self.do_astrometry(seqFile, astFile, photFolder)
+                astFitsHeaders = pm.getFitsHeaders(seqFile, ["CRVAL1", "CRVAL2", "CTYPE1", "CTYPE2"])
+                if len(astFitsHeaders) == 0:
+                    self.do_astrometry(seqFile, astFile, photFolder)
+                else:
+                    pm.printInfo(f"Astrometry was done on image {astFile}")
+                    shutil.copy(seqFile, astFile)
 
                 pmcatFile = f"{photFolder}/{baseFile}-{color}.cat"
 

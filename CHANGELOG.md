@@ -2,9 +2,11 @@
 
 **1.2 - Transient search**
 
+- #650 - Using precalibrated FITS (SeeStar FITS images)
 - #572 - FITS headers contain instrument and camera name
 - #564 - new algorithm for aligning and stacking
 - #556 - store mag limit in catalog files
+- #555 - use observer namecode from FITS header
 - #553 - store std coefficients in catalog files
 - #547 - make sequence and combined photometry together 
 - #545 - preserve records even mag is below limit

@@ -11,6 +11,7 @@ Created on Mar 1, 2020
 import glob
 import os
 import os.path
+import shutil
 import time
 from datetime import datetime
 from getopt import getopt, GetoptError
@@ -26,12 +27,26 @@ import pmbase as pm
 import pmconventions as pmc
 from pmhotpix import BadPixelEliminator
 from pmraw import RawConverter
+from pmfits import FitsSeparator
 
 # FITS header names
 FITS_HEADER_NAXIS = "NAXIS"
 FITS_HEADER_DATE_OBS = "DATE-OBS"
 FITS_HEADER_EXPTIME = "EXPTIME"
 FITS_HEADER_STACKCNT = "STACKCNT"
+FITS_HEADER_BAYER = "BAYERPAT"
+FITS_HEADER_OBSERVER = "OBSERVER"
+FITS_HEADER_INSTRUMENT = "INSTRUME"
+FITS_HEADER_TELESCOPE = "TELESCOP"
+# 'IMAGETYP'
+# 'NAXIS1'
+# 'NAXIS2'
+# 'CREATOR'
+# 'DATE-MID'
+# 'NCOMBINE'
+# 'MCOMBINE'
+# 'CCD-TEMP'
+
 
 class Pipeline:
     opt = {}  # command line options
@@ -67,25 +82,28 @@ class Pipeline:
         self.FLAT_DARK_FOLDER = disco.FLAT_DARK_FOLDER
         self.LIGHT_FOLDERS = disco.LIGHT_FOLDERS
 
-    def imSizeArg(self, fitsFileName):
+    @staticmethod
+    def imSizeArg(fitsFileName):
         h = pm.getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
         return f"--image 0:0:{int(h['NAXIS1']) - 1:d}:{int(h['NAXIS2']) - 1:d}"
 
-    def sumDateObs(self, targetFile, sourceFiles):
+    @staticmethod
+    def sumDateObs(targetFile, sourceFiles):
         e_sum = 0
         m_sum = 0
         t_min = None
         count = 0
         for sourceFile in sourceFiles:
             h = pm.getFitsHeaders(sourceFile, [FITS_HEADER_DATE_OBS, FITS_HEADER_EXPTIME])
-            fmt = '%Y-%m-%dT%H:%M:%S.%f' if h[FITS_HEADER_DATE_OBS].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
-            t = time.mktime(time.strptime(h[FITS_HEADER_DATE_OBS], fmt))
-            e = int(h[FITS_HEADER_EXPTIME])
-            e_sum = e_sum + e
-            m_sum = m_sum + (t + e / 2) * e
-            if t_min is None or t < t_min:
-                t_min = t
-            count += 1
+            if h is not None:
+                fmt = '%Y-%m-%dT%H:%M:%S.%f' if h[FITS_HEADER_DATE_OBS].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
+                t = time.mktime(time.strptime(h[FITS_HEADER_DATE_OBS], fmt))
+                e = int(h[FITS_HEADER_EXPTIME])
+                e_sum = e_sum + e
+                m_sum = m_sum + (t + e / 2) * e
+                if t_min is None or t < t_min:
+                    t_min = t
+                count += 1
 
         m_avg = m_sum / e_sum
         d = datetime(*time.gmtime(m_avg)[:6])
@@ -113,14 +131,15 @@ class Pipeline:
             pm.printDebug(result)
         return result
 
-    def def_fits_headers(self, imtype):
+    @staticmethod
+    def def_fits_headers(imtype):
         hx = {'CREATOR': f"pmutil {pmc.PMUTIL_VERSION_SHORT}", 'IMAGETYP': imtype}
         if 'DEF_NAMECODE' in pm.setup:
-            hx['OBSERVER'] = pm.setup['DEF_NAMECODE']
+            hx[FITS_HEADER_OBSERVER] = pm.setup['DEF_NAMECODE']
         if 'DEF_CAMERA' in pm.setup and pm.setup['DEF_CAMERA'] != 'Generic Camera':
-            hx['INSTRUME'] = pm.setup['DEF_CAMERA']
+            hx[FITS_HEADER_INSTRUMENT] = pm.setup['DEF_CAMERA']
         if 'DEF_TELESCOPE' in pm.setup and pm.setup['DEF_TELESCOPE'] != 'Generic Telescope':
-            hx['TELESCOP'] = pm.setup['DEF_TELESCOPE']
+            hx[FITS_HEADER_TELESCOPE] = pm.setup['DEF_TELESCOPE']
         return hx
 
     def raw2fits(self, folder:str) -> int:
@@ -231,13 +250,13 @@ class Pipeline:
 
         return 0
 
-    def makeMasterFlat(self, flatfolder, biasFolder, darkFolder, color):
+    def makeMasterFlat(self, flatFolder, biasFolder, darkFolder, color):
         # Names of the individual files storing the raw bias, dark, flat and object frames:
-        FLAT_PATTERN = f"{flatfolder}/{pm.setup['FLAT_FILE_PREFIX']}*-{color}.fits"
+        FLAT_PATTERN = f"{flatFolder}/{pm.setup['FLAT_FILE_PREFIX']}*-{color}.fits"
         FLATLIST = glob.glob(FLAT_PATTERN)
         FLATLIST.sort()
 
-        masterFlatFile = f"{flatfolder}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
+        masterFlatFile = f"{flatFolder}/{pm.setup['MASTER_FLAT_FILE']}-{color}.fits"
         masterDarkFile = f"{darkFolder}/{pm.setup['MASTER_DARK_FILE']}-{color}.fits"
         masterBiasFile = f"{biasFolder}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
 
@@ -260,11 +279,12 @@ class Pipeline:
 
         return 0
 
-    def getFitsHeadersForFlat(self, fitsFile):
-        h = pm.getFitsHeaders(fitsFile, ["INSTRUME", "TELESCOP", FITS_HEADER_DATE_OBS])
-        instrument = (h["INSTRUME"] if "INSTRUME" in h else pm.setup["DEF_CAMERA"]).translate(
+    @staticmethod
+    def getFitsHeadersForFlat(fitsFile):
+        h = pm.getFitsHeaders(fitsFile, [FITS_HEADER_INSTRUMENT, FITS_HEADER_TELESCOPE, FITS_HEADER_DATE_OBS])
+        instrument = (h[FITS_HEADER_INSTRUMENT] if FITS_HEADER_INSTRUMENT in h else pm.setup["DEF_CAMERA"]).translate(
                 {ord(c): '_' for c in " /."})
-        telescope = (h["TELESCOP"] if "TELESCOP" in h else pm.setup["DEF_TELESCOPE"]).translate(
+        telescope = (h[FITS_HEADER_TELESCOPE] if FITS_HEADER_TELESCOPE in h else pm.setup["DEF_TELESCOPE"]).translate(
                 {ord(c): '_' for c in " /."})
         date = h[FITS_HEADER_DATE_OBS].split('T')[0].translate({ord(c): None for c in ":-"})
         return instrument, telescope, date
@@ -275,7 +295,7 @@ class Pipeline:
         flatLibFolder = pm.assureFolder(self.FLATLIB_FOLDER)
         libFlatFileName = f"{flatLibFolder}/{pm.setup['MASTER_FLAT_FILE']}-{instrument}-{telescope}-{date}-{color}.fits"
         copyfile(flatFileName, libFlatFileName)
-        print(f'Master flat {flatFileName} was saved into flat library as {libFlatFileName}')
+        pm.printInfo(f'Master flat {flatFileName} was saved into flat library as {libFlatFileName}')
 
     def findBestLibraryFlat(self, color, lightFileName):
         instrument, telescope, date = self.getFitsHeadersForFlat(lightFileName)
@@ -337,7 +357,6 @@ class Pipeline:
         # get calibration master images
         MB = f"{self.BIAS_FOLDER}/{pm.setup['MASTER_BIAS_FILE']}-{color}.fits"
         MD = f"{self.DARK_FOLDER}/{pm.setup['MASTER_DARK_FILE']}-{color}.fits"
-        #        MF = "%s/%s-%s.fits" % (self.FLAT_FOLDER, pm.setup['MASTER_FLAT_FILE'], color)
         MF = self.locateMasterFlat(color, IOBJLIST[0])
         print(f'Master flat: {MF}')
 
@@ -354,8 +373,10 @@ class Pipeline:
 
         # post process calibrated images
         print(f"Subtract background for {CALIB_PATTERN}")
+        h = pm.getFitsHeaders(R_IOBJLIST[0], ['NAXIS1', 'NAXIS2'])
+        bp_max = [int(h['NAXIS1']), int(h['NAXIS2'])]
         bpe = BadPixelEliminator()
-        bpe.loadBadPixelsForDark(MD, color)
+        bpe.loadBadPixelsForDark(MD, color, bp_max)
 
         for fitsFileName in R_IOBJLIST:
             # subtract background
@@ -366,7 +387,8 @@ class Pipeline:
 
         return 0
 
-    def alignImages(self, imageList, refIndex):
+    @staticmethod
+    def alignImages(imageList, refIndex):
         alignedImageList = []
         for n, image in enumerate(imageList):
             if n != refIndex:
@@ -383,7 +405,8 @@ class Pipeline:
                 refImage = refImage + image
         return self.subtractBackground(refImage)
 
-    def subtractBackground(self, image):
+    @staticmethod
+    def subtractBackground(image):
         sigma_clip = SigmaClip(sigma=3.0)
         bkg_estimator = MedianBackground()
         bkg = Background2D(image, (50, 50), filter_size=(3, 3), sigma_clip=sigma_clip, bkg_estimator=bkg_estimator)
@@ -414,7 +437,8 @@ class Pipeline:
 
         return self.subtractBackground(stackedImage)
 
-    def loadImageForAlign(self, fitsName):
+    @staticmethod
+    def loadImageForAlign(fitsName):
         hdul = fits.open(fitsName)
         return hdul[0].data.byteswap().newbyteorder()
 
@@ -471,6 +495,8 @@ class Pipeline:
         # cleanup - remove temp files
         #  nothing to delete
 
+        return 0
+
     def mastersExist(self, folder, prefix):
         for color in self.opt['color']:
             MB = f"{folder}/{prefix}-{color}.fits"
@@ -482,7 +508,8 @@ class Pipeline:
         ex = self.mastersExist(biasFolder, pm.setup['MASTER_BIAS_FILE'])
         if self.opt['overwrite'] or not ex:
             pm.printInfo(title + ": Convert bias RAW files to FITS.")
-            raw_count = self.raw2fits(biasFolder)
+            ident = self.preprocessRawFrames(biasFolder)
+            raw_count = ident["count"]
             if raw_count == 0 and not ex:
                 pm.printError(f"No Bias RAW images was found in folder {biasFolder}")
             elif raw_count == 0 and self.opt['overwrite'] and ex:
@@ -499,7 +526,8 @@ class Pipeline:
         ex = self.mastersExist(darkFolder, pm.setup['MASTER_DARK_FILE'])
         if self.opt['overwrite'] or not ex:
             pm.printInfo(title + ": Convert dark RAW files to FITS.")
-            raw_count = self.raw2fits(darkFolder)
+            ident = self.preprocessRawFrames(darkFolder)
+            raw_count = ident["count"]
             if raw_count == 0 and not ex:
                 pm.printError(f"No Dark RAW images was found in folder {darkFolder}")
             elif raw_count == 0 and self.opt['overwrite'] and ex:
@@ -514,7 +542,8 @@ class Pipeline:
 
     def processFlat(self, flatFolder, biasFolder, darkFolder, title):
         pm.printInfo(title + ": Convert flat RAW files to FITS.")
-        raw_count = self.raw2fits(flatFolder)
+        ident = self.preprocessRawFrames(flatFolder)
+        raw_count = ident["count"]
         if raw_count == 0:
             pm.printError(f"No Flat RAW images was found in folder {darkFolder}")
         else:
@@ -526,7 +555,7 @@ class Pipeline:
 
     def processCalibration(self, lightFolder, calibFolder, title):
         pm.printInfo(title + ": Convert light RAW files to FITS.")
-        self.raw2fits(lightFolder)
+        self.preprocessRawFrames(lightFolder)
 
         pm.printInfo(title + ": Create calibrated light file(s).")
 
@@ -553,51 +582,67 @@ class Pipeline:
 
         # TODO: cleanup - delete light FITS files
 
-    def indetifyLights(self, folder:str) -> dict:
+    def preprocessRawFrames(self, folder:str) -> dict:
+        pm.printDebug(f"Preprocess RAW Frames in folder {folder}")
+        ident = self.identifyRawFrames(folder)
+        pm.printDebug(f"Identify RA Frames as {ident}")
+        if ident["type"] == "raw":
+            pm.printDebug(f"Convert RAW to FITS")
+            file_count = self.raw2fits(folder)
+            ident["count"] = file_count
+
+        elif ident["type"] == "fits":
+            pm.printDebug(f"Separate FITS to color channels")
+            fs = FitsSeparator(self.opt)
+            fitsFiles = glob.glob(f"{folder}/*.{ident["ext"]}")
+            for fitsFile in fitsFiles:
+                fs.separate(fitsFile, folder)
+            ident["count"] = len(fitsFiles)
+
+        else:
+            ident["count"] = 0
+
+        return ident
+
+    def identifyRawFrames(self, folder:str) -> dict:
         identification = {
             "type": "",
-            "extension": "",
-            "calibration": "no"
+            "ext": "",
+            "pre": False,
+            "flat": False,
+            "stack": False
         }
-        # identify lights as RAW images
+        # identify as RAW images
         for ext in pmc.RAW_FILE_EXTENSIONS:
             rawFiles = glob.glob(f"{folder}/*.{ext}")
             if len(rawFiles) > 0:
                 identification["type"] = "raw"
-                identification["extension"] = ext
-                identification["pre"] = False
-                identification["flat"] = False
-                identification["stack"] = False
+                identification["ext"] = ext
                 return identification
 
-        # identify lights as FITS images
+        # identify as FITS images
+        fitsFiles = []
         for ext in pmc.FITS_FILE_EXTENSIONS:
             fitsFiles = glob.glob(f"{folder}/*.{ext}")
             if len(fitsFiles) > 0:
                 identification["type"] = "fits"
-                identification["extension"] = ext
-                identification["pre"] = False
-                identification["flat"] = False
-                identification["stack"] = False
+                identification["ext"] = ext
                 break
 
         if identification["type"] == "fits":
 
             # get FITS headers
-            headers = pm.getFitsHeaders(fitsFiles[0], [FITS_HEADER_NAXIS, FITS_HEADER_STACKCNT])
+            headers = pm.getFitsHeaders(fitsFiles[0], [FITS_HEADER_STACKCNT])
 
-            # check 3D or single channel fits
-            if int(headers[FITS_HEADER_NAXIS]) == 3:
-                identification["type"] = "fits3d"
+            # check flat existence
+            if (self.FLAT_FOLDER is None or self.FLAT_FOLDER == "") and not self.opt["useMasterFlat"] and self.opt[
+                "masterFlat"] is None:
+                identification["flat"] = True
 
             # check precalibration
             if FITS_HEADER_STACKCNT in headers:
                 identification["stack"] = True
                 identification["pre"] = True  # not 100% sure, but for Seestar is OK
-
-            # check flat existence
-            if (self.FLAT_FOLDER is None or self.FLAT_FOLDER == "") and not self.opt["useMasterFlat"] and self.opt["masterFlat"] is None:
-                identification["flat"] = True
 
         return identification
 
@@ -609,7 +654,7 @@ class Pipeline:
 
         self.discoverFolders()
 
-        ident = self.indetifyLights(self.LIGHT_FOLDERS[0])
+        ident = self.identifyRawFrames(self.LIGHT_FOLDERS[0])
         print(f"Light identification: {ident}")
 
         if not ident["flat"] and self.opt['masterFlat'] is not None and self.opt['masterFlat'] != 'flatlib':
@@ -679,9 +724,11 @@ class Pipeline:
                 ##################################
                 # step 6. calibrate light frames
                 ##################################
+                cf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['CALIB_FOLDER_NAME'])
                 if not ident["pre"]:
-                    cf = lf.replace(pm.setup['LIGHT_FOLDER_NAME'], pm.setup['CALIB_FOLDER_NAME'])
                     self.processCalibration(lf, cf, "CALIBRATE")
+                else:
+                    shutil.copy(lf, cf)
 
                 ###############################################
                 # step 7. registrate and combine light frames
@@ -716,13 +763,15 @@ class MainApp:
         self.argv = argv
         pass
 
-    def printTitle(self):
+    @staticmethod
+    def printTitle():
         print()
         print(f"{pm.BGreen}ppl-calibration, version {pmc.PMUTIL_VERSION}{pm.Color_Off}" )
         print(pm.Blue + "Calibrate a set of RAW or FITS images." + pm.Color_Off)
         print()
 
-    def usage(self):
+    @staticmethod
+    def usage():
         print("Usage: ppl-calibration [OPTIONS]... [BASE_FOLDER]")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
@@ -734,7 +783,7 @@ class MainApp:
         print("  -F,  --save-flat               save master flat into flat library")
         print("  -m,  --master-flat folder      use the given master-flat folder")
         print("  -M,  --use-flat                use master flat from flat library")
-        print("  -t,  --image-time LT|UT        specify orignal image time zone, LT=local time, UT=universal time")
+        print("  -t,  --image-time LT|UT        specify original image time zone, LT=local time, UT=universal time")
         print("       --calib-folder folder     alternative folder for calibration frames (bias, dark, flat)")
         print("  -w,  --overwrite               force to overwrite existing results")
         print(

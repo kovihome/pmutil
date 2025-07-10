@@ -2,11 +2,11 @@
 #
 # PmUtils/pmhotpix
 #
-'''
+"""
 Created on Feb 22, 2020
 
 @author: kovi
-'''
+"""
 from getopt import getopt, GetoptError
 from sys import argv
 from os.path import exists
@@ -88,17 +88,20 @@ class BadPixelEliminator:
         if badPixelFileName:
             self.loadBadPixels(badPixelFileName)
 
-    def loadBadPixelsForDark(self, masterDarkFileName, color):
+    def loadBadPixelsForDark(self, masterDarkFileName, color, maxpx):
         cosmeticFileName = masterDarkFileName[:masterDarkFileName.rindex('/')] + '/bad_pixels-' + color
         if not exists(cosmeticFileName):
             bpxDetector = BadPixelDetector(debug = self.debug)
             bpxDetector.execute(masterDarkFileName, color)
-        self.loadBadPixels(cosmeticFileName)
+        self.loadBadPixels(cosmeticFileName, maxpx)
 
-    def loadBadPixels(self, badPixelFileName):
+    def loadBadPixels(self, badPixelFileName, maxpx):
         table = Table.read(badPixelFileName, format = 'ascii')
         for j in range(len(table)):
-            self.badPixels.append({ 'x': int(table[j]['X']), 'y': int(table[j]['Y']) })
+            bpx = int(table[j]['X'])
+            bpy = int(table[j]['Y'])
+            if bpx < maxpx[0] and bpy < maxpx[1]:
+                self.badPixels.append({ 'x': int(table[j]['X']), 'y': int(table[j]['Y']) })
 
     def process(self, fitsFileName):
         if exists(fitsFileName):

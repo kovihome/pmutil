@@ -13,6 +13,8 @@ from glob import glob
 
 from astropy.table import Table
 
+import pmbase as pm
+
 PMUTIL_VERSION = "1.2.0"
 PMUTIL_VERSION_SHORT = "1.2"
 
@@ -37,25 +39,25 @@ class Discovery:
 
     @staticmethod
     def findFolders(baseFolder, folderName):
-        return glob('*' + baseFolder + '*/' + folderName) if baseFolder is not None else glob(folderName)
+        return glob(f"*{baseFolder}*/{folderName}") if baseFolder is not None and baseFolder != "." else glob(folderName)
 
     def discoverFolder(self, baseFolder, folderName, title):
         FOLDERS = self.findFolders(baseFolder, folderName)
-
+	
         if len(FOLDERS) == 0:
-            print(f"Error: no {title} folder found; add one, and rerun this script.")
+            pm.printError(f"No {title} folder found; add one, and rerun this script.")
             exit(1)
 
         if len(FOLDERS) != 1:
-            print(f"Error: more than one {title} folder found; remove on of them, and rerun this script.")
+            pm.printError(f"More than one {title} folder found; remove on of them, and rerun this script.")
             print("  --> " + ' '.join(FOLDERS))
             exit(1)
 
         if not isdir(FOLDERS[0]):
-            print(f"Error: {title} folder {FOLDERS[0]} is not exist ot not a directory.")
+            pm.printError(f"{title} folder {FOLDERS[0]} is not exist ot not a directory.")
             exit(1)
 
-        print(f"{title} folder discovered: {FOLDERS[0]}")
+        pm.printDebug(f"{title} folder discovered: {FOLDERS[0]}")
         return FOLDERS[0]
 
     # discover Bias folder
@@ -79,8 +81,8 @@ class Discovery:
             FLAT_BIAS_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
                                                  self.ppl['FLAT_BIAS_FOLDER_NAME'])
             if len(FLAT_BIAS_FOLDERS) > 1:
-                print(f"Error: more than one {'Flat Bias'} folder found; remove on of them, and rerun this script.")
-                print("  --> " + ' '.join(FLAT_BIAS_FOLDERS))
+                pm.printError(f"More than one {'Flat Bias'} folder found; remove on of them, and rerun this script.")
+                # print("  --> " + ' '.join(FLAT_BIAS_FOLDERS))
                 exit(1)
 
             if len(FLAT_BIAS_FOLDERS) == 0 or not isdir(FLAT_BIAS_FOLDERS[0]):
@@ -89,14 +91,14 @@ class Discovery:
                 self.FLAT_BIAS_FOLDER = self.BIAS_FOLDER
             else:
                 self.FLAT_BIAS_FOLDER = FLAT_BIAS_FOLDERS[0]
-            print(f"Flat Bias folder discovered: {self.FLAT_BIAS_FOLDER}")
+            pm.printDebug(f"Flat Bias folder discovered: {self.FLAT_BIAS_FOLDER}")
 
             # discover flat dark folder
             FLAT_DARK_FOLDERS = self.findFolders(self.folderPattern if not self.calibFolder else self.calibFolder,
                                                  self.ppl['FLAT_DARK_FOLDER_NAME'])
             if len(FLAT_DARK_FOLDERS) > 1:
-                print(f"Error: more than one {'Flat Dark'} folder found; remove on of them, and rerun this script.")
-                print("  --> " + ' '.join(FLAT_DARK_FOLDERS))
+                pm.printError(f"More than one {'Flat Dark'} folder found; remove on of them, and rerun this script.")
+                # print("  --> " + ' '.join(FLAT_DARK_FOLDERS))
                 exit(1)
 
             if len(FLAT_DARK_FOLDERS) == 0 or not isdir(FLAT_DARK_FOLDERS[0]):
@@ -105,7 +107,7 @@ class Discovery:
                 self.FLAT_DARK_FOLDER = self.DARK_FOLDER
             else:
                 self.FLAT_DARK_FOLDER = FLAT_DARK_FOLDERS[0]
-            print(f"Flat Dark folder discovered: {self.FLAT_DARK_FOLDER}")
+            pm.printDebug(f"Flat Dark folder discovered: {self.FLAT_DARK_FOLDER}")
 
             # discover flat folder
             self.FLAT_FOLDER = self.discoverFolder(self.folderPattern if not self.calibFolder else self.calibFolder,
@@ -114,8 +116,11 @@ class Discovery:
         if not self.flatOnly:
             # discovery Light folders
             self.LIGHT_FOLDERS = self.findFolders(self.folderPattern, self.ppl['LIGHT_FOLDER_NAME'])
+            if len(self.LIGHT_FOLDERS) == 0:
+                pm.printError(f"No {self.ppl['LIGHT_FOLDER_NAME']} folders found; add one, and rerun this script.")
+                exit(1)
 
-            print("Light folders discovered:" + ' '.join(self.LIGHT_FOLDERS))
+            pm.printDebug("Light folders discovered:" + ' '.join(self.LIGHT_FOLDERS))
 
 
 def findBaseFolders(baseFolderPattern):

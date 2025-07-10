@@ -11,6 +11,11 @@ from getopt import GetoptError, getopt
 from sys import argv
 from astropy.io import fits
 
+FITS_HEADER_NAXIS = "NAXIS"
+FITS_HEADER_HISTORY = "HISTORY"
+FITS_HEADER_FILTER = "FILTER"
+FITS_HEADER_BAYER = "BAYERPAT"
+
 class FitsSeparator:
     def __init__(self, opt):
         self.colors = opt["color"]
@@ -19,11 +24,11 @@ class FitsSeparator:
     def saveChannelFits(self, channel_data, original_header, channel, base_filename):
         if channel in self.colors:
             new_header = original_header.copy()
-            new_header['FILTER'] = channel
-            if 'BAYERPAT' in new_header:
-                bayer_pattern = new_header['BAYERPAT']
-                del new_header['BAYERPAT']
-                new_header['HISTORY'] = f"Debayering with Bayer pattern {bayer_pattern}"
+            new_header[FITS_HEADER_FILTER] = channel
+            if FITS_HEADER_BAYER in new_header:
+                bayer_pattern = new_header[FITS_HEADER_BAYER]
+                del new_header[FITS_HEADER_BAYER]
+                new_header[FITS_HEADER_HISTORY] = f"Debayering with Bayer pattern {bayer_pattern}"
             hdu = fits.PrimaryHDU(data=channel_data, header=new_header)
             hdu.writeto(f'{base_filename}-{channel}.fits', overwrite=True)
 
@@ -34,11 +39,18 @@ class FitsSeparator:
             # Get header and image data
             data = hdul[0].data  # vagy hdul[ext].data, ha nem az első HDU-ban van
             original_header = hdul[0].header
-            naxis = int(original_header['NAXIS'])
+            naxis = int(original_header[FITS_HEADER_NAXIS])
+            bayer_pattern = original_header[FITS_HEADER_BAYER] if FITS_HEADER_BAYER in original_header else None
             if naxis == 3:
-                self.separate3D(data, original_header, new_base_filename)
+                if bayer_pattern is not None:
+                    self.separateBayer3D(data, original_header, new_base_filename)
+                else:
+                    self.separateFlat3D(data, original_header, new_base_filename)
             else:
-                self.debayer(data, original_header, new_base_filename)
+                if bayer_pattern is not None:
+                    self.separateBayer2D(data, original_header, new_base_filename)
+                else:
+                    self.copyWithColor(data, original_header, new_base_filename)
 
     @staticmethod
     def separate_channel(data, bayer_pattern, color, second = False):
@@ -49,8 +61,8 @@ class FitsSeparator:
         ypi = ci % 2
         return data[xpi::2, ypi::2]
 
-    def separate3D(self, data, original_header, new_base_filename:str):
-        bayer_pattern = original_header['BAYERPAT'] if 'BAYERPAT' in original_header else None
+    def separateBayer3D(self, data, original_header, new_base_filename:str):
+        bayer_pattern = original_header[FITS_HEADER_BAYER] if FITS_HEADER_BAYER in original_header else None
 
         if 'Bi' in self.colors:
             B = self.separate_channel(data[0, :, :], bayer_pattern, 'B')
@@ -70,13 +82,13 @@ class FitsSeparator:
             self.saveChannelFits(R, original_header, 'Ri', new_base_filename)
 
 
-    def debayer(self, data, original_header, new_base_filename:str):
+    def separateBayer2D(self, data, original_header, new_base_filename:str):
 
         # Separate color channels
         # ch = [data[0::2, 0::2], data[0::2, 1::2], data[1::2, 0::2], data[1::2, 1::2]]
 
         # Apply Bayer pattern to resolve channel colors
-        bayer_pattern = original_header['BAYERPAT'] if 'BAYERPAT' in original_header else None
+        bayer_pattern = original_header[FITS_HEADER_BAYER] if FITS_HEADER_BAYER in original_header else None
         # B = ch[bayer_pattern.index('B')]
         # G1 = ch[bayer_pattern.index('G')]
         # G2 = ch[bayer_pattern.rindex('G')]
@@ -95,6 +107,15 @@ class FitsSeparator:
             R = self.separate_channel(data, bayer_pattern, 'R')
             self.saveChannelFits(R, original_header, 'Ri', new_base_filename)
 
+    def separateFlat3D(self, data, original_header, new_base_filename):
+        for i, color in enumerate(['Bi', 'Gi', 'Ri']):
+            if color in self.colors:
+                self.saveChannelFits(data[i, :, :], original_header, color, new_base_filename)
+
+    def copyWithColor(self, data, original_header, new_base_filename):
+        color = original_header[FITS_HEADER_FILTER] if FITS_HEADER_FILTER in original_header else 'Gi'
+        if color in self.colors:
+            self.saveChannelFits(data, original_header, color, new_base_filename)
 
 if __name__ == '__main__':
     print("pmfits - separate 3D or 2D Bayered FITS into 3 color channels")

@@ -27,8 +27,12 @@ NEW CALIBRATION BUGS:
 	kovi@ubuntu:~/photometry$ ppl-calibration -c all -F -e skip --debug 20250703/
 	
 	Error: no Bias folder found; add one, and rerun this script.
+	
+	- A kovetkezo modon mukodik:
+	
+	    kovi@ubuntu:~/photometry/20250703$ ppl-calibration -c all -F -e skip --debug 20250703
 
--NEW: valszeg ugyanezért, ha megadom a calib-foldert, akkor meg a light folderek megtalálásával van gondja
++NEW: valszeg ugyanezért, ha megadom a calib-foldert, akkor meg a light folderek megtalálásával van gondja
 
 	kovi@ubuntu:~/photometry$ ppl-calibration -c all -F -e skip --debug --calib-folder 20250703/20250703 20250703/
 	
@@ -51,7 +55,7 @@ NEW CALIBRATION BUGS:
 		
 	- esetleg a kalibrációt fel kell készíteni a prefixre, az is lehet alternatíva, hogy az EKOS prefixxel, de egy könyvtárba teszi a Light képeket	
 	
--NEW: az egyik kép _bad lett, ezért nem találta, de fura hiba lett az eredménye:
++NEW: az egyik kép _bad lett, ezért nem találta, de fura hiba lett az eredménye:
 
 	akkor van, amikor csak az egyik csatornát gondolja bad-nek
 
@@ -72,7 +76,7 @@ NEW CALIBRATION BUGS:
 	                                    ~^^^^^^^^^^^^^^^^^^^^^^
 	TypeError: 'NoneType' object is not subscriptable
 
--NEW: !!! pmraw.convert save all color channel, regardless what is set on the command line
++NEW: !!! pmraw.convert save all color channel, regardless what is set on the command line
 
 -NEW: mintha a Logger.debug() nem jól múködne, --debug estén sem írja ki a szöveget
 
@@ -97,6 +101,14 @@ NEW IDEAS:
     - a pplphotometry-nek legyen egy kapcsoloja, ami ezt megcsinalja, ha nem egy folderen vegzi a fotometriat
 
 TECH UPGRADE:
+
+- Upgrade AAVSO service URLs
+
+       Old URL 	            New URL                         Location
+    www.aavso.org/vsx/*     vsx.aavso.org/*                 pmrefcat
+    www.aavso.org/apps/*  	apps.aavso.org/*                pmrefcat
+    www.aavso.org/vsp/*     apps.aavso.org/vsp/*            pmrefcat
+    www.aavso.org/cgi-bin/* archive.aavso.org/cgi-bin/*
 
 - Upgrade ext packages:
 
@@ -167,20 +179,27 @@ TECH UPGRADE:
 
 (650) Kalibrált 3D FITS file-ok kezelése (Seestar)
 
-    - 3D FITS csatornakra bontasa (pmfits)
+    + 3D FITS csatornakra bontasa (pmfits)
 
     - Opcionalisan Flat
 
     - EXPTIME rendbetetele (pmfits)
 
     - Light azonositas:
-        - RAW -> 3 x FITS -> Light folder (pmraw)
+        + RAW -> 3 x FITS -> Light folder (pmraw)
         - FITS3D no calibration -> 3 x FITS -> Light folder (pmfits)
         - FITS3D precalibrated, no flat -> 3 x FITS -> Calibrated folder (pmfits)
         - FITS3D precalibrated, flatted -> 3 x FITS -> Sequence folder (pmfits)
         - FITS no calibration -> do nothing -> Light folder
         - FITS precalibrated, no flat -> copy -> Calibrated folder
         - FITS precalibrated, flatted -> copy -> Sequence folder
+
+    + A Seestar 2D light képeket is készít, de ezek Bayer-mátrixosak
+        + BAYERPAT header van benne
+        + [Q] Ha Bayeres, de már kalibrált, akkor célszerű-e debayerezni? Ez a 3D FITSre is vonatkozik.
+
+    + Astrometria: ha CTYPEn és CRVALn FITS headerek vannak a FITS file-ban, akkor nem kell astrometria.
+        - Nem fog hiányozni olyan file, amit az astrometry.net készít?
 
 (540) BUG: a rawfit tukrozi a kepet
 
