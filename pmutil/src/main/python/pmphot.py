@@ -247,7 +247,7 @@ class Photometry:
                 f"(gcx) color: {color}, zp: {z:7.4f}, mel^2: {mel_2:7.4f}, ez^2: {ez_2:7.4f}, ez: {np.sqrt(ez_2):7.4f}, N: {len(y):d}, ev: {err:7.4f}")
 
         self.ePlot.add(mis, mvs, [1, z], color, stdcolor, color[0].lower(), pm.Plot.INV_X + pm.Plot.INV_Y,
-                       title="Inst {color}i vs. Cat {stdcolor}")
+                       title=f"Inst {color} vs. Cat {stdcolor}")
 
         return [1.0, z], err
 
@@ -290,7 +290,7 @@ class Photometry:
 
         pm.printDebug(f"polyfit result: {coef} error: {ep}")
 
-        self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower(), title="Inst {color}i vs. Cat {stdcolor}")
+        self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower(), title=f"Inst {color} vs. Cat {stdcolor}")
 
         return coef, ep
 
@@ -349,7 +349,7 @@ class Photometry:
                     mi.append(float(pmr[self.mif[color]]))
                     mv.append(float(pmr[self.mvf[color]]))
 
-            self.ePlot.add(mi, mv, [1, zp], color, stdcolor, color[0].lower(), title="Inst {color}i vs. Cat {stdcolor}")
+            self.ePlot.add(mi, mv, [1, zp], color, stdcolor, color[0].lower(), title=f"Inst {color} vs. Cat {stdcolor}")
 
         return p, ep
 

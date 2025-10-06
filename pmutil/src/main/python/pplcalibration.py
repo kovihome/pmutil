@@ -750,7 +750,7 @@ class MainApp:
         'useMasterFlat': False,  #
         'imageTime': 'LT',  #
         'masterFlat': None,  # 'flatlib' or path for master flat
-        'onError': 'noop',  # mg calculation method: comp, gcx, lfit
+        'onError': 'noop',  # action on error: noop=nothing to do; skip=remove the file on processing; stop=stop processing at all
         'overwrite': False,  # force to overwrite existing results, optional
         'baseFolder': None,  # base folder, optional
         'calibFolder': None,  # optional folder for calibration frames (bias, dark, flat)

@@ -2,7 +2,6 @@
 #
 # PmUtils/pmmerge
 #
-
 """
 Created on Mar 17, 2021
 
@@ -11,11 +10,12 @@ Created on Mar 17, 2021
 
 from getopt import getopt, GetoptError
 from sys import argv
-from astropy.table import Table, join, setdiff
-from astropy.io import fits
 from os import remove
 from os.path import exists
 from math import log10
+
+from astropy.table import Table, join, setdiff
+from astropy.io import fits
 
 import pmbase as pm
 from pmviz import VizUCAC4
@@ -77,7 +77,7 @@ class CatalogMatcher:
 
         plotcolor = 'gbr'[nr]
         self.hmgPlot.add(logm1, loge1, [m1, b1], f'log mi ({plotcolor.upper()}i)', f'log ei ({plotcolor.upper()}i)',
-                         plotcolor, pm.Plot.INV_X, title="Mg limit")
+                         plotcolor, title="Mg limit")
 
         return [hmg1, hmg2]
 
@@ -182,15 +182,49 @@ class CatalogMatcher:
 
         # TODO: Azok a csillagok, amik nem latszanak Gi-ben, csak Bi-ben vagy Ri-ben, azok is keruljenek bele
 
-        # match Bi cat to Gi
-        self.mergeCatalogs(catFileBase + 'Gi.cat', catFileBase + 'Bi.cat', tempFileBase + 'GiBi.cat')
+        if len(self.colors) == 3:
+            ccFile = tempFileBase + 'GiBiRi.cat'
 
-        # match Ri cat to combined Gi + Bi
-        self.mergeCatalogs(tempFileBase + 'GiBi.cat', catFileBase + 'Ri.cat', tempFileBase + 'GiBiRi.cat')
+            # match Bi cat to Gi
+            self.mergeCatalogs(catFileBase + 'Gi.cat', catFileBase + 'Bi.cat', tempFileBase + 'GiBi.cat')
+
+            # match Ri cat to combined Gi + Bi
+            self.mergeCatalogs(tempFileBase + 'GiBi.cat', catFileBase + 'Ri.cat', ccFile)
+
+            # set the mapping table of merged catalog
+            m = {
+                'RA_DEG': 'col14',
+                'DEC_DEG': 'col15',
+                'MAG_GI': 'col4',
+                'ERR_GI': 'col5',
+                'MAG_BI': 'col27',
+                'ERR_BI': 'col28',
+                'MAG_RI': 'col50',
+                'ERR_RI': 'col51',
+                # 'X_COORD': 'col16',
+                # 'Y_COORD': 'col17'
+            }
+
+        elif len(self.colors) == 1:
+            # TODO
+            c = self.colors[0]
+            ccFile = catFileBase + f'{c}.cat'
+            m = {
+                'RA_DEG': 'col14',
+                'DEC_DEG': 'col15',
+                'MAG_' + c: 'col4',
+                'ERR_' + c: 'col5',
+                # 'X_COORD': 'col16',
+                # 'Y_COORD': 'col17'
+            }
+
+        else:
+            pm.printError(f"No merge strategy for colors {self.colors}")
+            return self.createCombinedCat(0)
 
         # load combined cat
 
-        table = Table.read(tempFileBase + 'GiBiRi.cat', format='ascii.no_header', delimiter=' ')
+        table = Table.read(ccFile, format='ascii.no_header', delimiter=' ')
         count = len(table)
         self.log.debug(f'{count} matched objects found')
 
@@ -198,14 +232,17 @@ class CatalogMatcher:
         cmb = self.createCombinedCat(count)
 
         # fill cmb data from combined cat
-        cmb['RA_DEG'] = table['col14']
-        cmb['DEC_DEG'] = table['col15']
-        cmb['MAG_GI'] = table['col4']
-        cmb['ERR_GI'] = table['col5']
-        cmb['MAG_BI'] = table['col27']
-        cmb['ERR_BI'] = table['col28']
-        cmb['MAG_RI'] = table['col50']
-        cmb['ERR_RI'] = table['col51']
+        for k in m.keys():
+            cmb[k] = table[m[k]]
+
+        # cmb['RA_DEG'] = table['col14']
+        # cmb['DEC_DEG'] = table['col15']
+        # cmb['MAG_GI'] = table['col4']
+        # cmb['ERR_GI'] = table['col5']
+        # cmb['MAG_BI'] = table['col27']
+        # cmb['ERR_BI'] = table['col28']
+        # cmb['MAG_RI'] = table['col50']
+        # cmb['ERR_RI'] = table['col51']
 
         ras = []
         des = []
@@ -259,8 +296,8 @@ class CatalogMatcher:
         # xmatch cmb to UCAC4 catalog
         # TODO: err values from xmatch
         xmt = self.viz.xmatch(combined, 'RA_DEG', 'DEC_DEG')
-        if not xmt:
-            self.log.error("Accessing Vizier service if failed.")
+        if xmt is None:
+            self.log.error("Accessing Vizier service was failed.")
             return
         self.log.debug(f'Xmatch table contains {len(xmt)} records')
 
@@ -383,6 +420,9 @@ class CatalogMatcher:
         # xmatch refcat to UCAC4
         # TODO: drop out records, where angDist comlumn value is grater then a threshold (bad match)
         xmt = self.viz.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
+        if xmt is None:
+            pm.printError("Adding refcat data to combined catalog failed.")
+            return
         self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
 
         missingRefcat = setdiff(foRefcat, xmt, 'AUID')
@@ -446,7 +486,9 @@ class CatalogMatcher:
 
         # xmatch combined catalog to UCAC4, and store UCAC4 id
         self.log.print('Match combined catalog with UCAC4')
-        self.xmatchViz(combined)
+        result = self.xmatchViz(combined)
+        if result is None:
+            return False
 
         # load refcat
         refcat = self.loadRefcat()
@@ -461,6 +503,8 @@ class CatalogMatcher:
         # save combined catalog
         self.log.print('Save combined catalog')
         self.save(combined)
+        
+        return True
 
 
 if __name__ == '__main__':

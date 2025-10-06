@@ -246,7 +246,6 @@ class Colorize:
         return True
 
     def execute(self):
-        print('Colorize.execute starts.')
         pmFolder = pm.setup['PHOT_FOLDER_NAME']
         seqFolder = pm.setup['SEQ_FOLDER_NAME']
 
@@ -318,7 +317,7 @@ class MainApp:
             elif o == '--scale':
                 self.opt['scaling'] = float(a)
             elif o == '-c' or o == '--color':
-                if a in ['Gi', 'Bi', 'Ri']:
+                if a in ['Gi', 'Bi', 'Ri', 'all']:
                     self.opt['color'] = a
                 else:
                     print(f"Invalid color code {a}. Available color codes are: Gi, Bi, Ri")
@@ -328,9 +327,13 @@ class MainApp:
                 self.usage()
                 exit(0)
 
-        self.opt['baseFolder'] = args[0]
-        if self.opt['baseFolder'].endswith('/'):
-            self.opt['baseFolder'] = args[0][:-1]
+        if len(args) > 0:
+            if args[0].endswith('/'):
+                self.opt['baseFolder'] = args[0][:-1]
+            else:
+                self.opt['baseFolder'] = args[0] 
+        else:    
+            self.opt['baseFolder'] = "./"
 
         print("scaling method: %s" % (self.opt['scaleMethod']))
 
