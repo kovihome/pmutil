@@ -298,7 +298,7 @@ class CatalogMatcher:
         xmt = self.viz.xmatch(combined, 'RA_DEG', 'DEC_DEG')
         if xmt is None:
             self.log.error("Accessing Vizier service was failed.")
-            return
+            return False
         self.log.debug(f'Xmatch table contains {len(xmt)} records')
 
         combined.add_index('AUID')
@@ -316,6 +316,8 @@ class CatalogMatcher:
     #            r['ERR_B'] = xr['e_Bmag']
     #            r['ERR_V'] = xr['e_Vmag']
     #            r['ERR_R'] = xr['e_Rmag']
+    
+        return True
 
     def loadRefcat(self):
         refcatFileName = f"{self.folder}/ref.cat"
@@ -488,6 +490,7 @@ class CatalogMatcher:
         self.log.print('Match combined catalog with UCAC4')
         result = self.xmatchViz(combined)
         if result is None:
+            print("Error: something wrong with the xmatchViz")
             return False
 
         # load refcat

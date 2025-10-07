@@ -1,32 +1,45 @@
-## pmutil changelog
+# Changelog
 
-**1.2 - Transient search**
+All notable changes to this project will be documented in this file.
 
-- #650 - Using precalibrated FITS (SeeStar FITS images)
-- #572 - FITS headers contain instrument and camera name
-- #564 - new algorithm for aligning and stacking
-- #556 - store mag limit in catalog files
-- #555 - use observer namecode from FITS header
-- #553 - store std coefficients in catalog files
-- #547 - make sequence and combined photometry together 
-- #545 - preserve records even mag is below limit
-- #539 - save graphs with --saveGraph option
-- #537 - update reference catalog
-- #490 - manage flat library
-- #489 - reference catalog contains field stars
-- #482 - make saved command file executable
-- #465 - archivating raw images and result files
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**1.1 - Standardisation**
+## [[Unreleased]](https://github.com/kovihome/pmutil) - transient search
+### Added
+- Using precalibrated FITS (SeeStar FITS images)
+- New algorithm for aligning and stacking
+- Save graphs with --saveGraph option
+- Manage flat library
+- Archivate raw images and result files
 
-- #542 - calculat magnitude limit with linear fit
-- #541 - select best reference image for aligning
-- #523 - create histogram equalized jpg
-- #519 - create monochrome jpg
-- #474 - .pmlib folder for configuration and common files
-- #463 - save calibrated image in jpg
-- #452 - more magnitude calculation methods
-- #450 - standardisation
-- #449 - manage hot/dead pixels
+### Modified
+- FITS headers contain instrument and camera name
+- Use observer namecode from FITS header
+- Store mag limit in catalog files
+- Store standard coefficients in catalog files
+- Preserve records even mag is below limit
+- Make sequence and combined photometry together 
+- Update reference catalog
+- Reference catalog contains field stars
+- Make saved command file executable
 
-**1.0 - Original release** 
+## [[1.1] - 2021-01-22](https://github.com/kovihome/pmutil/releases/tag/pmutil-v1.1.0) - Standardization
+### Added
+- Calculate magnitude limit with linear fit
+- Select best reference image for aligning
+- Create histogram equalized jpg
+- Create monochrome jpg
+- .pmlib folder for configuration and common files
+- Save calibrated image in jpg
+- More magnitude calculation methods
+- Standardization
+- Manage hot/dead pixels
+
+## [[1.0] - 2020-01-26](https://github.com/kovihome/pmutil/releases/tag/pmutil-v1.0.0) - Original release
+### Added
+- Image calibration with FITSH
+- Photometry with Astromerty.net and SExtractor
+- Using stored flats
+- Reference catalog for variables and comparison stars
+- Observation report in AAVSO format

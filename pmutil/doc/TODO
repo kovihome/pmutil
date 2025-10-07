@@ -14,6 +14,52 @@ pmutil TODO
 
 -----------
 
+-NEW: 20190612-RXLyr, hibas comp star
+
+    Az ensemble_parameters abran latszik egy nagyon kilogo pont, de nem jottem ra, hogy melyik comp az
+    ettol tok rossz az adhoc std
+
+-NEW: ppl-colorize elszall, ha nem adok meg foldert, ellenorizni kellene, es hibat kiiratni
+
+   	+ Traceback (most recent call last):
+      File "/home/kovi/bin/ppl-colorize", line 350, in <module>
+        app.run()
+      File "/home/kovi/bin/ppl-colorize", line 339, in run
+        self.processCommands()
+      File "/home/kovi/bin/ppl-colorize", line 331, in processCommands
+        self.opt['baseFolder'] = args[0]
+                             ~~~~^^^
+    IndexError: list index out of range
+    
+    + meg mindig elszall, csak most mashol
+
+    Traceback (most recent call last):
+      File "/home/kovi/bin/ppl-colorize", line 350, in <module>
+        app.run()
+      File "/home/kovi/bin/ppl-colorize", line 339, in run
+        self.processCommands()
+      File "/home/kovi/bin/ppl-colorize", line 333, in processCommands
+        self.opt['baseFolder'] = args[0][:-1]
+                             ~~~~^^^
+    IndexError: list index out of range
+    
+    - ha nincs baseFolder, akkor nem csinal semmit
+    
+        baseFolderPattern: ./
+        baseFolders: []
+        
+    - ha a baseFolder ./, akkor hibakat ir
+    
+        baseFolderPattern: .
+        baseFolders: ['magnitude_limit.png', '20090717_m57-ann.jpg', '20090717_m57.orig.jpg', 'ref.cat',            '20090717_m57.extended.aavso', 'std_coefficients.png', 'ensemble_parameters.png', '20090717_m57.jpg']
+        *** magnitude_limit.png
+        Error: No combined FITS images exist in folders Photometry or Sequence
+
++NEW: ppl-colorize hibat mond a -c all opciora, de jol mukodik
+
+    Invalid color code all. Available color codes are: Gi, Bi, Ri
+
+
 -NEW: configure error:
 
 	chmod: cannot access '/home/kovi/bin/*': No such file or directory
@@ -76,7 +122,7 @@ NEW CALIBRATION BUGS:
 	                                    ~^^^^^^^^^^^^^^^^^^^^^^
 	TypeError: 'NoneType' object is not subscriptable
 
-+NEW: !!! pmraw.convert save all color channel, regardless what is set on the command line
++NEW: pmraw.convert save all color channel, regardless what is set on the command line
 
 -NEW: mintha a Logger.debug() nem jól múködne, --debug estén sem írja ki a szöveget
 
@@ -102,19 +148,11 @@ NEW IDEAS:
 
 TECH UPGRADE:
 
-- Upgrade AAVSO service URLs
-
-       Old URL 	            New URL                         Location
-    www.aavso.org/vsx/*     vsx.aavso.org/*                 pmrefcat
-    www.aavso.org/apps/*  	apps.aavso.org/*                pmrefcat
-    www.aavso.org/vsp/*     apps.aavso.org/vsp/*            pmrefcat
-    www.aavso.org/cgi-bin/* archive.aavso.org/cgi-bin/*
-
 - Upgrade ext packages:
 
 	Pkg			Lastest version		Actual version
 
-	ExifTool		13.25	2025-03-11	12.76			    !!! min 10.82 for CR3 support
+	ExifTool		13.32	2025-03-11	12.76			    !!! min 10.82 for CR3 support
 
 	FITSH			0.9.4	2021-02-04	0.9.3	2019-02-06
 
@@ -124,25 +162,25 @@ TECH UPGRADE:
 
 	//wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
 
-	python			3.13.2  2025-02-04	3.12.3
+	python			3.13.5  2025-06-11	3.12.3
 
 	python/astroalign	2.6.1	2024-11-15	2.4.1
 
-	python/astropy		7.0.1	2025-02-06	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+	python/astropy		7.1.0	2025-05-20	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.9	2025-01-25	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
+	python/astroquery	0.4.10	2025-03-18	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
-	python/matplotlib	3.10.1	2025-02-27	3.1.2			!!!
+	python/matplotlib	3.10.3	2025-05-08	3.1.2			!!!
 
-	python/numpy		2.2.3	2025-02-13	1.16.3			!!!
+	python/numpy		2.3.1	2025-06-21	1.16.3			!!!
 
-	python/pillow		11.1.0	2025-01-02	5.1.0			!!!
+	python/pillow		11.3.0	2025-07-01	5.1.0			!!!
 
 	python/photutils	2.2.0	2025-02-18	0.7.2			!!!
 
-	python/rawpy        0.24.0  2024-12-14  0.23.1
+	python/rawpy        0.25.0  2025-05-12  0.23.1
 
-	python/scipy		1.15.2	2025-02-17	1.4.1			!!!
+	python/scipy		1.16.0	2025-06-22	1.4.1			!!!
 
 	python/xmltodict	0.14.2	2024-10-16	0.12.0
 
@@ -174,6 +212,14 @@ TECH UPGRADE:
 		High: *451, *548
 		Med : *554
 		Low : *525, *544, 576
+
+(655) Upgrade AAVSO service URLs
+
+       Old URL 	            New URL                         Location
+    www.aavso.org/vsx/*     vsx.aavso.org/*                 pmrefcat
+    www.aavso.org/apps/*  	apps.aavso.org/*                pmrefcat
+    www.aavso.org/vsp/*     apps.aavso.org/vsp/*            (pmrefcat)
+    www.aavso.org/cgi-bin/* archive.aavso.org/cgi-bin/*
 
 --- calibration --------------------------------------------
 

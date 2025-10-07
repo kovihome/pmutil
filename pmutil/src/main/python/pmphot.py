@@ -184,7 +184,7 @@ class Photometry:
         Calculate unit slope linear fit regression with robust averaging
         see: http://gcx.sourceforge.net/html/node11.html
         inputs:    I[k] - instrumental mgs              MAG_ISOCORR | MAG_BEST
-                   S[k] - standard mgs                  MAG_R \ MAG_V | MAG_B
+                   S[k] - standard mgs                  MAG_R | MAG_V | MAG_B
                    ei[k] - error of instrumental mgs    MAGERR_ISOCORR | MAGERR_BEST
                    es[k] - error of standard mgs        ERR_R | ERR_V | ERR_B
         """
@@ -390,9 +390,10 @@ class Photometry:
         w_Tbv = []
         for row in mergedCat:
             if row['MAG_V'] == '-' or row['MAG_B'] == '-' or row['MAG_R'] == '-' or \
-                    row['MAG_GI'] == '-' or row['MAG_BI'] == '-' or row['MAG_RI'] == '-':
+                    row['MAG_GI'] == '-' or row['MAG_BI'] == '-' or row['MAG_RI'] == '-' or \
+                    row['MAG_GI'] == 99.0 or row['MAG_BI'] == 99.0 or row['MAG_RI'] == 99.0:
                 continue
-
+                
             V_vi.append(float(row['MAG_V']) - float(row['MAG_GI']))
             V_R.append(float(row['MAG_V']) - float(row['MAG_R']))
             vi_ri.append(float(row['MAG_GI']) - float(row['MAG_RI']))
@@ -604,7 +605,6 @@ class Photometry:
         return cmb
 
     def calcHmg(self, cmb, vcomp):
-        # print(f'vcomp: {vcomp}')
         for cc in ['Gi', 'Bi', 'Ri']:
             hmgInst = pm.getTableComment(cmb, 'MgLimitInst' + cc)
             hmg = float(hmgInst) + vcomp[cc]['mc'] - vcomp[cc]['mi']
@@ -671,8 +671,6 @@ class Photometry:
             # standardization
             coeffs = None
 
-            print("************** files")
-            print(self.opt['files'])
             target = pm.guess(self.opt['files'][0])['target']
 
             if self.opt['makeCoeffs']:

@@ -126,7 +126,9 @@ warn_py_module "matplotlib" "3.1"
 warn_py_module "numpy" "1.18"
 warn_py_module "photutils" "0.7"
 warn_py_module "pillow" "5.3"
-warn_py_module "regions" "0.5"
+#warn_py_module "regions" "0.5"
+warn_py_module "rawpy" "0.17"
+warn_py_module "scikit-image" "0.25"
 warn_py_module "scipy" "1.4"
 warn_py_module "xmltodict" "0.12"
 
@@ -164,9 +166,9 @@ warn_version "$SEXTRACTOR_VERSION" "$SEXTRACTOR_MINVERSION" "SExtractor"
 
 # wcstools
 
-WCSFTOOL_VERSION=$(sethead 2> shtmp; grep "WCSTools" shtmp | cut -d" " -f3 | cut -d"," -f1; rm shtmp)
-WCSTOOL_MINVERSION=3.9.5
-warn_version "$WCSFTOOL_VERSION" "$WCSTOOL_MINVERSION" "wcstool"
+#WCSFTOOL_VERSION=$(sethead 2> shtmp; grep "WCSTools" shtmp | cut -d" " -f3 | cut -d"," -f1; rm shtmp)
+#WCSTOOL_MINVERSION=3.9.5
+#warn_version "$WCSFTOOL_VERSION" "$WCSTOOL_MINVERSION" "wcstool"
 
 ####################################
 # Copy sources to user's bin folder
@@ -215,6 +217,7 @@ copy_source "python/pmconventions.py" "pmconventions.py"
 copy_source "python/pmmerge.py" "pmmerge.py"
 copy_source "python/pmraw.py" "pmraw.py"
 copy_source "python/pmviz.py" "pmviz.py"
+copy_source "python/pmfits.py" "pmfits.py"
 
 create_link "pplphotometry.py" "ppl-photometry"
 create_link "pplcalibration.py" "ppl-calibration"
