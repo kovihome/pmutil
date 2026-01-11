@@ -149,13 +149,13 @@ class Photometry:
     def __init__(self, opt):
         self.opt = opt
 
-    def loadFitsHeaders(self, fileName):
+    def loadFitsHeaders(self, fileName: str) -> None:
         """
         fileName: path/[Seq_nnn|Combined].cmb.pm
         """
         self.fits = pm.getFitsHeaders(fileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
 
-    def getCamera(self):
+    def getCamera(self) -> str:
         if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
             return self.fits['INSTRUME']
         if 'camera' in self.opt and self.opt['camera'] and len(self.opt['camera']) > 0:
@@ -164,7 +164,7 @@ class Photometry:
             return pm.setup['DEF_CAMERA']
         return 'Generic Camera'
 
-    def getTelescope(self):
+    def getTelescope(self) -> str:
         if 'TELESCOP' in self.fits.keys() and self.fits['TELESCOP'] and len(self.fits['TELESCOP']) > 0:
             return self.fits['TELESCOP']
         if 'telescope' in self.opt and self.opt['telescope'] and len(self.opt['telescope']) > 0:
@@ -173,7 +173,8 @@ class Photometry:
             return pm.setup['DEF_TELESCOPE']
         return 'Generic Telescope'
 
-    def stdColor(self, color):
+    @staticmethod
+    def stdColor(color: str) -> str:
         stdcolor = color[:1].upper()
         if stdcolor == 'G':
             stdcolor = 'V'
@@ -273,8 +274,7 @@ class Photometry:
                 mi.append(float(pmr[self.mif[color]]))
                 mv.append(float(pmr[self.mvf[color]]))
                 ei = float(pmr[self.eif[color]])
-                ev = float(pmr[self.evf[color]]) if pmr[self.evf[color]] != '-' and pmr[
-                    self.evf[color]] != '0.0' else ei
+                ev = float(pmr[self.evf[color]]) if self.isValidMgErr(pmr[self.evf[color]]) else ei
                 e2 = ei * ei + ev * ev
                 ep = ep + e2
                 N = N + 1
@@ -294,6 +294,14 @@ class Photometry:
 
         return coef, ep
 
+    @staticmethod
+    def isValidMg (mg: str) -> bool:
+        return mg != '-' and mg != '99.0' and mg != 99.0
+
+    @staticmethod
+    def isValidMgErr(err: str) -> bool:
+        return err != '-' and err != '0.0' and err != 0.0
+
     def findBestCompStar(self, comps, color):
         # filter out com stars not measured
         emin = 1.0
@@ -301,15 +309,15 @@ class Photometry:
         for pms in comps:
             mvs = pms[self.mvf[color]]
             evs = pms[self.evf[color]]
-            if mvs != '-' and mvs != '99.0':
-                ei = float(pms[self.eif[color]]) if pms[self.eif[color]] != '-' else MAG_ERR_DEFAULT
-                ev = float(evs) if evs != '-' and evs != '0.0' else ei
+            if self.isValidMg(mvs):
+                ei = float(pms[self.eif[color]]) if self.isValidMgErr(pms[self.eif[color]]) else MAG_ERR_DEFAULT
+                ev = float(evs) if self.isValidMgErr(evs) else ei
                 e = ei * ei + ev * ev
                 if e < emin:
                     haveAllMags = True
                     for c in self.opt['color']:
                         if c != color:
-                            if pms[self.mvf[c]] == '-' or pms[self.evf[c]] == '-':
+                            if not self.isValidMg(pms[self.mvf[c]]) or not self.isValidMgErr(pms[self.evf[c]]):
                                 haveAllMags = False
                                 break
                     if not haveAllMags:
@@ -318,8 +326,8 @@ class Photometry:
                     bestComp = pms
 
         if bestComp:
-            ei = float(bestComp[self.eif[color]]) if bestComp[self.eif[color]] != '-' else MAG_ERR_DEFAULT
-            ev = float(bestComp[self.evf[color]]) if bestComp[self.evf[color]] != '-' else MAG_ERR_DEFAULT
+            ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else MAG_ERR_DEFAULT
+            ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else MAG_ERR_DEFAULT
             e = pm.quad(ei, ev)
             bestComp['ROLE'] = 'K'
             pm.printDebug(f'Best comp star: {bestComp["AUID"]}, mag: {bestComp[self.mvf[color]]}, err: {e:4.3f}')
@@ -336,16 +344,15 @@ class Photometry:
 
         zp = float(bestComp[self.mvf[color]]) - float(bestComp[self.mif[color]])
         p = [1.0, zp]
-        ei = float(bestComp[self.eif[color]]) if bestComp[self.eif[color]] != '-' else MAG_ERR_DEFAULT
-        ev = float(bestComp[self.evf[color]]) if bestComp[self.evf[color]] != '-' and bestComp[
-            self.evf[color]] != '0.0' else ei
+        ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else MAG_ERR_DEFAULT
+        ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else ei
         ep = pm.quad(ei, ev)
 
         if self.opt['showGraphs'] or self.opt['saveGraphs']:
             mi = []
             mv = []
             for pmr in comps:
-                if pmr[self.mvf[color]] != '-' and pmr['VIZ_FLAG'] == '---':
+                if self.isValidMg(pmr[self.mvf[color]]) and pmr['VIZ_FLAG'] == '---':
                     mi.append(float(pmr[self.mif[color]]))
                     mv.append(float(pmr[self.mvf[color]]))
 
@@ -373,10 +380,10 @@ class Photometry:
 
     # standardization functions
 
-    def mgd(self, s):
-        return float(s) if s != '-' and s != '0.0' else MAG_ERR_DEFAULT
+    def mgd(self, s: str) -> float:
+        return float(s) if self.isValidMgErr(s) else MAG_ERR_DEFAULT
 
-    def calculateCoeffs(self, mergedCat):
+    def calculateCoeffs(self, mergedCat: Table) -> list[float]:
         # Tv:  slope of (V-v) -> (V-R)
         # Tvr: 1/slope of (v-r) -> (V-R)
         # Tbv: 1/slope of (b-v) -> (B-V)
@@ -390,8 +397,7 @@ class Photometry:
         w_Tbv = []
         for row in mergedCat:
             if row['MAG_V'] == '-' or row['MAG_B'] == '-' or row['MAG_R'] == '-' or \
-                    row['MAG_GI'] == '-' or row['MAG_BI'] == '-' or row['MAG_RI'] == '-' or \
-                    row['MAG_GI'] == 99.0 or row['MAG_BI'] == 99.0 or row['MAG_RI'] == 99.0:
+                    not self.isValidMg(row['MAG_GI']) or not self.isValidMg(row['MAG_BI']) or not self.isValidMgErr(row['MAG_RI']):
                 continue
                 
             V_vi.append(float(row['MAG_V']) - float(row['MAG_GI']))
@@ -469,7 +475,8 @@ class Photometry:
 
         return vcomp
 
-    def setEmptyStd(self, cmb):
+    @staticmethod
+    def setEmptyStd(cmb: Table) -> Table:
         cmb['MAG_STDB'] = ['-'] * len(cmb)
         cmb['ERR_STDB'] = ['-'] * len(cmb)
         cmb['MAG_STDV'] = ['-'] * len(cmb)
@@ -478,7 +485,7 @@ class Photometry:
         cmb['ERR_STDR'] = ['-'] * len(cmb)
         return cmb
 
-    def calculateSimpleMgs(self, cmb, vcomp):
+    def calculateSimpleMgs(self, cmb: Table, vcomp):
         ma = []
         ea = []
         for c in ['Ri', 'Gi', 'Bi']:
@@ -499,7 +506,7 @@ class Photometry:
 
         return self.setEmptyStd(cmb)
 
-    def calculateStdMgs(self, coeffs, cmb, vcomp, std):
+    def calculateStdMgs(self, coeffs, cmb, vcomp, std: bool):
         """
         allResults: dict of results, key is th color
         """
@@ -526,63 +533,39 @@ class Photometry:
         er_result = []
 
         for g_row in cmb:
-            role = g_row['ROLE']
-            if 1 == 1:  # role == 'V' or role == 'VF' or role == 'K':
-                # auid = g_row['AUID']
 
-                isFainter = g_row['VIZ_FLAG'] == 'III'  # TODO: I es B flagek kezelese is
+            isFainter = 'I' in g_row['VIZ_FLAG']  # TODO: I es B flagek kezelese is
 
-                Tv = coeffs[0] if not isFainter else 0.0
-                Tvr = coeffs[1] if not isFainter else 1.0
-                Tbv = coeffs[2] if not isFainter else 1.0
+            Tv = coeffs[0] if not isFainter else 0.0
+            Tvr = coeffs[1] if not isFainter else 1.0
+            Tbv = coeffs[2] if not isFainter else 1.0
 
-                v0 = float(g_row['MAG_GI'])
-                b0 = float(g_row['MAG_BI'])
-                r0 = float(g_row['MAG_RI'])
+            v0 = float(g_row['MAG_GI'])
+            b0 = float(g_row['MAG_BI'])
+            r0 = float(g_row['MAG_RI'])
 
-                V_R = (Vc_Rc) + Tvr * ((v0 - r0) - (vc - rc))
-                V = v0 + (Vc - vc) + Tv * ((V_R) - (Vc_Rc))
-                R = V - (V_R)
-                B = V + (Bc - Vc) + Tbv * ((b0 - v0) - (bc - vc))
+            V_R = (Vc_Rc) + Tvr * ((v0 - r0) - (vc - rc))
+            V = v0 + (Vc - vc) + Tv * ((V_R) - (Vc_Rc))
+            R = V - (V_R)
+            B = V + (Bc - Vc) + Tbv * ((b0 - v0) - (bc - vc))
+            
+            validStd = not (isFainter and std)
 
-                v_result.append(V)
-                b_result.append(B)
-                r_result.append(R)
+            v_result.append(V if self.isValidMg(g_row['MAG_GI']) and validStd else 99.0)
+            b_result.append(B if self.isValidMg(g_row['MAG_BI']) and validStd else 99.0)
+            r_result.append(R if self.isValidMg(g_row['MAG_RI']) and validStd else 99.0)
 
-                if not isFainter:
+            err_v0 = float(g_row['ERR_GI']) if self.isValidMgErr(g_row['ERR_GI']) else err_vc
+            err_b0 = float(g_row['ERR_BI']) if self.isValidMgErr(g_row['ERR_BI']) else err_bc
+            err_r0 = float(g_row['ERR_RI']) if self.isValidMgErr(g_row['ERR_RI']) else err_rc
 
-                    err_v0 = float(g_row['ERR_GI']) \
-                        if g_row['ERR_GI'] != '-' and g_row['ERR_GI'] != '0.0' \
-                        else err_vc
-                    err_b0 = float(g_row['ERR_BI']) \
-                        if g_row['ERR_BI'] != '-' and g_row['ERR_BI'] != '0.0' \
-                        else err_bc
-                    err_r0 = float(g_row['ERR_RI']) \
-                        if g_row['ERR_RI'] != '-' and g_row['ERR_RI'] != '0.0' \
-                        else err_rc
+            errV = np.sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
+            errB = np.sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
+            errR = np.sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
 
-                    errV = np.sqrt(err_v0 * err_v0 + err_Vc * err_Vc + err_vc * err_vc)
-                    errB = np.sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
-                    errR = np.sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
-
-                    ev_result.append(errV)
-                    eb_result.append(errB)
-                    er_result.append(errR)
-
-                else:
-
-                    ev_result.append(-1.0)
-                    eb_result.append(-1.0)
-                    er_result.append(-1.0)
-
-            else:
-
-                v_result.append(99.0)
-                b_result.append(99.0)
-                r_result.append(99.0)
-                ev_result.append(-1.0)
-                eb_result.append(-1.0)
-                er_result.append(-1.0)
+            ev_result.append(errV if self.isValidMg(g_row['MAG_GI']) and validStd else -1.0)
+            eb_result.append(errB if self.isValidMg(g_row['MAG_BI']) and validStd else -1.0)
+            er_result.append(errR if self.isValidMg(g_row['MAG_RI']) and validStd else -1.0)
 
         if std:
 
@@ -604,7 +587,8 @@ class Photometry:
 
         return cmb
 
-    def calcHmg(self, cmb, vcomp):
+    @staticmethod
+    def calcHmg(cmb, vcomp):
         for cc in ['Gi', 'Bi', 'Ri']:
             hmgInst = pm.getTableComment(cmb, 'MgLimitInst' + cc)
             hmg = float(hmgInst) + vcomp[cc]['mc'] - vcomp[cc]['mi']
@@ -633,10 +617,10 @@ class Photometry:
 
         return p_a, err_a
 
-    def process(self):
+    def process(self) -> bool:
         if not self.opt['files']:
             pm.printError('No input files are given.')
-            return
+            return False
 
         # load cmb catalog
         cmbFileName = self.opt['files'][0]

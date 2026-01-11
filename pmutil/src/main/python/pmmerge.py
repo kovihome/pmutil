@@ -14,12 +14,29 @@ from os import remove
 from os.path import exists
 from math import log10
 
+import numpy as np
 from astropy.table import Table, join, setdiff
 from astropy.io import fits
+from scipy.spatial import cKDTree
 
 import pmbase as pm
-from pmviz import VizUCAC4
+from pmviz import VizierQuery, UCAC4, APASS
 
+SNR = 7.2
+PXPREC = 2.0
+
+# sextractor catalog field names
+CAT_ID_FIELD = "NUMBER"
+MAG_FIELD = "MAG_ISOCOR"
+MAGERR_FIELD = "MAGERR_ISOCOR"
+FLUX_FIELD = "FLUX_ISOCOR"
+FLUXERR_FIELD = "FLUXERR_ISOCOR"
+XPOS_FIELD = "XWIN_IMAGE"
+YPOS_FIELD = "YWIN_IMAGE"
+RA_FIELD = "ALPHA_J2000"
+DEC_FIELD = "DELTA_J2000"
+
+NO_MAG = "99.0"
 
 class CatalogMatcher:
     folder = './'
@@ -39,7 +56,7 @@ class CatalogMatcher:
 
     COORD_MATCH_THRE = 2.0 / 60.0  # degrees
 
-    viz = None
+    catUCAC4 = None
 
     def __init__(self, baseName, folder, colors, show, save, loggingMode=pm.Logger.LOG_MODE_INFO):
         self.baseName = baseName
@@ -47,10 +64,13 @@ class CatalogMatcher:
             self.folder = folder
         if colors is not None:
             self.colors = colors
-        self.viz = VizUCAC4(self.MG_LIMIT)
+        # self.viz = VizUCAC4(self.MG_LIMIT)
+        self.catUCAC4 = VizierQuery(cat=UCAC4, limit=self.MG_LIMIT)
         self.showGraphs = show
         self.saveGraphs = save
         self.log = pm.Logger(mode=loggingMode)
+        self.mgLimits = None
+        self.hmgPlot = None
 
     def hmg(self, pmTable, nr):
         mgIsoCorrArr = pmTable['MAG_ISOCOR']
@@ -100,33 +120,6 @@ class CatalogMatcher:
             return 'B'
         return '-'
 
-    def mergeCatalogs(self, refFile, matchFile, outFile):
-        # match ref and input
-        r = self.invokeGrMatch(refFile, matchFile, outFile)
-
-        if not r.startswith('ERROR'):
-            # merge exclusions
-            self.mergeExclusions(outFile)
-
-        return r
-
-    def mergeExclusions(self, outFile):
-        # TODO
-        xrfExclusionFile = outFile + '.xrf'
-        inpExclusionFile = outFile + '.xin'
-
-        cat = Table.read(outFile, format='ascii.no_header', delimiter=' ')
-        refEx = Table.read(xrfExclusionFile, format='ascii.no_header', delimiter=' ')
-        refExCount = len(refEx)
-
-        pass
-
-    def invokeGrMatch(self, refFile, matchFile, outFile):
-        # TODO: add non-matched objects from xrf and xin file
-        matchOptions = '--match-coord --col-ref 14,15 --col-inp 14,15'
-        return pm.invoke(
-                f"grmatch {matchOptions} -r {refFile} -i {matchFile} -o {outFile} --output-excluded-reference {outFile + '.xrf'} --output-excluded-input {outFile + '.xin'}")
-
     def calcVisFlag(self, mg, limit):
         """
         flags I - INVISIBLE, B - BELOW_LIMIT, N - NEAR_LIMIT, S - SATURATED
@@ -150,27 +143,12 @@ class CatalogMatcher:
 
         flags B - object is near of image border
         """
-
         return self.determineOnFrameStatus(x_obj, y_obj, im_w, im_h)
 
-    def matchCatalogs(self):
-        catFileBase = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-"
-        tempFileBase = f"{self.folder}/Temp/{self.baseName}-"
-        pm.assureFolder(f"{self.folder}/Temp")
-
-        # query image size
-        img_w, img_h = self.readFrameSize(catFileBase + 'Gi.ast.fits')
-        self.log.debug(f'Image size: {img_w} x {img_h}')
-
+    def calcMgLimits(self, catFileBase: str):
         # calculate mg limits
         self.hmgPlot = pm.Plot(len(self.colors), self.showGraphs, self.saveGraphs)
 
-        #        if len(self.opt['color']) == 3:
-        #        hmgGi = self.calcMgLimit(catFileBase + 'Gi.cat', 0)
-        #        hmgBi = self.calcMgLimit(catFileBase + 'Bi.cat', 1)
-        #        hmgRi = self.calcMgLimit(catFileBase + 'Ri.cat', 2)
-        #        self.mgLimits = { 'Gi': hmgGi, 'Bi': hmgBi, 'Ri': hmgRi }
-        #        self.log.info(f'Limit mg Gi: {hmgGi}, Bi: {hmgBi}, Ri: {hmgRi}')
         self.mgLimits = {}
         s = ''
         for j, clr in enumerate(self.colors):
@@ -180,98 +158,222 @@ class CatalogMatcher:
 
         self.hmgPlot.showOrSave(self.folder + '/magnitude_limit.png')
 
-        # TODO: Azok a csillagok, amik nem latszanak Gi-ben, csak Bi-ben vagy Ri-ben, azok is keruljenek bele
+    def loadAndFiltercatalogFile(self, catFileBase: str, color: str) -> Table:
+        catFn = f"{catFileBase}{color}.cat"
+        cat = Table.read(catFn, format="ascii.sextractor")
+        self.log.debug(f"Original catalog file size for {color}: {len(cat)}")
 
-        if len(self.colors) == 3:
-            ccFile = tempFileBase + 'GiBiRi.cat'
+        # filter catalog by SNR
+        cat_snr = cat[cat[FLUX_FIELD] / cat[FLUXERR_FIELD] > SNR]
+        self.log.debug(f"SNR filtered catalog size for Gi: {len(cat_snr)}")
 
-            # match Bi cat to Gi
-            self.mergeCatalogs(catFileBase + 'Gi.cat', catFileBase + 'Bi.cat', tempFileBase + 'GiBi.cat')
+        return cat_snr
 
-            # match Ri cat to combined Gi + Bi
-            self.mergeCatalogs(tempFileBase + 'GiBi.cat', catFileBase + 'Ri.cat', ccFile)
+    @staticmethod
+    def matchCatalogsByPixelCoords(cats: dict[str,Table]) -> Table:
+        gCat_snr = cats["Gi"]
+        rCat_snr = cats["Ri"]
+        bCat_snr = cats["Bi"]
+        # Match SNR filtered Gi and Ri tables
+        # find nearest Ri object for all Gi ones
+        g_coords = np.vstack([gCat_snr[XPOS_FIELD], gCat_snr[YPOS_FIELD]]).T
+        r_coords = np.vstack([rCat_snr[XPOS_FIELD], rCat_snr[YPOS_FIELD]]).T
+        tree = cKDTree(r_coords)
+        dist, idx2 = tree.query(g_coords, distance_upper_bound=PXPREC)
+        di = np.vstack([dist, idx2]).T
+        # print(f"match size: {len(di)}")
 
-            # set the mapping table of merged catalog
-            m = {
-                'RA_DEG': 'col14',
-                'DEC_DEG': 'col15',
-                'MAG_GI': 'col4',
-                'ERR_GI': 'col5',
-                'MAG_BI': 'col27',
-                'ERR_BI': 'col28',
-                'MAG_RI': 'col50',
-                'ERR_RI': 'col51',
-                # 'X_COORD': 'col16',
-                # 'Y_COORD': 'col17'
-            }
+        # filter out large distances
+        d_mask = di[:, 0] < PXPREC
+        # di_masked = di[d_mask]
 
-        elif len(self.colors) == 1:
-            # TODO
-            c = self.colors[0]
-            ccFile = catFileBase + f'{c}.cat'
-            m = {
-                'RA_DEG': 'col14',
-                'DEC_DEG': 'col15',
-                'MAG_' + c: 'col4',
-                'ERR_' + c: 'col5',
-                # 'X_COORD': 'col16',
-                # 'Y_COORD': 'col17'
-            }
+        # Get matched records in Gi
+        g_matched_to_r = gCat_snr[d_mask]
 
-        else:
-            pm.printError(f"No merge strategy for colors {self.colors}")
-            return self.createCombinedCat(0)
+        # Get non-matched records in Gi
+        g_not_matched_to_r = gCat_snr[~d_mask]
 
-        # load combined cat
+        # Get matched records in Ri
+        # r_matched_to_g = rCat_snr[idx2[d_mask]]
 
-        table = Table.read(ccFile, format='ascii.no_header', delimiter=' ')
-        count = len(table)
-        self.log.debug(f'{count} matched objects found')
+        # Get Ri records not matched to Gi
+        r_ix = idx2[d_mask]
+        fi2 = list(set(range(0, len(rCat_snr))) - set(r_ix))
+        r_not_matched_to_g = rCat_snr[fi2]
 
-        # create cmb catalog
-        cmb = self.createCombinedCat(count)
+        # merge G and R table indices
+        from astropy.table import vstack
+        rg_merged = Table({
+            "G_NUMBER": g_matched_to_r[CAT_ID_FIELD],
+            "R_NUMBER": rCat_snr[r_ix][CAT_ID_FIELD],
+            "X": g_matched_to_r[XPOS_FIELD],
+            "Y": g_matched_to_r[YPOS_FIELD]})
+        g_only = Table({
+            "G_NUMBER": g_not_matched_to_r[CAT_ID_FIELD],
+            "R_NUMBER": [0] * len(g_not_matched_to_r),
+            "X": g_not_matched_to_r[XPOS_FIELD],
+            "Y": g_not_matched_to_r[YPOS_FIELD]
+        })
+        r_only = Table({
+            "G_NUMBER": [0] * len(r_not_matched_to_g),
+            "R_NUMBER": r_not_matched_to_g[CAT_ID_FIELD],
+            "X": r_not_matched_to_g[XPOS_FIELD],
+            "Y": r_not_matched_to_g[YPOS_FIELD]
+        })
+        rg_merged_xref = vstack([rg_merged, g_only, r_only])
 
-        # fill cmb data from combined cat
-        for k in m.keys():
-            cmb[k] = table[m[k]]
+        # Find nearest Bi object for all Gi/Ri ones
+        gr_coords = np.vstack([rg_merged_xref['X'], rg_merged_xref['Y']]).T
+        b_coords = np.vstack([bCat_snr[XPOS_FIELD], bCat_snr[YPOS_FIELD]]).T
+        tree = cKDTree(b_coords)
+        dist3, idx23 = tree.query(gr_coords)
+        di3 = np.vstack([dist3, idx23]).T
 
-        # cmb['RA_DEG'] = table['col14']
-        # cmb['DEC_DEG'] = table['col15']
-        # cmb['MAG_GI'] = table['col4']
-        # cmb['ERR_GI'] = table['col5']
-        # cmb['MAG_BI'] = table['col27']
-        # cmb['ERR_BI'] = table['col28']
-        # cmb['MAG_RI'] = table['col50']
-        # cmb['ERR_RI'] = table['col51']
+        # Filter out large distances
+        d3_mask = di3[:, 0] < PXPREC
+        # di3_masked = di3[d3_mask]
 
-        ras = []
-        des = []
-        auid = []
+        # Get matched records in Gi/Ri
+        rg_matched_to_b = rg_merged_xref[d3_mask]
+
+        # Get non-matched records in Gi/Ri
+        rg_not_matched_to_b = rg_merged_xref[~d3_mask]
+
+        # Get matched records in Ri
+        # b_matched_to_gr = rCat_snr[idx23[d3_mask]]
+
+        # Get Ri records not matched to Gi
+        r3_ix = idx23[d3_mask]
+        fi2 = list(set(range(0, len(bCat_snr))) - set(r3_ix))
+        b_not_matched_to_gr = bCat_snr[fi2]
+
+        # merge Gi/Ri and Bi table indices
+        rgb_merged = Table({
+            "G_NUMBER": rg_matched_to_b["G_NUMBER"],
+            "R_NUMBER": rg_matched_to_b["R_NUMBER"],
+            "B_NUMBER": bCat_snr[r3_ix][CAT_ID_FIELD],
+        })
+        gr_only = Table({
+            "G_NUMBER": rg_not_matched_to_b["G_NUMBER"],
+            "R_NUMBER": rg_not_matched_to_b["R_NUMBER"],
+            "B_NUMBER": [0] * len(rg_not_matched_to_b),
+        })
+        b_only = Table({
+            "G_NUMBER": [0] * len(b_not_matched_to_gr),
+            "R_NUMBER": [0] * len(b_not_matched_to_gr),
+            "B_NUMBER": b_not_matched_to_gr[CAT_ID_FIELD],
+        })
+        rgb_merged_xref = vstack([rgb_merged, gr_only, b_only])
+
+        return rgb_merged_xref
+
+    def buildCombinedCatalog(self, cats: dict[str,Table], indices: Table, imageSize: tuple[int, int]) -> Table:
+        gCat = cats["Gi"]
+        rCat = cats["Ri"]
+        bCat = cats["Bi"]
+
+        cmb = self.createCombinedCat()
+
+        # combine catalogs
         n_auid = 1
-        visFlags = []
-        posFlags = []
-        for r in cmb:
-            auid.append('%03d-FFF-%03d' % (n_auid // 1000, n_auid % 1000))
+        for ix in indices:
+            auid = '%03d-FFF-%03d' % (n_auid // 1000, n_auid % 1000)
+            gRec = gCat[gCat[CAT_ID_FIELD] == ix["G_NUMBER"]][0] if ix["G_NUMBER"] > 0 else None
+            rRec = rCat[rCat[CAT_ID_FIELD] == ix["R_NUMBER"]][0] if ix["R_NUMBER"] > 0 else None
+            bRec = bCat[bCat[CAT_ID_FIELD] == ix["B_NUMBER"]][0] if ix["B_NUMBER"] > 0 else None
+            ra = gRec[RA_FIELD] if gRec else rRec[RA_FIELD] if rRec else bRec[RA_FIELD]
+            decl = gRec[DEC_FIELD] if gRec else rRec[DEC_FIELD] if rRec else bRec[DEC_FIELD]
+            ra_s = pm.deg2hexa(float(ra) / 15.0)
+            de_s = pm.deg2hexa(float(decl))
+            magG = gRec[MAG_FIELD] if gRec else NO_MAG
+            magR = rRec[MAG_FIELD] if rRec else NO_MAG
+            magB = bRec[MAG_FIELD] if bRec else NO_MAG
+            xpos = gRec[XPOS_FIELD] if gRec else rRec[XPOS_FIELD] if rRec else bRec[XPOS_FIELD]
+            ypos = gRec[YPOS_FIELD] if gRec else rRec[YPOS_FIELD] if rRec else bRec[YPOS_FIELD]
+            # Calculate flags
+            # FLAGS & 4 -> VIZ_FLAG Saturated object
+            # TODO: FLAGS & 3 -> VIZ_FLAG??? Blended object
+            # FLAGS & 24 -> POS_FLAG Close to boundary
+            gFlag = int(gRec["FLAGS"]) if gRec else 0
+            rFlag = int(rRec["FLAGS"]) if rRec else 0
+            bFlag = int(bRec["FLAGS"]) if bRec else 0
+            closeToBoundary = ((gFlag | rFlag | bFlag) & 24) > 0
+            posFlags = 'B' if closeToBoundary else self.calcPosFlag(float(xpos), float(ypos), imageSize[0], imageSize[1])
+            gVisFlag = 'S' if gFlag & 4 > 0 else self.calcVisFlag(magG, self.mgLimits['Gi'])
+            bVisFlag = 'S' if bFlag & 4 > 0 else self.calcVisFlag(magB, self.mgLimits['Bi'])
+            rVisFlag = 'S' if rFlag & 4 > 0 else self.calcVisFlag(magR, self.mgLimits['Ri'])
+            visFlags = gVisFlag + bVisFlag + rVisFlag
+            #####
+            rec = [auid, '-', 'F', '-', visFlags, posFlags, 'T', ra_s, str(ra), de_s, str(decl),
+                   str(magG) if gRec else NO_MAG, str(gRec[MAGERR_FIELD]) if gRec else '-',
+                   str(magB) if bRec else NO_MAG, str(bRec[MAGERR_FIELD]) if bRec else '-',
+                   str(magR) if rRec else NO_MAG, str(rRec[MAGERR_FIELD]) if rRec else '-',
+                   NO_MAG, '-',
+                   NO_MAG, '-',
+                   NO_MAG, '-']
+            cmb.add_row(rec)
             n_auid += 1
-            ra_s = pm.deg2hexa(float(r['RA_DEG']) / 15.0)
-            de_s = pm.deg2hexa(float(r['DEC_DEG']))
-            ras.append(ra_s)
-            des.append(de_s)
-            posFlags.append(
-                    self.calcPosFlag(float(table[r.index]['col16']), float(table[r.index]['col17']), img_w, img_h))
-            visFlags.append((self.calcVisFlag(r['MAG_GI'], self.mgLimits['Gi']) if 'Gi' in self.colors else " ") +
-                            (self.calcVisFlag(r['MAG_BI'], self.mgLimits['Bi']) if 'Bi' in self.colors else " ") +
-                            (self.calcVisFlag(r['MAG_RI'], self.mgLimits['Ri']) if 'Ri' in self.colors else " "))
+        return cmb
 
-        cmb['AUID'] = auid
-        cmb['RA'] = ras
-        cmb['DEC'] = des
-        cmb['POS_FLAG'] = posFlags
-        cmb['VIZ_FLAG'] = visFlags
+    def matchCatalogsAllColors(self, catFileBase: str, imageSize: tuple[int, int]) -> Table:
+        # open catalog files
+        pmCatalogs = {}
+        for cc in ["Gi", "Ri", "Bi"]:
+            pmCatalogs[cc] = self.loadAndFiltercatalogFile(catFileBase, cc)
+
+        # match catalogs by pixel coords, return indices
+        indices = self.matchCatalogsByPixelCoords(pmCatalogs)
+
+        # merge catalog by indices
+        return self.buildCombinedCatalog(pmCatalogs, indices, imageSize)
+
+    def getIndicesForOneColor(self, cat: Table) -> Table:
+        cc = self.colors[0]
+        indexColumn = cat[CAT_ID_FIELD]
+        emptyColumn = [0] * len(cc)
+        return Table({
+            "G_NUMBER": indexColumn if cc == "Gi" else emptyColumn,
+            "R_NUMBER": indexColumn if cc == "Ri" else emptyColumn,
+            "B_NUMBER": indexColumn if cc == "Bi" else emptyColumn,
+        })
+
+    def matchCatalogsOneColor(self, catFileBase, imageSize: tuple[int, int]):
+        # filter catalog by SNR
+        pmCatalog = self.loadAndFiltercatalogFile(catFileBase, self.colors[0])
+
+        # create indices for this one catalog
+        indices = self.getIndicesForOneColor(pmCatalog)
+
+        # merge catalog by indices
+        pmCatalogs = {}
+        for cc in ["Gi", "Ri", "Bi"]:
+            pmCatalogs[cc] = pmCatalog if cc == self.colors[0] else None
+        return self.buildCombinedCatalog(pmCatalogs, indices, imageSize)
+
+    def matchCatalogs(self) -> Table :
+        # create photometry files base name
+        catFileBase = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-"
+
+        # query image size
+        imgSize = self.readFrameSize(f"{catFileBase}{self.colors[0]}.ast.fits")
+        self.log.debug(f'Image size: {imgSize[0]} x {imgSize[1]}')
+
+        # calculate mg limits
+        self.calcMgLimits(catFileBase)
+
+        # match photometry catalogs by pixel coords
+        if len(self.colors) == 3:
+            cmb = self.matchCatalogsAllColors(catFileBase, imgSize)
+        elif len(self.colors) == 1:
+            cmb = self.matchCatalogsOneColor(catFileBase, imgSize)
+        else:
+            self.log.error(f"No merge strategy for colors {self.colors}")
+            return self.createCombinedCat()
 
         return cmb
 
-    def createCombinedCat(self, count=0):
+    @staticmethod
+    def createCombinedCat():
         fnames = ['AUID', 'VIZ_ID', 'ROLE', 'LABEL',
                   'VIZ_FLAG', 'POS_FLAG', 'MATCH_FLAG',
                   'RA', 'RA_DEG', 'DEC', 'DEC_DEG',
@@ -282,24 +384,15 @@ class CatalogMatcher:
                   'U12', 'U12', 'U12', 'U12',
                   'U6', 'U5', 'U6', 'U5', 'U6', 'U5',
                   'U6', 'U5', 'U6', 'U5', 'U6', 'U5']
-        if count > 0:
-            rows = [['AUID'] * count, ['-'] * count, ['F'] * count, ['-'] * count,
-                    ['-'] * count, ['-'] * count, ['T'] * count,
-                    [''] * count, [0.0] * count, [''] * count, [0.0] * count,
-                    ['99.0'] * count, ['-'] * count, ['99.0'] * count, ['-'] * count, ['99.0'] * count, ['-'] * count,
-                    ['99.0'] * count, ['-'] * count, ['99.0'] * count, ['-'] * count, ['99.0'] * count, ['-'] * count]
-            return Table(rows, names=fnames, dtype=fdtype)
-        else:
-            return Table(names=fnames, dtype=fdtype)
+        return Table(names=fnames, dtype=fdtype)
 
     def xmatchViz(self, combined):
         # xmatch cmb to UCAC4 catalog
-        # TODO: err values from xmatch
-        xmt = self.viz.xmatch(combined, 'RA_DEG', 'DEC_DEG')
+        xmt = self.catUCAC4.xmatch(combined, 'RA_DEG', 'DEC_DEG')
         if xmt is None:
-            self.log.error("Accessing Vizier service was failed.")
+            self.log.error("Accessing Vizier xmatch service for UCAC4 catalog was failed.")
             return False
-        self.log.debug(f'Xmatch table contains {len(xmt)} records')
+        self.log.debug(f'UCAC4 xmatch results {len(xmt)} objects')
 
         combined.add_index('AUID')
 
@@ -316,7 +409,31 @@ class CatalogMatcher:
     #            r['ERR_B'] = xr['e_Bmag']
     #            r['ERR_V'] = xr['e_Vmag']
     #            r['ERR_R'] = xr['e_Rmag']
-    
+
+        # get valid mags and errors from APASS
+        catAPASS = VizierQuery(APASS, self.MG_LIMIT)
+        apassMatchTable = catAPASS.xmatch(combined, 'RA_DEG', 'DEC_DEG')
+        if apassMatchTable is None:
+            self.log.error("Accessing Vizier xmatch service for APASS catalog was failed.")
+            return False
+        self.log.debug(f'APASS xmatch results {len(xmt)} objects')
+
+        fmapApass = {
+            "MAG_V": "Vmag",
+            "ERR_V": "e_Vmag",
+            "MAG_B": "Bmag",
+            "ERR_B": "e_Bmag",
+            "MAG_R": "rpmag",
+            "ERR_R": "e_rpmag"
+        }
+        ff = "{:.3f}.format"
+        for r in apassMatchTable:
+            auid = r['AUID']
+            br = combined.loc[auid]
+            for f in fmapApass.keys():
+                if type(r[fmapApass[f]]) != np.ma.core.MaskedConstant:
+                    br[f] = np.round(np.float64(r[fmapApass[f]]), 3)
+
         return True
 
     def loadRefcat(self):
@@ -330,7 +447,7 @@ class CatalogMatcher:
     def addFrameCoords(self, cat, fitsFileName):
         # 1. convert cat to fits format
         # baseFolder = fitsFileName.partition(pm.setup['PHOT_FOLDER_NAME'])[0]
-        tempFile = self.folder + '/Temp/tempCat.fits'
+        tempFile = self.folder + '/temp/tempCat.fits'
         if not exists(tempFile):
             cat.write(tempFile)
 
@@ -347,8 +464,10 @@ class CatalogMatcher:
         cat['X'] = [0.0] * tlen
         cat['Y'] = [0.0] * tlen
 
-        f = fits.open(axyFile)
-        d = f[1].data
+        # f = fits.open(axyFile)
+        # d = f[1].data
+        with fits.open(axyFile) as f:
+            d = f[1].data
 
         for j in range(tlen):
             x, y = d[j]
@@ -368,14 +487,10 @@ class CatalogMatcher:
 
         foMask = cat['FRAME_STATUS'] != 'O'
         foCat = cat[foMask]
-        #        print('Out of frame objects:')
-        #        print(foCat)
-
-        # foMask = cat['FRAME_STATUS'] != 'O'
-        # foCat = cat[foMask]
         return foCat
 
-    def matchCatalogByCoords(self, cat, ra, dec):
+    @staticmethod
+    def matchCatalogByCoords(cat, ra, dec):
         dmin = 99.0
         auid = None
         for row in cat:
@@ -389,7 +504,8 @@ class CatalogMatcher:
         #        print(f"Coord matched - auid: {auid}, d: {sqrt(dmin)*60}'")
         return auid, dmin
 
-    def updateCmb(self, cmb, r, auid=None, vizid=None):
+    @staticmethod
+    def updateCmb(cmb, r, auid=None, vizid=None):
         if vizid:
             cr = cmb.loc['VIZ_ID', vizid]
         else:
@@ -404,26 +520,24 @@ class CatalogMatcher:
         cr['ERR_V'] = r['ERR_V']
         cr['ERR_R'] = r['ERR_R']
 
-    #        r['MATCH_FLAG'] = xr['MATCH_FLAG']
-
-    def insertCmb(self, cmb, r):
+    @staticmethod
+    def insertCmb(cmb: Table, r):
         n = [r['AUID'], '-', r['ROLE'], r['LABEL'], 'III', '-', 'N', r['RA'], r['RA_DEG'], r['DEC'], r['DEC_DEG'],
-             '99.0', '99.0', '99.0', '99.0', '99.0', '99.0', r['MAG_B'], r['ERR_B'], r['MAG_V'], r['ERR_V'], r['MAG_R'],
+             NO_MAG, NO_MAG, NO_MAG, NO_MAG, NO_MAG, NO_MAG, r['MAG_B'], r['ERR_B'], r['MAG_V'], r['ERR_V'], r['MAG_R'],
              r['ERR_R']]
         cmb.add_row(n)
 
-    def addRefcatData(self, cmb, refcat):
+    def addRefcatData(self, cmb: Table, refcat):
 
         del refcat.meta['comments']
 
-        fitsFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-Gi.ast.fits"
+        fitsFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-{self.colors[0]}.ast.fits"
         foRefcat = self.filterOutFrameStars(refcat, fitsFileName)
 
         # xmatch refcat to UCAC4
-        # TODO: drop out records, where angDist comlumn value is grater then a threshold (bad match)
-        xmt = self.viz.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
+        xmt = self.catUCAC4.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
         if xmt is None:
-            pm.printError("Adding refcat data to combined catalog failed.")
+            self.log.error("Adding refcat data to combined catalog failed.")
             return
         self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
 
@@ -439,10 +553,6 @@ class CatalogMatcher:
 
                 except KeyError:
                     self.log.debug(xr)
-
-            # else:
-            # self.log.debug('xmt record not matched in cmb:')
-            # print(xr)  # RBL
 
         mergedTable = join(xmt, cmb, keys='AUID', join_type='left')
         mask = mergedTable['VIZ_ID'] == '-'  # or mergedTable['VIZ_ID'] == '' or mergedTable['VIZ_ID'] == None
@@ -486,7 +596,7 @@ class CatalogMatcher:
         self.log.print('Combine measurement catalogs all together')
         combined = self.matchCatalogs()
 
-        # xmatch combined catalog to UCAC4, and store UCAC4 id
+        # match combined catalog to UCAC4, APASS catalogs
         self.log.print('Match combined catalog with UCAC4')
         result = self.xmatchViz(combined)
         if result is None:
@@ -533,16 +643,20 @@ if __name__ == '__main__':
             for o, a in optlist:
                 if a[:1] == ':':
                     a = a[1:]
-                elif o == '-c' or o == '--color':
+                if o == '-c' or o == '--color':
                     self.color = a
                 elif o == '--show-graph':
                     self.showGraphs = True
                 elif o == '--save-graph':
                     self.saveGraphs = True
 
-            self.folder = args[0]
-            if not self.folder.endswith('/'):
-                self.folder += '/'
+            if args:
+                self.folder = args[0]
+                if not self.folder.endswith('/'):
+                    self.folder += '/'
+            else:
+                pm.printError('No folder specified in the command-line arguments.')
+                return
 
         def run(self):
             self.processCommands()

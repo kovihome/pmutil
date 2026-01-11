@@ -9,6 +9,7 @@ Created on Feb 22, 2020
 """
 import shutil
 from getopt import getopt, GetoptError
+from math import sqrt
 from sys import argv
 from datetime import datetime
 from glob import glob
@@ -32,6 +33,8 @@ class Pipeline:
     SEX_CFG = ''  # sextractor config file
     SOLVE_ARGS = ''  # astrometry.net command line arguments
     SEXTRACTOR = pm.setup['SEXTRACTOR'] # sextractor command name
+
+    TEMPDIR = "temp"
 
     def __init__(self, opt):
         self.opt = opt
@@ -135,7 +138,8 @@ class Pipeline:
     def do_photometry(self, astFile, pmcatFile):
         pm.printInfo(f"Make photometry for {astFile}")
         if not exists(pmcatFile) or self.opt['overwrite']:
-            pmCommand = f"{self.SEXTRACTOR} {astFile} -c {self.SEX_CFG} -CATALOG_NAME {pmcatFile} -CATALOG_TYPE ASCII_HEAD"
+            saturation_level = self.calculateSaturationLevel(astFile)
+            pmCommand = f"{self.SEXTRACTOR} {astFile} -c {self.SEX_CFG} -CATALOG_NAME {pmcatFile} -CATALOG_TYPE ASCII_HEAD -SATURATE {saturation_level}"
             pm.printDebug(pmCommand)
             pm.invoke(pmCommand)
         else:
@@ -149,67 +153,10 @@ class Pipeline:
                                  self.opt['logMode'])
         matcher.process()
 
-    # else:
-    #     pm.printInfo(f"Combined photometry file {combinedCatalog} already exists.")
-
-    #    def photometry(self, seqFolder, photFolder, refcatFileName, color):
-
-    # Names of the sequence/combined files:
-    #        SEQLIST = glob(seqFolder + '/' + pm.setup['SEQ_FILE_PREFIX'] + '*-' + color + '.fits')
-    #        SEQLIST.sort()
-    #        if len(SEQLIST) == 0:
-    #            SEQLIST = glob(seqFolder + '/Combined-' + color + '.fits')
-    #            if len(SEQLIST) == 0:
-    #                pm.printWarning("No files for photometry in folder %s" % (seqFolder))
-    #                return False
-
-    #        for f in SEQLIST:
-
-    #            print(f"photometry of {f}")
-
-    #            AST_FILE = photFolder + '/' + basename(f).replace('.fits', '.ast.fits')
-    #            PMCAT_FILE = photFolder + '/' + basename(f).replace('.fits', '.cat')
-
-    # make astrometry
-    #            self.do_astrometry(f, AST_FILE, photFolder)
-
-    # make photometry
-
-    #            self.do_photometry(AST_FILE, PMCAT_FILE)
-
-    #            PMCAT_FILE_FLT = PMCAT_FILE + ".cat"
-    #            pm.printInfo("Filtering result catalog to %s" % (PMCAT_FILE_FLT))
-    #            if not exists(PMCAT_FILE_FLT) or self.opt['overwrite']:
-    #                opt = {
-    #                    'ref' : refcatFileName,
-    #                    'out' : PMCAT_FILE_FLT,
-    #                    'color': color,
-    #                    'files': [ PMCAT_FILE ],
-    #                    }
-    #                matcher = CatalogMatcher(opt)
-    #                matcher.process()
-
-    #            else:
-    #                print("filtered photometry file %s already exists." % (PMCAT_FILE_FLT))
-
-    #        return True
+        # else:
+        #     pm.printInfo(f"Combined photometry file {combinedCatalog} already exists.")
 
     def calculateMags(self, baseName, photFolder, colors):
-
-        # Names of the sequence/combined files:
-        #        color = colors[0]
-        #        PHOTLIST = glob(photFolder + '/' + pm.setup['SEQ_FILE_PREFIX'] + '*-' + color + '.cmb')
-        #        PHOTLIST.sort()
-        #        if len(PHOTLIST) == 0:
-        #            PHOTLIST = glob(f"{photFolder}/{baseName}-{color}.cmb")
-        #            if len(PHOTLIST) == 0:
-        #                pm.printWarning("No files for calculate magnitudes in folder %s" % (photFolder))
-        #                return False
-
-        #        for f in PHOTLIST:
-        #            inputFiles = []
-        #            for c in colors:
-        #                inputFiles.append(f.replace('-' + color, '-' + c))
 
         cmbFileName = f"{photFolder}/{baseName}.cmb"
 
@@ -276,10 +223,6 @@ class Pipeline:
 
             self.calculateMags(baseFile, photFolder, self.opt['color'])
 
-        #            self.photometry(seqFolder, photFolder, PMREF, color)
-
-        #        self.calculateMags(photFolder, self.opt['color'])
-
         # TODO: cleanup
 
         return True
@@ -342,6 +285,11 @@ class Pipeline:
                 pm.printError(f'Reference catalog is not usable for photometry ; skip folder {sf}')
                 continue
 
+            # create the temp dir, if not exists
+            tempFolder = f"{baseFolder}/{self.TEMPDIR}"
+            if not exists(tempFolder):
+                mkdir(tempFolder)
+
             pf = sf.replace(pm.setup['SEQ_FOLDER_NAME'], pm.setup['PHOT_FOLDER_NAME'])
 
             success = self.process_photometry(sf, pf, "PHOTOMETRY")
@@ -360,7 +308,6 @@ class Pipeline:
                 REPORT_FOLDER = BASE_FOLDERS[0]
             else:
                 PM_FILES = glob(pm.setup['PHOT_FOLDER_NAME'] + '/*.cmb.pm')
-                # PM_FILES = [ f"{pm.setup['PHOT_FOLDER_NAME']}/{baseName}.cmb.pm" for baseName in self.collectBaseFileNames(pm.setup['PHOT_FOLDER_NAME'])  ]
                 REPORT_FOLDER = getcwd()
 
             pm.printInfo(f"Create report into {REPORT_FOLDER} folder.")
@@ -378,6 +325,13 @@ class Pipeline:
 
         print()
         pm.printInfo("Photometry is ready.")
+
+    def calculateSaturationLevel(self, astFile: str) -> int:
+        dyrange = int(pm.setup['DYRANGE']) if ('DYRANGE' in pm.setup) else 16
+        headers = pm.getFitsHeaders(astFile, ["NCOMBINE", "MCOMBINE"])
+        max_level = 2^dyrange
+        image_count = int(headers["NCOMBINE"]) if (headers["MCOMBINE"] == "sum") else 1
+        return (max_level - int(sqrt(max_level))) * image_count
 
 
 class MainApp:
@@ -506,10 +460,6 @@ class MainApp:
             self.opt['baseFolder'] = args[0]
             if args[0].endswith('/'):
                 self.opt['baseFolder'] = args[0][:-1]
-
-#        if self.opt['nameCode'] is None:
-#            pm.printWarning('No observer code was given. Use \'XYZ\' instead.')
-#            self.opt['nameCode'] = 'XYZ'
 
         print('Mg calculation method: ' + self.mgCalcMethods[self.opt['method']])
 

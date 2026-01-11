@@ -14,6 +14,26 @@ pmutil TODO
 
 -----------
 
+-UPDATES
+    "astroalign>=2.4",	    2.6.1 -> 2.6.2
+    "astropy>=4.0",	        6.1.4 -> 7.2.0
+    "astroquery>=0.4",	    0.4.10 -> 0.4.11
+    "matplotlib>=3.1",	    3.9.2 -> 3.10.8
+    "numpy>=1.18",	        2.1.2 -> 2.3.5
+    "photutils>=0.7",	    2.0.1 -> 2.3.0
+    "pillow>=5.3",	        11.1.0 -> 12.0.0
+    "scikit-image<=0.25.1",	0.25.1 -> 0.25.2
+    "scipy>=1.4",	        1.14.1 -> 1.16.3
+    "xmltodict>=0.12"	    0.14.2 -> 1.0.2
+
+-NEW astropy.time.Time
+
+-NEW astrowidgets.ginga ?
+
+-NEW astroquery:
+	+ II/336/apass9
+	+ B/vsx/vsx
+
 -NEW: 20190612-RXLyr, hibas comp star
 
     Az ensemble_parameters abran latszik egy nagyon kilogo pont, de nem jottem ra, hogy melyik comp az
@@ -58,7 +78,6 @@ pmutil TODO
 +NEW: ppl-colorize hibat mond a -c all opciora, de jol mukodik
 
     Invalid color code all. Available color codes are: Gi, Bi, Ri
-
 
 -NEW: configure error:
 
@@ -128,6 +147,16 @@ NEW CALIBRATION BUGS:
 
 NEW PHOTOMETRY BUGS:
 
++NEW mintha túl sok lenne a sextractor cat file-ban a saturated objektum. Lehetséges, hogy a szaturáció
+    értéke rosszul van beállítva a konfig file-ban?
+    - konfigban 50000 (egy kép esetén 2^14 = 16384 lehetne a max)
+    - lehet, hogy a hívásnál kellene számolni
+        NCOMBINE - képek száma
+        MCOMBINE - sum,avg (sum esetében szorzódik a sat level, avg esetében nem)
+    - a pmutil configba kellene tenni a camera dinamikai tartományát, DYNRANGE=14
+    - max.level = 2^DYNRANGE
+    - sat.level = (max.level - sqrt(max.level)) * [NCOMBINE if MCOMBINE == sum else 1]
+
 -NEW: Ha Sequence fotometria fut --save-graph opcioval, akkor csak egy peldany mentodik el az ensemble_parameters es
     a magnitude_limit kepekbol. Ilyenkor indexelni kellene ezeket is, es a Combined-hoz tartozo lenne az index nelkuli.
 
@@ -164,25 +193,25 @@ TECH UPGRADE:
 
 	python			3.13.5  2025-06-11	3.12.3
 
-	python/astroalign	2.6.1	2024-11-15	2.4.1
+	python/astroalign	2.6.2	2024-11-15	2.4.1
 
-	python/astropy		7.1.0	2025-05-20	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+	python/astropy		7.2.0	2025-05-20	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.10	2025-03-18	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
+	python/astroquery	0.4.11	2025-03-18	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
-	python/matplotlib	3.10.3	2025-05-08	3.1.2			!!!
+	python/matplotlib	3.10.8	2025-05-08	3.1.2			!!!
 
-	python/numpy		2.3.1	2025-06-21	1.16.3			!!!
+	python/numpy		2.3.5	2025-06-21	1.16.3			!!!
 
-	python/pillow		11.3.0	2025-07-01	5.1.0			!!!
+	python/pillow		12.0.0	2025-07-01	5.1.0			!!!
 
-	python/photutils	2.2.0	2025-02-18	0.7.2			!!!
+	python/photutils	2.3.0	2025-02-18	0.7.2			!!!
 
 	python/rawpy        0.25.0  2025-05-12  0.23.1
 
-	python/scipy		1.16.0	2025-06-22	1.4.1			!!!
+	python/scipy		1.16.3	2025-06-22	1.4.1			!!!
 
-	python/xmltodict	0.14.2	2024-10-16	0.12.0
+	python/xmltodict	1.0.2	2024-10-16	0.12.0
 
 - SCAMP: grmatch helyett
 
@@ -295,47 +324,72 @@ TECH UPGRADE:
 
 	pmmerge:
 
-		+ Vizier HMG kezelese, szamolas, vagy egyaltalan nem kell a matchinghez
+	    - új módszertan:
+	        + 1. [MOD] pixel coord match a három csatornára -> combined
+	        + 2. coord match a refcat-ra ->
+	        + 2.1 változók
+	        + 2.2 öh-k
+	        2.3 !!! mezőcsillagok, ha vannak (ezek lennének a negatív tranziensek)
+	        2.4 [NEW] galaxisok, ha vannak
+	        +3. ha nincsenek mezőcsillagok, akkor
+	        + 3.1 coord match az USNO katalógusra -> ID, fényességek
+	        + 3.2 [NEW] apass coord match -> pontos fényességek
+	        4. [NEW] ha nincsenek galaxisok, akkor
+	        4.1 [NEW] coord match a ned-re
 
 		- NEW: HMG konstansok konfigba keruljenek
 
-		/ [#517 V1.3 - szaturalt objektumok flagelese]
+		- NEW: debug kiiratasok --debug modban
 
-		- !!! keruljenek bele azok a csillagok is, amik nem minden szinben latszanak
-		
-		    G B R		GiBiRi.cat
-            G B		    GiBiRi.xrf
-            G   R		GiBi.xrf, GiBiRi.xin
-            G		    Gibi.xrf
-              B R		Gibi.xin, GiBiRi.xin
-              B		    Gibi.xin
-                R		GiBiRi.xin
+		+ Temp folder kitisztitasa: .cat .xrf .xin file-ok
 
-		- !!! az e_Xmag mezok nem jonnek a viz-bol
+		+ addRefcatData: ha a distance túl nagy, akkor dobja el (bad match)
 
-		+ sequence kezelese
+		+ ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
 
 		+ csak a mg limit folottiek kerulnek az uj tablaba, a limit a szorasokbol szamitodik
+		    + ebben lehet hiba, mintha az RX Lyr ezert tunne el a kombinalt catalogbol
 
-		    - ebben lehet hiba, mintha az RX Lyr ezert tunne el a kombinalt catalogbol
+		+ az e_Xmag mezok nem jonnek a viz-bol
+		    + APASS update megoldja
 
-		- !!! a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
+		+ a koordinata match pontossagat is meg kell adni, mert tul sok csillag kimarad
+		    + a 2" egy elég jó érték, az 1" kevés, a példában 1.7" volt a felső határ
 
-		- addRefcatData: ha a distance túl nagy, akkor dobja el (bad match)
+        + pixel matching az RGB csatornákra, annak biztosabbnak kell lennie
+            + a stack-elés miatt lehet probléma, ha nem ugyan az a base image
 
-		- ha a refcat-ban nincs mg vagy err, akkor azt ne irjuk felul, kiveve a valtozoknal
+		+ Vizier HMG kezelese, szamolas, vagy egyaltalan nem kell a matchinghez
+
+		+ keruljenek bele azok a csillagok is, amik nem minden szinben latszanak
+		
+		+ sequence kezelese
 
 		+ ha a refcat-ban szerepel, de a kepen nem, akkor hozza kell adni a cmb-hez MATCH_FLAG = 'N' ertekkel
 
 		+ TESZT: Ha nem 3 szin van megadva
 
-		- !!! mergeExclusions: nem lett befejezve
+		/ [#517 V1.3 - szaturalt objektumok flagelese]
+		    + az S flag bekerül a cmb táblába
 
-		- NEW: debug kiiratasok --debug modban
-
-		- Temp folder kitisztitasa: .cat .xrf .xin file-ok
+		/ !!! mergeExclusions: nem lett befejezve
+		    + a pixel match megoldotta
 
 	pmphot:
+
+        - !!! BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
+
+        - !!! a pm táblába az új mg és err értékek túl sok tizedessel kerülnek be, elég lenne csak 4 jegyre
+
+	    + BUG: ha nem találta meg meg a merge valameliyk színben, akkor a mg érték 99.0,
+	        de ezt nem veszi figyelembe a fotometriánál
+
+		- NEW: kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
+
+        + BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
+	            az std rendben van, a tobbit kell megnezni (20190612)
+
+	            + most egyaltalan nem jelenik meg a Combined.cmb katalogusban. A kepen latszik, bar halvany.
 
 		+ a felhasznalt coeff ertekeket tegye bele a pm tablaba commentkent
 
@@ -343,26 +397,18 @@ TECH UPGRADE:
 
 		+ a comp star auid-ot tegye a pm tablaba commentkent
 
-		/ [#522 V1.4 - kappa-sigma egyenesillesztés]
-
 		+ a VF, CF role-okat mikor tesszuk bele? Itt mi lesz helyette? A viz_flag?
-
-		- NEW: kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
 
         + BUG: EX Dra: ZTF J180122.06+674151.5 - tobb eszleles 120 mg alatti
 
-        - !!! BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
-
         + BUG: EX Dra: Neha a hiba olyan 226000 koruli, ezeket lekorlatoztam 1.0-ra, de ki kell deriteni az okat
 
-        - !!! BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
-	            az std rendben van, a tobbit kell megnezni (20190612)
-
-	            - most egyaltalan nem jelenik meg a Combined.cmb katalogusban. A kepen latszik, bar halvany.
-
-	            - ha a hmg alatt van, akkor a commentbe oda kellene irni a mert mg-t es hibat tanulsagkeppen
-
 	    + process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
+
+		/ [#522 V1.4 - kappa-sigma egyenesillesztés]
+
+	    / [FUTURE] ha a hmg alatt van, de látszik, akkor a commentbe oda kellene irni a mert mg-t es hibat tanulsagkeppen
+	        - kérdés, hogy az új merge-nél lesz-e ilyen eset
 
 	pmresult:
 
@@ -509,6 +555,46 @@ TECH UPGRADE:
 --- calibration --------------------------------------------
 
 (459) Dark library kezelés
+
+    - Dark library konfiguráció
+
+        + Dark library helye (DARKLIB)
+
+        + Dark file temp threshold (milyen hőmérséklet-ugrásokkal tárolja a képeket: 1, 2, 5 fok) (DARK_TEMP_THRE)
+
+        + Dark create temp threshold (milyen hőmérséklet-eltérést engedünk meg a dark készítésénél az egyes képek között)
+            Ezt lehet, hogy a file temp threahold-ból lehet számolni
+
+        - Dark query temp threashold (milyen eltérést enged meg a dark keresésnél)
+            Ez lehet, hogy ugyan az, mint a file temp threshold
+
+    - Dark kép készítéskor:
+
+        - Dark minőségi paraméterek számolása, és mentése FITS headerben (hőmérséklet szórása, adu értékek szórása, stb.)
+            + STD-TEMP: a hőmérséklet szórása (1 szigma)
+
+        + Dark kép név-ben szerepeljen: kamera, hőmérséklet (pl: master-dark-CanonEOS250D-281K-Gi.fits)
+            Készítés ideje kell-e a file-névbe? Lehet-e azt mondani, hogy a darknak van szavatossági ideje?
+
+        + Dark kép mentése, ha a dark library-ban még nincs ilyen file
+
+        + Dark kép felülírása, ha van már ilyen a dark library-ban, de az új képnek jobbak a paraméterei.
+
+    - Bias kép készítésekor:
+
+        - Bias minőségi paraméterek számolása, és mentése FITS headerben (adu értékek szórása, stb.)
+
+        + Bias kép név-ben szerepeljen: kamera (pl: master-bias-CanonEOS250D.fits)
+
+        + Bias kép mentése, ha a dark library-ban még nincs ilyen file
+
+        - Bias kép felülírása, ha van már ilyen a dark library-ban, de az új képnek jobbak a paraméterei.
+
+    - Flat kép készítésekor:
+
+        - Ha a flat képhez nem tarozik dark és/vagy bias, akkor a dark library-ban kell keresni
+            Ehhez ismerni kell a flat képek hőmérsékletét, és mindegyikhez keresni dark-ot.
+            Amennyiben valamelyikhez nem talál, akkor kell azt mondani, hogy nem létezik dark.
 
 --- photometry ---------------------------------------------
 
@@ -680,6 +766,7 @@ TECH UPGRADE:
 	+ sextractor param es cfg
 
 	- pmmerge: nezze a sextractor flageket, ls ha szaturalt, akkor a psf mg-t tegye bele a cmb tablaba, es irja a megfelelo flag-et
+	    + S flag már benne van a cmb táblában
 
 	- pmreport: kommentbe irja bele, hogy szaturalt es psf mg
 

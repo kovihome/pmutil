@@ -7,7 +7,6 @@ Created on Mar 03, 2021
 
 @author: kovi
 """
-
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
@@ -48,45 +47,58 @@ class Refcat(Table):
             self.add_row([auid, 'F', sra, ra, sdec, dec, b, eb, v, ev, r, er, abbrev + '-' + row[mapping['LABEL']]])
             n_auid += 1
 
+UCAC4 = {
+    'name': 'UCAC4',
+    'id': 'I/322A',
+    'idFull': 'I/322A/out',
+    'cols': {'LABEL': 'UCAC4', 'RA_DEG': 'RAJ2000', 'DEC_DEG': 'DEJ2000', 'MAG_B': 'Bmag', 'ERR_B': 'e_Bmag',
+      'MAG_V': 'Vmag', 'ERR_V': 'e_Vmag', 'MAG_R': 'rmag', 'ERR_R': 'e_rmag'}
+}
 
-class VizUCAC4:
-    cat = 'I/322A'  # UCAC-4
-    catFull = 'I/322A/out'
-    catName = 'UCAC4'
-    cs = {'LABEL': 'UCAC4', 'RA_DEG': 'RAJ2000', 'DEC_DEG': 'DEJ2000', 'MAG_B': 'Bmag', 'ERR_B': 'e_Bmag',
-          'MAG_V': 'Vmag', 'ERR_V': 'e_Vmag', 'MAG_R': 'rmag', 'ERR_R': 'e_rmag'}
+APASS = {
+    'name': 'APASS',
+    'id': 'I/336',
+    'idFull': 'II/336/apass9',
+    'cols': {'LABEL': 'APASS', 'RA_DEG': 'RAJ2000', 'DEC_DEG': 'DEJ2000', 'MAG_B': 'Bmag', 'ERR_B': 'e_Bmag',
+             'MAG_V': 'Vmag', 'ERR_V': 'e_Vmag', 'MAG_R': 'rmag', 'ERR_R': 'e_rmag'}
+}
 
-    def __init__(self, limit):
+class VizierQuery:
+    def __init__(self, cat: dict, limit: float):
+        self.cat = cat
         slimit = "<" + ("%.1f" % limit)
-        print(f'slimit: {slimit}')
-        self.viz = Vizier(catalog=self.cat, columns=list(self.cs.values()), column_filters={'Vmag': slimit},
+        self.viz = Vizier(catalog=cat['id'], columns=list(cat['cols'].values()), column_filters={cat['cols']['MAG_V']: slimit},
                           row_limit=-1)
 
-    def query(self, target, size):
+    def query(self, target: str, size: float) -> Table | None:
+        pm.printDebug(f"query {self.cat['name']} on target {target}")
         t = Refcat()
         try:
             result = self.viz.query_region(target, width=size * u.arcmin)
         except ConnectionError as ce:
             pm.printError(str(ce))
             return None
-        t.load(result[0], self.catName, self.cs)
+        t.load(result[0], self.cat['name'], self.cat['cols'])
+        pm.printDebug(f"  results {len(t)} objects")
         return t
 
-    def xmatch(self, srcTable, raColName, decColName):
+    def xmatch(self, srcTable: Table, raColName: str, decColName: str) -> Table | None:
+        pm.printDebug(f"matching catalog with {self.cat['name']}")
         try:
-            return XMatch.query(cat1=srcTable, cat2='vizier:' + self.catFull, max_distance=5 * u.arcsec,
-                                colRA1=raColName, colDec1=decColName, colRA2='RAJ2000', colDec2='DEJ2000')
+            t = XMatch.query(cat1=srcTable, cat2='vizier:' + self.cat['idFull'], max_distance=2 * u.arcsec,
+                                colRA1=raColName, colDec1=decColName, colRA2=self.cat['cols']['RA_DEG'], colDec2=self.cat['cols']['DEC_DEG'])
+            pm.printDebug(f"  results {len(t)} objects")
+            return t
         except ConnectionError as ce:
             pm.printError(str(ce))
             return None
-
 
 if __name__ == '__main__':
     # M31
 
     sz = 30
 
-    v = VizUCAC4(17.0)
+    v = VizierQuery(cat=UCAC4, limit=17.0)
 
     # Test 1: query for object
     obj = "R Crb"

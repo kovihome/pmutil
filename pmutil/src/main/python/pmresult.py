@@ -104,7 +104,7 @@ class ReportProcessor:
         starid = res['LABEL'].replace('_', ' ')
         date = res['JD']
 
-        visFlag = res['VIZ_FLAG']['BGR'.index(cc)]
+        visFlag = res['VIZ_FLAG']['GBR'.index(cc)]
         fainter = "<" if visFlag in "IB" else ""
 
         if fainter == '<':
@@ -116,7 +116,7 @@ class ReportProcessor:
             m = res['MAG_STD' + sc]
             e = res['ERR_STD' + sc]
             aavsoColor = self.aavso_std_colors[color]
-            if str(m) == '-':
+            if str(m) == '-' or str(m) == '99.0' or m == 99.0:
                 m = res['MAG_T' + cc]
                 e = res['ERR_T' + cc]
                 aavsoColor = self.aavso_colors[color]
@@ -273,7 +273,6 @@ class ReportProcessor:
             self.chartId = chartId if chartId else self.NOT_AVAILABLE
 
             self.getMgLimits(pmResult)
-
 
             aavso += self.convertToAAVSORecords(pmResult, ['Ri', 'Gi', 'Bi'])
         aavso.sort()

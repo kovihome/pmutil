@@ -99,22 +99,87 @@ def printDebug(s):
 
 # RBL: it is moving to pmconventions as loadConfig
 def loadPplSetup():
-    pplSetup = {}
-    userhome = getenv("HOME")
-    #    f = open(userhome + "/bin/ppl-setup")
-    f = open(userhome + "/.pmlib/ppl.cfg")
-    pplSetup['HOME'] = userhome
-    for line in f:
-        if not line.startswith('#') and line.strip() != "":
-            r = line.split('=')
-            value = r[1].rstrip()[1:-1]
-            if '$' in value:
-                for k in pplSetup.keys():
-                    if '$' + k in value:
-                        value = value.replace('$' + k, pplSetup[k])
-            pplSetup[r[0].strip()] = value
-    return pplSetup
+    # get user home folder cross-platform
+    userhome = getenv("HOME") or getenv("USERPROFILE")
+    if not userhome:
+        hd = getenv("HOMEDRIVE")
+        hp = getenv("HOMEPATH")
+        if hd and hp:
+            userhome = hd + hp
+    if not userhome:
+        from pathlib import Path
+        userhome = str(Path.home())
 
+    PMLIB = f"{userhome}/.pmlib"
+    pplSetup = {
+        'PMLIB' : PMLIB,
+        'DARKLIB' : f"{PMLIB}/dark",
+        'FLATLIB' : f"{PMLIB}/flat",
+        'COEFFLIB' : f"{PMLIB}/coeff",
+        'ARCHLIB' : f"{PMLIB}/archive",
+
+        # astronomy.net bin folder location (not used in v1.2)
+        'AST_BIN_FOLDER' : "/usr/local/astrometry/bin",
+
+        # sextractor program name
+        # if you are using sextractor version below 2.0, use the name sextractor, otherwise leave source-extractor
+        'SEXTRACTOR' : "source-extractor",
+
+        # folder of the config files (ast, sex)
+        'CONFIG_FOLDER' : PMLIB,
+
+        # standard Ekos folder names
+        'BIAS_FOLDER_NAME' : "Bias",
+        'DARK_FOLDER_NAME' : "Dark",
+        'FLAT_BIAS_FOLDER_NAME' : "Flat-Bias",
+        'FLAT_DARK_FOLDER_NAME' : "Flat-Dark",
+        'FLAT_FOLDER_NAME' : "Flat",
+        'LIGHT_FOLDER_NAME' : "Light",
+        'CALIB_FOLDER_NAME' : "Calibrated",
+        'SEQ_FOLDER_NAME' : "Sequence",
+        'PHOT_FOLDER_NAME' : "Photometry",
+
+        # standard Ekos file prefixes
+        'BIAS_FILE_PREFIX' : "Bias_",
+        'DARK_FILE_PREFIX' : "Dark_",
+        'FLAT_FILE_PREFIX' : "Flat_",
+        'LIGHT_FILE_PREFIX' : "Light_",
+        'SEQ_FILE_PREFIX' : "Seq_",
+
+        'MASTER_BIAS_FILE' : "master-bias",
+        'MASTER_DARK_FILE' : "master-dark",
+        'MASTER_FLAT_FILE' : "master-flat",
+
+        # standardization
+        'DEF_NAMECODE' : "NNN",
+        'DEF_CAMERA' : "Generic Camera",
+        'DEF_TELESCOPE' : "Generic Telescope",
+
+        # refcat
+        'DEF_FIELD_STAR_MG_LIMIT' : "17.0",
+
+        # dark library properties
+        'DARK_TEMP_FILE_THRE' : 2,
+        'DARK_TEMP_USE_THRE' : 5,
+        'DARK_TEMP_CREATE_THRE' : 3
+        }
+
+    cfgFile = userhome + "/.pmlib/ppl.cfg"
+    if exists(cfgFile):
+        with open(userhome + "/.pmlib/ppl.cfg") as f:
+            for line in f:
+                if not line.startswith('#') and line.strip() != "":
+                    r = line.split('=')
+                    value = r[1].rstrip()[1:-1]
+                    if '$' in value:
+                        for k in pplSetup.keys():
+                            if '$' + k in value:
+                                value = value.replace('$' + k, pplSetup[k])
+                    pplSetup[r[0].strip()] = value
+    else:
+        printWarning(f"PPL config file {cfgFile} not found; using default settings.")
+    pplSetup['HOME'] = userhome
+    return pplSetup
 
 def invoke(cmd):
     if pmlog is not None:
