@@ -168,7 +168,7 @@ def loadPplSetup():
     if exists(cfgFile):
         with open(userhome + "/.pmlib/ppl.cfg") as f:
             for line in f:
-                if not line.startswith('#') and line.strip() != "":
+                if not line.startswith('#') and not line.startswith("PMLIB") and line.strip() != "":
                     r = line.split('=')
                     value = r[1].rstrip()[1:-1]
                     if '$' in value:
@@ -479,7 +479,7 @@ class Plot:
 
 def addTableComment(tbl, key, value):
     cmt = key + ': ' + value
-    print(f'add table comment: {cmt}')
+    # print(f'add table comment: {cmt}')
     if 'comments' not in tbl.meta:
         tbl.meta['comments'] = []
     tbl.meta['comments'].append(cmt)

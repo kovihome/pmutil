@@ -148,6 +148,7 @@ class Photometry:
 
     def __init__(self, opt):
         self.opt = opt
+        self.log = pm.Logger(mode=opt['logMode'])
 
     def loadFitsHeaders(self, fileName: str) -> None:
         """
@@ -244,7 +245,7 @@ class Photometry:
         ez_2 = su / sl
         mel_2 = su / float(len(y) - 1)
         err = np.sqrt(se2 / len(y))
-        pm.printDebug(
+        self.log.debug(
                 f"(gcx) color: {color}, zp: {z:7.4f}, mel^2: {mel_2:7.4f}, ez^2: {ez_2:7.4f}, ez: {np.sqrt(ez_2):7.4f}, N: {len(y):d}, ev: {err:7.4f}")
 
         self.ePlot.add(mis, mvs, [1, z], color, stdcolor, color[0].lower(), pm.Plot.INV_X + pm.Plot.INV_Y,
@@ -281,14 +282,14 @@ class Photometry:
                 er.append(1.0 / e2)
 
         if len(mi) < 2:
-            pm.printError("Not enough comp stars for linear fit ensemble")
+            self.log.error("Not enough comp stars for linear fit ensemble")
             return []
 
         #        p = Polynomial.fit(mi, mv, 1, w = er)
         coef = pm.linfit(mi, mv, er)
         ep = np.sqrt(ep / float(N))
 
-        pm.printDebug(f"polyfit result: {coef} error: {ep}")
+        self.log.debug(f"polyfit result: {coef} error: {ep}")
 
         self.ePlot.add(mi, mv, coef, color, stdcolor, color[0].lower(), title=f"Inst {color} vs. Cat {stdcolor}")
 
@@ -330,10 +331,10 @@ class Photometry:
             ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else MAG_ERR_DEFAULT
             e = pm.quad(ei, ev)
             bestComp['ROLE'] = 'K'
-            pm.printDebug(f'Best comp star: {bestComp["AUID"]}, mag: {bestComp[self.mvf[color]]}, err: {e:4.3f}')
+            self.log.debug(f'Best comp star: {bestComp["AUID"]}, mag: {bestComp[self.mvf[color]]}, err: {e:4.3f}')
             return bestComp['AUID']
         else:
-            pm.printError('No usable comp star found ; check the comp stars if they exist in all colors you need')
+            self.log.error('No usable comp star found ; check the comp stars if they exist in all colors you need')
             return None
 
     def calculateMgsComparision(self, comps, color, bestCompId):
@@ -360,7 +361,8 @@ class Photometry:
 
         return p, ep
 
-    def reportResult(self, cmb, outFileName, dateObs, coeffs):
+    @staticmethod
+    def savePhotometryCatalog(cmb, outFileName, dateObs, coeffs):
 
         jdObs = "%12.4f" % pm.jd(dateObs)
 
@@ -433,7 +435,7 @@ class Photometry:
         folder, a, b = self.opt['files'][0].partition('Photometry')
         stdPlot.showOrSave(folder + 'std_coefficients.png')
 
-        pm.printDebug(f"Standard coeffs: Tv = {Tv} Tvr = {Tvr} Tbv = {Tbv}")
+        self.log.debug(f"Standard coeffs: Tv = {Tv} Tvr = {Tvr} Tbv = {Tbv}")
         return [Tv, Tvr, Tbv]
 
     def openCoeffs(self, obsDate, target):
@@ -447,7 +449,7 @@ class Photometry:
     def saveCoeffs(self, coeffs, obsDate, target):
         self.openCoeffs(obsDate, target)
         if not self.opt['overwrite'] and self.coeffTable.exists():
-            pm.printError(
+            self.log.error(
                 f'Standard coefficients for {self.coeffTable.observer}/{self.coeffTable.date}/{self.coeffTable.camera}/{self.coeffTable.telescope} is exists ; to overwrite it use -w option')
             return
         self.coeffTable.addCoeffs(coeffs[0], coeffs[1], coeffs[2], 0.0, 0.0, 0.0, target.replace(' ', '_').upper())
@@ -460,7 +462,7 @@ class Photometry:
         if not bestCoeffs:
             pm.printWarning('standard coeffs not found')
             return None
-        pm.printDebug(f"standard coeffs: Tv = {bestCoeffs['TV']} Tvr = {bestCoeffs['TVR']} Tbv = {bestCoeffs['TBV']}")
+        self.log.debug(f"standard coeffs: Tv = {bestCoeffs['TV']} Tvr = {bestCoeffs['TVR']} Tbv = {bestCoeffs['TBV']}")
         return [bestCoeffs['TV'], bestCoeffs['TVR'], bestCoeffs['TBV']]
 
     def calcVComp(self, colors, cmb, bestComp, p_a, err_a):
@@ -485,21 +487,28 @@ class Photometry:
         cmb['ERR_STDR'] = ['-'] * len(cmb)
         return cmb
 
+    @staticmethod
+    def getVizFlag(row, color: str) -> str:
+        index = "GBR".index(color[0])
+        return row['VIZ_FLAG'][index]
+
     def calculateSimpleMgs(self, cmb: Table, vcomp):
         ma = []
         ea = []
         for c in ['Ri', 'Gi', 'Bi']:
             cc = c[:1]
             for row in cmb:
-                isFainter = row['VIZ_FLAG'] == 'III'  # TODO: I es B flagek kezelese is
-
-                m0 = float(row['MAG_' + c])
-                M = m0 + vcomp[c]['mc'] - vcomp[c]['mi']
-                ma.append(M)
-
-                err_m0 = float(row['ERR_' + c])
-                errM = np.sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
-                ea.append(errM)
+                # isFainter = row['VIZ_FLAG'] == 'III'  # TODO: I es B flagek kezelese is
+                if self.getVizFlag(row, c) in ['I', 'B']:
+                    m0 = float(row['MAG_' + c])
+                    M = m0 + vcomp[c]['mc'] - vcomp[c]['mi']
+                    err_m0 = float(row['ERR_' + c])
+                    errM = np.sqrt(err_m0 * err_m0 + vcomp[c]['ec'] * vcomp[c]['ec'] + vcomp[c]['ei'] * vcomp[c]['ei'])
+                    ma.append(np.round(np.float64(M), 4))
+                    ea.append(np.round(np.float64(errM), 4))
+                else:
+                    ma.append(99.0)
+                    ea.append(-1.0)
 
             cmb['MAG_T' + cc] = ma
             cmb['ERR_T' + cc] = ea
@@ -551,9 +560,17 @@ class Photometry:
             
             validStd = not (isFainter and std)
 
-            v_result.append(V if self.isValidMg(g_row['MAG_GI']) and validStd else 99.0)
-            b_result.append(B if self.isValidMg(g_row['MAG_BI']) and validStd else 99.0)
-            r_result.append(R if self.isValidMg(g_row['MAG_RI']) and validStd else 99.0)
+            def mgval(mg: float, validF: str, default: float) -> float:
+                vmg = mg if self.isValidMg(g_row[validF]) and validStd else default
+                return np.round(np.float64(vmg), 4)
+
+            # v_result.append(V if self.isValidMg(g_row['MAG_GI']) and validStd else 99.0)
+            # b_result.append(B if self.isValidMg(g_row['MAG_BI']) and validStd else 99.0)
+            # r_result.append(R if self.isValidMg(g_row['MAG_RI']) and validStd else 99.0)
+
+            v_result.append(mgval(V, 'MAG_GI', 99.0))
+            b_result.append(mgval(B, 'MAG_BI', 99.0))
+            r_result.append(mgval(R, 'MAG_RI', 99.0))
 
             err_v0 = float(g_row['ERR_GI']) if self.isValidMgErr(g_row['ERR_GI']) else err_vc
             err_b0 = float(g_row['ERR_BI']) if self.isValidMgErr(g_row['ERR_BI']) else err_bc
@@ -563,9 +580,13 @@ class Photometry:
             errB = np.sqrt(err_b0 * err_b0 + err_Bc * err_Bc + err_bc * err_bc)
             errR = np.sqrt(err_r0 * err_r0 + err_Rc * err_Rc + err_rc * err_rc)
 
-            ev_result.append(errV if self.isValidMg(g_row['MAG_GI']) and validStd else -1.0)
-            eb_result.append(errB if self.isValidMg(g_row['MAG_BI']) and validStd else -1.0)
-            er_result.append(errR if self.isValidMg(g_row['MAG_RI']) and validStd else -1.0)
+            # ev_result.append(errV if self.isValidMg(g_row['MAG_GI']) and validStd else -1.0)
+            # eb_result.append(errB if self.isValidMg(g_row['MAG_BI']) and validStd else -1.0)
+            # er_result.append(errR if self.isValidMg(g_row['MAG_RI']) and validStd else -1.0)
+
+            ev_result.append(mgval(errV, 'MAG_GI', -1.0))
+            eb_result.append(mgval(errB, 'MAG_BI', -1.0))
+            er_result.append(mgval(errR, 'MAG_RI', -1.0))
 
         if std:
 
@@ -587,12 +608,14 @@ class Photometry:
 
         return cmb
 
-    @staticmethod
-    def calcHmg(cmb, vcomp):
+    def calcHmg(self, cmb, vcomp):
+        limits = []
         for cc in ['Gi', 'Bi', 'Ri']:
             hmgInst = pm.getTableComment(cmb, 'MgLimitInst' + cc)
             hmg = float(hmgInst) + vcomp[cc]['mc'] - vcomp[cc]['mi']
+            limits.append(hmg)
             pm.addTableComment(cmb, 'MgLimit' + cc, '%7.3f' % hmg)
+        self.log.debug(f"Mg limits: Gi = {limits[0]}, Bi = {limits[1]}, Ri = {limits[2]}")
 
     def calculateEnsembleParams(self, cmb, bestComp):
 
@@ -619,25 +642,25 @@ class Photometry:
 
     def process(self) -> bool:
         if not self.opt['files']:
-            pm.printError('No input files are given.')
+            self.log.error('No input files are given.')
             return False
 
         # load cmb catalog
         cmbFileName = self.opt['files'][0]
-        pm.printDebug(f' Input files: {cmbFileName}')
+        self.log.debug(f' Input files: {cmbFileName}')
         cmb = Table.read(cmbFileName, format='ascii')
         cmb.add_index('AUID')
 
         # filter comp stars
-        compStarMask = cmb['ROLE'] == 'C'
+        compStarMask = (cmb['ROLE'] == 'C') & (cmb['VIZ_FLAG'] == '---')
         compStars = cmb[compStarMask]
 
         # find best comp star in Gi frame
         color = 'Gi' if 'Gi' in self.opt['color'] else self.opt['color'][0]
         fitsFileName = cmbFileName.replace('.cmb', f'-{color}.ast.fits')
-        pm.printDebug(f'.ast.fits file name: {fitsFileName}')
+        self.log.debug(f'.ast.fits file name: {fitsFileName}')
         self.loadFitsHeaders(fitsFileName)
-        pm.printDebug(f' Headers: {self.fits}')
+        self.log.debug(f' Headers: {self.fits}')
         dateObs = self.fits['DATE-OBS']
         dateObsDate = dateObs.split('T')[0]
 
@@ -669,7 +692,7 @@ class Photometry:
                 coeffs = self.loadCoeffs(dateObsDate, target)
 
             if not coeffs:
-                pm.printError(
+                self.log.error(
                         'No std coefficients for transformation ; use Tv = 0, Tvr = 1, Tbv = 1 for comp star method.')
                 coeffs = [0.0, 1.0, 1.0]  # this is for non-std transformation
                 std = False
@@ -698,7 +721,7 @@ class Photometry:
 
         # save results
         fileName = self.opt['files'][0]
-        self.reportResult(cmb, fileName + '.pm', dateObs, coeffs)
+        self.savePhotometryCatalog(cmb, fileName + '.pm', dateObs, coeffs)
 
         return True
 

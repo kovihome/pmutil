@@ -12,18 +12,21 @@ from getopt import getopt, GetoptError
 from sys import argv
 from os import remove
 from os.path import exists
-from math import log10
+from math import log10, cos
 
 import numpy as np
+from astropy.coordinates import SkyCoord
 from astropy.table import Table, join, setdiff
 from astropy.io import fits
+from astropy.wcs import WCS
 from scipy.spatial import cKDTree
 
 import pmbase as pm
 from pmviz import VizierQuery, UCAC4, APASS
 
-SNR = 7.2
-PXPREC = 2.0
+SNR = 7.2                       # SNR to determine limiting magnitude
+PX_PREC = 2.0                   # Pixel coordinate matching precision
+SEP_PREC = 2.0 / 3600.0         # Coordinate matching precisin in degrees
 
 # sextractor catalog field names
 CAT_ID_FIELD = "NUMBER"
@@ -179,12 +182,12 @@ class CatalogMatcher:
         g_coords = np.vstack([gCat_snr[XPOS_FIELD], gCat_snr[YPOS_FIELD]]).T
         r_coords = np.vstack([rCat_snr[XPOS_FIELD], rCat_snr[YPOS_FIELD]]).T
         tree = cKDTree(r_coords)
-        dist, idx2 = tree.query(g_coords, distance_upper_bound=PXPREC)
+        dist, idx2 = tree.query(g_coords, distance_upper_bound=PX_PREC)
         di = np.vstack([dist, idx2]).T
         # print(f"match size: {len(di)}")
 
         # filter out large distances
-        d_mask = di[:, 0] < PXPREC
+        d_mask = di[:, 0] < PX_PREC
         # di_masked = di[d_mask]
 
         # Get matched records in Gi
@@ -230,7 +233,7 @@ class CatalogMatcher:
         di3 = np.vstack([dist3, idx23]).T
 
         # Filter out large distances
-        d3_mask = di3[:, 0] < PXPREC
+        d3_mask = di3[:, 0] < PX_PREC
         # di3_masked = di3[d3_mask]
 
         # Get matched records in Gi/Ri
@@ -474,30 +477,48 @@ class CatalogMatcher:
             cat[j]['X'] = x
             cat[j]['Y'] = y
 
+    @staticmethod
+    def getWCS(fitsFileName):
+        with fits.open(fitsFileName) as f:
+            h = f[0].header
+            return WCS(h)
+
     def filterOutFrameStars(self, cat, fitsFileName):
+        # get WCS from the image
+        wcs = self.getWCS(fitsFileName)
+
         # add frame coords to the catalog
-        self.addFrameCoords(cat, fitsFileName)
+        # self.addFrameCoords(cat, fitsFileName)
 
         # read frame size from fits file
-        fx, fy = self.readFrameSize(fitsFileName)
+        # fx, fy = self.readFrameSize(fitsFileName)
 
-        cat['FRAME_STATUS'] = ['-'] * len(cat)
-        for row in cat:
-            row['FRAME_STATUS'] = self.determineOnFrameStatus(row['X'], row['Y'], fx, fy)
+        # cat['FRAME_STATUS'] = ['-'] * len(cat)
+        # for row in cat:
+        #     row['FRAME_STATUS'] = self.determineOnFrameStatus(row['X'], row['Y'], fx, fy)
+        #
+        # foMask = cat['FRAME_STATUS'] != 'O'
+        # foCat = cat[foMask]
+        # return foCat
 
-        foMask = cat['FRAME_STATUS'] != 'O'
-        foCat = cat[foMask]
-        return foCat
+        sky = SkyCoord(ra=cat["RA_DEG"], dec=cat["DEC_DEG"], unit="deg")
+        pxc = Table(wcs.world_to_pixel(sky))
+        # pxc.add_column(list(range(len(sky))), name="INDEX")
+        # xmax,ymax = wcs.pixel_shape
+        inframe_mask = (pxc['col0'] > 0) & (pxc['col0'] < wcs.pixel_shape[0]) & (pxc['col1'] > 0) & (pxc['col1'] < wcs.pixel_shape[1])
+        # pxcout = pxc[~inframe_mask]
+        # pxcin = pxc[inframe_mask]
+        return cat[inframe_mask]
 
     @staticmethod
     def matchCatalogByCoords(cat, ra, dec):
-        dmin = 99.0
+        dmin = SEP_PREC
         auid = None
         for row in cat:
             if row['VIZ_ID'] == '-':
                 cra = float(row['RA_DEG'])
                 cdec = float(row['DEC_DEG'])
-                d = pm.quad(cra - ra, cdec - dec)
+                d = pm.quad((cra - ra) * cos(dec), cdec - dec)
                 if d < dmin:
                     dmin = d
                     auid = row['AUID']
@@ -527,61 +548,102 @@ class CatalogMatcher:
              r['ERR_R']]
         cmb.add_row(n)
 
-    def addRefcatData(self, cmb: Table, refcat):
+    def addRefcatData(self, cmb: Table, refcat: Table) -> None:
 
         del refcat.meta['comments']
 
+        # filter out refcat objects that are not on the frame
         fitsFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-{self.colors[0]}.ast.fits"
         foRefcat = self.filterOutFrameStars(refcat, fitsFileName)
 
+        # match refcat LABEL to cmb VIZ_ID
+        refcat_x_cmb = join(foRefcat, cmb, join_type='left', keys_left='LABEL', keys_right='VIZ_ID')
+        miss_mask = refcat_x_cmb["AUID_2"].mask == True
+        missingRefcat = refcat_x_cmb[miss_mask]
+
+        # match missing records to cmb by coords
+        cmb_coords = SkyCoord(ra=cmb["RA_DEG"], dec=cmb["DEC_DEG"], unit="deg")
+        refcat_coords = SkyCoord(ra=missingRefcat["RA_DEG_1"], dec=missingRefcat["DEC_DEG_1"], unit="deg")
+        match_idx, sep, dist = refcat_coords.match_to_catalog_sky(cmb_coords)
+        index = list(range(len(match_idx)))
+        # TODO: col2 (dist) is unused
+        xref = Table([match_idx, sep, dist, index])
+        xm = xref["col1"] < SEP_PREC
+        xref_good = xref[xm]
+        # missing_to_upgrade = missingRefcat[xref_good["col3"]]
+
         # xmatch refcat to UCAC4
-        xmt = self.catUCAC4.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
-        if xmt is None:
-            self.log.error("Adding refcat data to combined catalog failed.")
-            return
-        self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
+        # xmt = self.catUCAC4.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
+        # if xmt is None :
+        #     self.log.error("Adding refcat data to combined catalog failed.")
+        #     return
+        # self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
+        #
+        # missingRefcat = setdiff(foRefcat, xmt, 'AUID')
+        #
+        # cmb.add_index('VIZ_ID')
+        #
+        # for xr in xmt:
+        #     vizId = 'UCAC4-' + xr['UCAC4']
+        #     if vizId in cmb['VIZ_ID']:
+        #         try:
+        #             self.updateCmb(cmb, xr, vizid=vizId)
+        #
+        #         except KeyError:
+        #             self.log.debug(xr)
+        #
 
-        missingRefcat = setdiff(foRefcat, xmt, 'AUID')
+        # update cmb from refcat data found by coord matching
+        # TODO: a mezőcsillagokat meg kell nézni, hogy olyat talált-e meg, aminek nincs VIZ_ID-je, és ha van, de eltérő, akkor Warning, és nem update-elni
+        for j in range(len(xref_good)):
+            br = cmb[xref_good[j]["col0"]]
+            ur = missingRefcat[xref_good[j]["col3"]]
+            for f in ["AUID", "ROLE", "LABEL", "MAG_V", "ERR_V", "MAG_B", "ERR_B", "MAG_R", "ERR_R"]:
+                f_ix = f"{f}_1"
+                if ur[f_ix] != '-':
+                    br[f] = ur[f_ix]
+        # mergedTable = join(xmt, cmb, keys='AUID', join_type='left')
+        # mask = mergedTable['VIZ_ID'] == '-'  # or mergedTable['VIZ_ID'] == '' or mergedTable['VIZ_ID'] == None
+        # nt = mergedTable[mask]
 
-        cmb.add_index('VIZ_ID')
+        # refcat records not found in cmb at all
+        xref_bad = xref[~xm]
+        # missing_missing = missingRefcat[xref_bad["col3"]]
+        nt = missingRefcat[xref_bad['col3']]
+        fields = ["AUID", "ROLE", "RA", "RA_DEG", "DEC", "DEC_DEG", "MAG_V", "ERR_V", "MAG_B", "ERR_B", "MAG_R",
+                  "ERR_R", "LABEL"]
+        cols = [nt[f"{f}_1"] for f in fields]
+        negative_transients = Table(cols, names=fields)
 
-        for xr in xmt:
-            vizId = 'UCAC4-' + xr['UCAC4']
-            if vizId in cmb['VIZ_ID']:
-                try:
-                    self.updateCmb(cmb, xr, vizid=vizId)
+        # save negative transients
+        ntFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-{self.colors[0]}.nt"
+        negative_transients.write(ntFileName, format='ascii.fixed_width', overwrite=True)
 
-                except KeyError:
-                    self.log.debug(xr)
-
-        mergedTable = join(xmt, cmb, keys='AUID', join_type='left')
-        mask = mergedTable['VIZ_ID'] == '-'  # or mergedTable['VIZ_ID'] == '' or mergedTable['VIZ_ID'] == None
-        nt = mergedTable[mask]
-
-        self.log.debug(f'Negative transients: {len(nt)} found.')
+        # self.log.debug(f'Negative transients: {len(nt)} found.')
 
         # refCat: AUID         ROLE RA             RA_DEG         DEC            DEC_DEG        MAG_B     ERR_B     MAG_V     ERR_V     MAG_R     ERR_R     LABEL
         # cmb:    'AUID','VIZ_ID','ROLE','LABEL','VIZ_FLAG','POS_FLAG','MATCH_FLAG','RA','RA_DEG','DEC','DEC_DEG',
         #        'MAG_GI','ERR_GI','MAG_BI','ERR_BI','MAG_RI','ERR_RI','MAG_B','ERR_B','MAG_V','ERR_V','MAG_R','ERR_R']
 
-        for r in nt:
-            n = [r['AUID'], '-', r['ROLE_1'], r['LABEL_1'], r['VIZ_FLAG'], r['POS_FLAG'], r['MATCH_FLAG'], r['RA_1'],
-                 r['RA_DEG_1'], r['DEC_1'], r['DEC_DEG_1'],
-                 r['MAG_GI'], r['ERR_GI'], r['MAG_BI'], r['ERR_BI'], r['MAG_RI'], r['ERR_RI'],
-                 r['MAG_B_1'], r['ERR_B_1'], r['MAG_V_1'], r['ERR_V_1'], r['MAG_R_1'], r['ERR_R_1']]
-            cmb.add_row(n)
-
-        self.log.debug(f'Stars missing from refcat: {len(missingRefcat)} found.')
-        for r in missingRefcat:
-            auid, d = self.matchCatalogByCoords(cmb, float(r['RA_DEG']), float(r['DEC_DEG']))
-            self.log.debug(f"Match missingRefcat object {r['AUID']} {r['LABEL']} for {auid} within {d * 60}'")
-            # print(r)  # RBL
-            if d < 2.0 / 60.0:
-                self.updateCmb(cmb, r, auid=auid)
-            else:
-                self.insertCmb(cmb, r)
+        # for r in nt:
+        #     n = [r['AUID'], '-', r['ROLE_1'], r['LABEL_1'], r['VIZ_FLAG'], r['POS_FLAG'], r['MATCH_FLAG'], r['RA_1'],
+        #          r['RA_DEG_1'], r['DEC_1'], r['DEC_DEG_1'],
+        #          r['MAG_GI'], r['ERR_GI'], r['MAG_BI'], r['ERR_BI'], r['MAG_RI'], r['ERR_RI'],
+        #          r['MAG_B_1'], r['ERR_B_1'], r['MAG_V_1'], r['ERR_V_1'], r['MAG_R_1'], r['ERR_R_1']]
+        #     cmb.add_row(n)
+        #
+        # self.log.debug(f'Stars missing from refcat: {len(missingRefcat)} found.')
+        # for r in missingRefcat:
+        #     auid, d = self.matchCatalogByCoords(cmb, float(r['RA_DEG']), float(r['DEC_DEG']))
+        #     self.log.debug(f"Match missingRefcat object {r['AUID']} {r['LABEL']} for {auid} within {d * 60}'")
+        #     # print(r)  # RBL
+        #     if d < 2.0 / 60.0:
+        #         self.updateCmb(cmb, r, auid=auid)
+        #     else:
+        #         self.insertCmb(cmb, r)
 
     def addMgLimits(self, cmb):
+        self.log.debug(f"Instrumental mg limits: Gi = {self.mgLimits['Gi']}, Bi = {self.mgLimits['Bi']}, Ri = {self.mgLimits['Ri']}")
         for cc in self.mgLimits.keys():
             pm.addTableComment(cmb, 'MgLimitInst' + cc, '%7.3f' % (self.mgLimits[cc]))
 
@@ -599,7 +661,7 @@ class CatalogMatcher:
         # match combined catalog to UCAC4, APASS catalogs
         self.log.print('Match combined catalog with UCAC4')
         result = self.xmatchViz(combined)
-        if result is None:
+        if not result:
             print("Error: something wrong with the xmatchViz")
             return False
 

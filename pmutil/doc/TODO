@@ -34,7 +34,7 @@ pmutil TODO
 	+ II/336/apass9
 	+ B/vsx/vsx
 
--NEW: 20190612-RXLyr, hibas comp star
+*NEW: 20190612-RXLyr, hibas comp star
 
     Az ensemble_parameters abran latszik egy nagyon kilogo pont, de nem jottem ra, hogy melyik comp az
     ettol tok rossz az adhoc std
@@ -278,11 +278,10 @@ TECH UPGRADE:
 
 (540) BUG: a rawfit tukrozi a kepet
 
-	/ valszeg a dcraw -t 0 opcio megoldja
-
 	- 2-es opcioval a CR2 meg mindig tukrozott, pedig mintha a CR3-nal jo lett volna
 
 	- kerdes, hogy ha a tavcso tukrozi a kepet, akkor azt hogy tudjuk meghatarozni? lehet, hogy kellene egy opcio a tukrozesre
+	    - a normál newton távcsőnél legyen jó, a coudé vagy cass meg kapjon egy opciót, és/vagy config bejegyzést
 
 --- photometry ---------------------------------------------
 
@@ -310,36 +309,76 @@ TECH UPGRADE:
         network connection was broken.
 
 (525) colorize: a megtalalt csillagokat ra kellene rajzolni a kepre, foleg a valtozokat, meg az oh-kat, ez a tranziens-keresesnel lesz fontos
+    - !!! A coord->px trafót astropy.wcs-sel kellene csinálni
 	+ ezt a colorize csinalja? ez lenne a legjobb
 	+ csinalunk rd2xy transzformaciot, az alapjan be tudja rajzolni a vonalakat
-	+ com star legyen sarga, a valtozo feher
+	+ comp star legyen sarga, a valtozo feher
 
 	+ refcat
-	- pm result stars
-	- transients
+	- pm result stars ??? túl sok van belőlük
+	/ transients
+	/ deep sky objects
 
-	- !!! pillow 5.3.0 needed
+	+ pillow 5.3.0 needed
 
 (451) whole frame photometry
 
 	pmmerge:
 
-	    - új módszertan:
+	    + új módszertan:
 	        + 1. [MOD] pixel coord match a három csatornára -> combined
 	        + 2. coord match a refcat-ra ->
 	        + 2.1 változók
 	        + 2.2 öh-k
-	        2.3 !!! mezőcsillagok, ha vannak (ezek lennének a negatív tranziensek)
-	        2.4 [NEW] galaxisok, ha vannak
+	        + 2.3 !!! mezőcsillagok, ha vannak (ezek lennének a negatív tranziensek)
+	        /2.4 [NEW] galaxisok, ha vannak
 	        +3. ha nincsenek mezőcsillagok, akkor
 	        + 3.1 coord match az USNO katalógusra -> ID, fényességek
 	        + 3.2 [NEW] apass coord match -> pontos fényességek
-	        4. [NEW] ha nincsenek galaxisok, akkor
-	        4.1 [NEW] coord match a ned-re
+	        /4. [NEW] ha nincsenek galaxisok, akkor
+	        /4.1 [NEW] coord match a ned-re
+
+	    * WARNING: FITSFixedWarning: 'datfix' made the change 'Set MJD-OBS to 59101.724178 from DATE-OBS'. [astropy.wcs.wcs]
+	        - A fits headerek közé fel kell venni az MJD-OBS headert
+
+	    * [BUG] addRefcatData elszáll, ha talál negatív tranzienst
+            Traceback (most recent call last):
+              File "/usr/lib/python3/dist-packages/astropy/table/table.py", line 3299, in insert_row
+                newcol = col.insert(index, val, axis=0)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              File "/usr/lib/python3/dist-packages/astropy/table/column.py", line 1406, in insert
+                self_for_insert = _expand_string_array_for_values(self, values)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              File "/usr/lib/python3/dist-packages/astropy/table/column.py", line 149, in _expand_string_array_for_values
+                values_str_len = np.char.str_len(values).max()
+                                 ^^^^^^^^^^^^^^^^^^^^^^^
+              File "/usr/lib/python3/dist-packages/numpy/core/defchararray.py", line 298, in str_len
+                return _vec_string(a, int_, '__len__')
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            TypeError: string operation on non-string array
+            The above exception was the direct cause of the following exception:
+            Traceback (most recent call last):
+              File "/home/kovi/bin/pmmerge.py", line 614, in process
+                self.addRefcatData(combined, refcat)
+              File "/home/kovi/bin/pmmerge.py", line 573, in addRefcatData
+                cmb.add_row(n)
+              File "/usr/lib/python3/dist-packages/astropy/table/table.py", line 3189, in add_row
+                self.insert_row(len(self), vals, mask)
+              File "/usr/lib/python3/dist-packages/astropy/table/table.py", line 3321, in insert_row
+                raise ValueError(
+            ValueError: Unable to insert row because of exception in column 'RA_DEG':
+            string operation on non-string array
+
+		- [#517 V1.3 - szaturalt objektumok flagelese]
+		    + az S flag bekerül a cmb táblába
+		    - nem biztos, hogy teljesen jól kezeli a sextractor a szaturáció limitet
 
 		- NEW: HMG konstansok konfigba keruljenek
 
-		- NEW: debug kiiratasok --debug modban
+		- [FUTURE] galaxisok és egyéb mélyég objektumok keresése a merge során
+		    - A refcat-ba is bekerüljenek-e?
+
+		+ NEW: debug kiiratasok --debug modban
 
 		+ Temp folder kitisztitasa: .cat .xrf .xin file-ok
 
@@ -369,22 +408,27 @@ TECH UPGRADE:
 
 		+ TESZT: Ha nem 3 szin van megadva
 
-		/ [#517 V1.3 - szaturalt objektumok flagelese]
-		    + az S flag bekerül a cmb táblába
-
-		/ !!! mergeExclusions: nem lett befejezve
+		+ !!! mergeExclusions: nem lett befejezve
 		    + a pixel match megoldotta
+
 
 	pmphot:
 
-        - !!! BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
+        - !!! [BUG] 20200909_ex_dra hibás mg értékek a combined riportban
+            - a combined aavso riportban az összes R érték 90 mg fölötti, és a hiba fixen 0.320
+                holott az egyedi Seq riport értékek teljesen jók (a hiba is)
 
-        - !!! a pm táblába az új mg és err értékek túl sok tizedessel kerülnek be, elég lenne csak 4 jegyre
+        * !!! BUG: EX Dra: Nem veszi figyelembe a kiszamolt hmg-t
 
-	    + BUG: ha nem találta meg meg a merge valameliyk színben, akkor a mg érték 99.0,
+		- [FUTURE] ensemble fotometria mezőcsillagok alapján, ha nincs elég öh
+
+	    + best comp keresésnél csak olyan vegyen figyelembe, aminek a viz flag üres (saturated ne legyen)
+	        - ez igaz a comp star-ok szűrésénél is ensemble esetben
+
+        + a pm táblába az új mg és err értékek túl sok tizedessel kerülnek be, elég lenne csak 4 jegyre
+
+	    + BUG: ha nem találta meg meg a merge valamelyik színben, akkor a mg érték 99.0,
 	        de ezt nem veszi figyelembe a fotometriánál
-
-		- NEW: kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
 
         + BUG: STD: az RX Lyr a nem std modszerekkel fainter lett, std-vel nem. Nem veszi figyelembe a hmg-t?
 	            az std rendben van, a tobbit kell megnezni (20190612)
@@ -405,12 +449,17 @@ TECH UPGRADE:
 
 	    + process: best comp keresés, ha nincs Gi szín (pl. csak Ri-ben fotometrál)
 
+		/ [FUTURE] kell egy opcio, hogy az ensemble csak a comp csillagok alapjan megy, vagy az osszes mezocsillag alapjan
+
 		/ [#522 V1.4 - kappa-sigma egyenesillesztés]
 
 	    / [FUTURE] ha a hmg alatt van, de látszik, akkor a commentbe oda kellene irni a mert mg-t es hibat tanulsagkeppen
 	        - kérdés, hogy az új merge-nél lesz-e ilyen eset
 
 	pmresult:
+
+        - calcAirMass: observer location legyen a konfigban, vagy helység vagy koordináta, legyen base függvény,
+            ami a koordinátát adja vissza
 
 		+ BUG: nem kerul bele a comp id es mg
 
@@ -419,9 +468,6 @@ TECH UPGRADE:
 		+ EX Dra: olyan mg es mgerr ertekek vannak, hogy 'nan'
 
 		+ [#547 V1.2] sequence eseten csak a Seq-bol csinal riportot, a Combined-bol nem
-
-        - calcAirMass: observer location legyen a konfigban, vagy helység vagy koordináta, legyen base függvény,
-            ami a koordinátát adja vissza
 
 
 		+ combined catalog fields:

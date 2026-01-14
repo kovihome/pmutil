@@ -83,11 +83,10 @@ class VizierQuery:
         return t
 
     def xmatch(self, srcTable: Table, raColName: str, decColName: str) -> Table | None:
-        pm.printDebug(f"matching catalog with {self.cat['name']}")
         try:
             t = XMatch.query(cat1=srcTable, cat2='vizier:' + self.cat['idFull'], max_distance=2 * u.arcsec,
                                 colRA1=raColName, colDec1=decColName, colRA2=self.cat['cols']['RA_DEG'], colDec2=self.cat['cols']['DEC_DEG'])
-            pm.printDebug(f"  results {len(t)} objects")
+            pm.printDebug(f"Matching catalog with {self.cat['name']} results {len(t)} objects")
             return t
         except ConnectionError as ce:
             pm.printError(str(ce))

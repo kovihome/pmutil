@@ -14,6 +14,7 @@ from sys import argv
 import numpy as np
 import rawpy
 from astropy.io import fits
+from astropy.time import Time
 
 import pmbase as pm
 
@@ -61,6 +62,8 @@ class RawConverter:
 
         # DATE-OBS
         # DATE-IMG, DATE-LOC
+        # MJD-OBS (for WCS)
+        # TODO: use astropy.time
         dt_str = None
         if "TimeStamp" in exif:
             dt_str = exif["TimeStamp"] + "0000"  # datetime string
@@ -83,6 +86,7 @@ class RawConverter:
             hdr("DATE-LOC", dt_s, "Time of observation (local)")
             hdr("DATE-IMG", dt_s, "Time of observation (local)")
             hdr("DATE-OBS", dt_utc_s, "Time of observation (UTC)")
+            hdr("MJD-OBS", f"{Time(dt_utc_s).mjd:.6f}", "Time of observation (MJD)")
 
         # EXPTIME, EXPSURE
         if "ExposureTime" in exif:

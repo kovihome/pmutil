@@ -174,6 +174,7 @@ class Pipeline:
             'saveGraphs': self.opt['saveGraphs'],
             'observer': self.obsCode, # self.opt['nameCode'],
             'files': [cmbFileName],
+            'logMode': self.opt['logMode'],
         }
         phot = Photometry(pmopt)
         phot.process()
