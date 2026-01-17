@@ -9,22 +9,21 @@ Created on Mar 17, 2021
 """
 
 from getopt import getopt, GetoptError
-from sys import argv
-from os import remove
+from math import log10
 from os.path import exists
-from math import log10, cos
+from sys import argv
+from typing import Any
 
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, join, setdiff
 from astropy.io import fits
+from astropy.table import Table, join
 from astropy.wcs import WCS
 from scipy.spatial import cKDTree
 
 import pmbase as pm
 from pmviz import VizierQuery, UCAC4, APASS
 
-SNR = 7.2                       # SNR to determine limiting magnitude
 PX_PREC = 2.0                   # Pixel coordinate matching precision
 SEP_PREC = 2.0 / 3600.0         # Coordinate matching precisin in degrees
 
@@ -42,40 +41,32 @@ DEC_FIELD = "DELTA_J2000"
 NO_MAG = "99.0"
 
 class CatalogMatcher:
-    folder = './'
+    # folder = './'
     baseName = None
-    colors = ['Ri', 'Gi', 'Bi']
+    # colors = ['Ri', 'Gi', 'Bi']
     showGraphs = False
     saveGraphs = False
 
-    # TODO: ezt a kettot konfigba tenni
-    HMG_MAX_ERR = 0.15  # mg
-
-    LIMIT_THRE = 0.5  # mg
+    # TODO: ezt konfigba tenni
+    LIMIT_THRE = 3.0 * pm.DEFAULT_MG_ERR  # mg
 
     IMAGE_BORDER_SIZE = 10  # pixels
 
     MG_LIMIT = 17.0  # TODO: nem lehet-e ezt szamolni?
 
-    COORD_MATCH_THRE = 2.0 / 60.0  # degrees
-
-    catUCAC4 = None
-
-    def __init__(self, baseName, folder, colors, show, save, loggingMode=pm.Logger.LOG_MODE_INFO):
+    def __init__(self, baseName: str, folder: str, colors: list[str], opt: dict[str, Any]):
         self.baseName = baseName
-        if folder is not None:
-            self.folder = folder
-        if colors is not None:
-            self.colors = colors
-        # self.viz = VizUCAC4(self.MG_LIMIT)
-        self.catUCAC4 = VizierQuery(cat=UCAC4, limit=self.MG_LIMIT)
-        self.showGraphs = show
-        self.saveGraphs = save
-        self.log = pm.Logger(mode=loggingMode)
+        self.folder = folder if folder is not None else './'
+        self.colors = colors if colors is not None else ['Ri', 'Gi', 'Bi']
+        self.showGraphs: bool = opt['showGraphs']
+        self.saveGraphs: bool = opt['saveGraphs']
+        self.log = pm.Logger(mode=opt['logMode'])
+        self.offline: bool = opt['offline']
+        self.catUCAC4 = VizierQuery(cat=UCAC4, limit=self.MG_LIMIT) if not self.offline else None
         self.mgLimits = None
         self.hmgPlot = None
 
-    def hmg(self, pmTable, nr):
+    def hmg(self, pmTable: Table, nr: int) -> list[float]:
         mgIsoCorrArr = pmTable['MAG_ISOCOR']
         mgIsoCorrErrArr = pmTable['MAGERR_ISOCOR']
         mgBestArr = pmTable['MAG_BEST']
@@ -93,10 +84,10 @@ class CatalogMatcher:
                 loge2.append(log10(mgBestErrArr[j]))
 
         m1, b1 = pm.linfit(logm1, loge1)
-        hmg1 = -1.0 * 10.0 ** ((log10(self.HMG_MAX_ERR) - b1) / m1)
+        hmg1 = -1.0 * 10.0 ** ((log10(pm.DEFAULT_MG_ERR) - b1) / m1)
 
         m2, b2 = pm.linfit(logm2, loge2)
-        hmg2 = -1.0 * 10.0 ** ((log10(self.HMG_MAX_ERR) - b2) / m2)
+        hmg2 = -1.0 * 10.0 ** ((log10(pm.DEFAULT_MG_ERR) - b2) / m2)
 
         plotcolor = 'gbr'[nr]
         self.hmgPlot.add(logm1, loge1, [m1, b1], f'log mi ({plotcolor.upper()}i)', f'log ei ({plotcolor.upper()}i)',
@@ -104,18 +95,19 @@ class CatalogMatcher:
 
         return [hmg1, hmg2]
 
-    def calcMgLimit(self, fileName, nr):
+    def calcMgLimit(self, fileName: str, nr: int) -> float:
         t = Table.read(fileName, format='ascii.sextractor')
         mgs = self.hmg(t, nr)
         return mgs[0]
 
-    def readFrameSize(self, fitsFileName):
+    @staticmethod
+    def readFrameSize(fitsFileName: str) -> tuple[int, int]:
         h = pm.getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
         xf = int(h['NAXIS1'])
         yf = int(h['NAXIS2'])
         return xf, yf
 
-    def determineOnFrameStatus(self, x_obj, y_obj, im_w, im_h):
+    def determineOnFrameStatus(self, x_obj: float, y_obj: float, im_w: int, im_h: int) -> str:
         if x_obj < 0 or x_obj >= im_w or y_obj < 0 or y_obj >= im_h:
             return 'O'
         if x_obj < self.IMAGE_BORDER_SIZE or x_obj >= im_w - self.IMAGE_BORDER_SIZE or y_obj < self.IMAGE_BORDER_SIZE \
@@ -123,7 +115,7 @@ class CatalogMatcher:
             return 'B'
         return '-'
 
-    def calcVisFlag(self, mg, limit):
+    def calcVisFlag(self, mg: str, limit: float) -> str:
         """
         flags I - INVISIBLE, B - BELOW_LIMIT, N - NEAR_LIMIT, S - SATURATED
         """
@@ -137,18 +129,7 @@ class CatalogMatcher:
             return 'N'
         return '-'
 
-    def calcPosFlag(self, x_obj, y_obj, im_w, im_h):
-        """
-        x_obj # object x position
-        y_obj # object y position
-        im_w  # image width
-        im_h  # image height
-
-        flags B - object is near of image border
-        """
-        return self.determineOnFrameStatus(x_obj, y_obj, im_w, im_h)
-
-    def calcMgLimits(self, catFileBase: str):
+    def calcMgLimits(self, catFileBase: str) -> None:
         # calculate mg limits
         self.hmgPlot = pm.Plot(len(self.colors), self.showGraphs, self.saveGraphs)
 
@@ -167,8 +148,8 @@ class CatalogMatcher:
         self.log.debug(f"Original catalog file size for {color}: {len(cat)}")
 
         # filter catalog by SNR
-        cat_snr = cat[cat[FLUX_FIELD] / cat[FLUXERR_FIELD] > SNR]
-        self.log.debug(f"SNR filtered catalog size for Gi: {len(cat_snr)}")
+        cat_snr = cat[cat[FLUX_FIELD] / cat[FLUXERR_FIELD] > pm.DEFAULT_SNR]
+        self.log.debug(f"SNR filtered catalog size for {color}: {len(cat_snr)}")
 
         return cat_snr
 
@@ -188,16 +169,12 @@ class CatalogMatcher:
 
         # filter out large distances
         d_mask = di[:, 0] < PX_PREC
-        # di_masked = di[d_mask]
 
         # Get matched records in Gi
         g_matched_to_r = gCat_snr[d_mask]
 
         # Get non-matched records in Gi
         g_not_matched_to_r = gCat_snr[~d_mask]
-
-        # Get matched records in Ri
-        # r_matched_to_g = rCat_snr[idx2[d_mask]]
 
         # Get Ri records not matched to Gi
         r_ix = idx2[d_mask]
@@ -234,16 +211,12 @@ class CatalogMatcher:
 
         # Filter out large distances
         d3_mask = di3[:, 0] < PX_PREC
-        # di3_masked = di3[d3_mask]
 
         # Get matched records in Gi/Ri
         rg_matched_to_b = rg_merged_xref[d3_mask]
 
         # Get non-matched records in Gi/Ri
         rg_not_matched_to_b = rg_merged_xref[~d3_mask]
-
-        # Get matched records in Ri
-        # b_matched_to_gr = rCat_snr[idx23[d3_mask]]
 
         # Get Ri records not matched to Gi
         r3_ix = idx23[d3_mask]
@@ -301,7 +274,7 @@ class CatalogMatcher:
             rFlag = int(rRec["FLAGS"]) if rRec else 0
             bFlag = int(bRec["FLAGS"]) if bRec else 0
             closeToBoundary = ((gFlag | rFlag | bFlag) & 24) > 0
-            posFlags = 'B' if closeToBoundary else self.calcPosFlag(float(xpos), float(ypos), imageSize[0], imageSize[1])
+            posFlags = 'B' if closeToBoundary else self.determineOnFrameStatus(float(xpos), float(ypos), imageSize[0], imageSize[1])
             gVisFlag = 'S' if gFlag & 4 > 0 else self.calcVisFlag(magG, self.mgLimits['Gi'])
             bVisFlag = 'S' if bFlag & 4 > 0 else self.calcVisFlag(magB, self.mgLimits['Bi'])
             rVisFlag = 'S' if rFlag & 4 > 0 else self.calcVisFlag(magR, self.mgLimits['Ri'])
@@ -340,7 +313,7 @@ class CatalogMatcher:
             "B_NUMBER": indexColumn if cc == "Bi" else emptyColumn,
         })
 
-    def matchCatalogsOneColor(self, catFileBase, imageSize: tuple[int, int]):
+    def matchCatalogsOneColor(self, catFileBase:str, imageSize: tuple[int, int]) -> Table:
         # filter catalog by SNR
         pmCatalog = self.loadAndFiltercatalogFile(catFileBase, self.colors[0])
 
@@ -376,7 +349,7 @@ class CatalogMatcher:
         return cmb
 
     @staticmethod
-    def createCombinedCat():
+    def createCombinedCat() -> Table:
         fnames = ['AUID', 'VIZ_ID', 'ROLE', 'LABEL',
                   'VIZ_FLAG', 'POS_FLAG', 'MATCH_FLAG',
                   'RA', 'RA_DEG', 'DEC', 'DEC_DEG',
@@ -389,7 +362,7 @@ class CatalogMatcher:
                   'U6', 'U5', 'U6', 'U5', 'U6', 'U5']
         return Table(names=fnames, dtype=fdtype)
 
-    def xmatchViz(self, combined):
+    def xmatchViz(self, combined: Table) -> bool:
         # xmatch cmb to UCAC4 catalog
         xmt = self.catUCAC4.xmatch(combined, 'RA_DEG', 'DEC_DEG')
         if xmt is None:
@@ -408,11 +381,6 @@ class CatalogMatcher:
             r['MAG_V'] = xr['Vmag']
             r['MAG_R'] = xr['Rmag']
 
-    # TODO: query errors from vizier
-    #            r['ERR_B'] = xr['e_Bmag']
-    #            r['ERR_V'] = xr['e_Vmag']
-    #            r['ERR_R'] = xr['e_Rmag']
-
         # get valid mags and errors from APASS
         catAPASS = VizierQuery(APASS, self.MG_LIMIT)
         apassMatchTable = catAPASS.xmatch(combined, 'RA_DEG', 'DEC_DEG')
@@ -429,7 +397,6 @@ class CatalogMatcher:
             "MAG_R": "rpmag",
             "ERR_R": "e_rpmag"
         }
-        ff = "{:.3f}.format"
         for r in apassMatchTable:
             auid = r['AUID']
             br = combined.loc[auid]
@@ -439,7 +406,7 @@ class CatalogMatcher:
 
         return True
 
-    def loadRefcat(self):
+    def loadRefcat(self) -> Table | None:
         refcatFileName = f"{self.folder}/ref.cat"
         if exists(refcatFileName):
             return Table.read(refcatFileName, format='ascii')
@@ -447,106 +414,20 @@ class CatalogMatcher:
             self.log.warning(f'No ref.cat in the folder {self.folder}')
             return None
 
-    def addFrameCoords(self, cat, fitsFileName):
-        # 1. convert cat to fits format
-        # baseFolder = fitsFileName.partition(pm.setup['PHOT_FOLDER_NAME'])[0]
-        tempFile = self.folder + '/temp/tempCat.fits'
-        if not exists(tempFile):
-            cat.write(tempFile)
-
-        # 2. calculate ref objects' frame xy points
-        wcsFile = fitsFileName.replace('.ast.fits', '.wcs')
-        axyFile = fitsFileName.replace('.ast.fits', '.ref.axy')
-        pm.invoke("wcs-rd2xy -w %s -i %s -o %s -R RA_DEG -D DEC_DEG" % (
-            wcsFile, tempFile, axyFile))  # -f option need argument
-
-        remove(tempFile)
-
-        # 3. merge frame xy point to refCat
-        tlen = len(cat)
-        cat['X'] = [0.0] * tlen
-        cat['Y'] = [0.0] * tlen
-
-        # f = fits.open(axyFile)
-        # d = f[1].data
-        with fits.open(axyFile) as f:
-            d = f[1].data
-
-        for j in range(tlen):
-            x, y = d[j]
-            cat[j]['X'] = x
-            cat[j]['Y'] = y
-
     @staticmethod
-    def getWCS(fitsFileName):
+    def getWCS(fitsFileName: str) -> WCS:
         with fits.open(fitsFileName) as f:
             h = f[0].header
             return WCS(h)
 
-    def filterOutFrameStars(self, cat, fitsFileName):
+    def filterOutFrameStars(self, cat: Table, fitsFileName: str) -> Table:
         # get WCS from the image
         wcs = self.getWCS(fitsFileName)
 
-        # add frame coords to the catalog
-        # self.addFrameCoords(cat, fitsFileName)
-
-        # read frame size from fits file
-        # fx, fy = self.readFrameSize(fitsFileName)
-
-        # cat['FRAME_STATUS'] = ['-'] * len(cat)
-        # for row in cat:
-        #     row['FRAME_STATUS'] = self.determineOnFrameStatus(row['X'], row['Y'], fx, fy)
-        #
-        # foMask = cat['FRAME_STATUS'] != 'O'
-        # foCat = cat[foMask]
-        # return foCat
-
         sky = SkyCoord(ra=cat["RA_DEG"], dec=cat["DEC_DEG"], unit="deg")
         pxc = Table(wcs.world_to_pixel(sky))
-        # pxc.add_column(list(range(len(sky))), name="INDEX")
-        # xmax,ymax = wcs.pixel_shape
         inframe_mask = (pxc['col0'] > 0) & (pxc['col0'] < wcs.pixel_shape[0]) & (pxc['col1'] > 0) & (pxc['col1'] < wcs.pixel_shape[1])
-        # pxcout = pxc[~inframe_mask]
-        # pxcin = pxc[inframe_mask]
         return cat[inframe_mask]
-
-    @staticmethod
-    def matchCatalogByCoords(cat, ra, dec):
-        dmin = SEP_PREC
-        auid = None
-        for row in cat:
-            if row['VIZ_ID'] == '-':
-                cra = float(row['RA_DEG'])
-                cdec = float(row['DEC_DEG'])
-                d = pm.quad((cra - ra) * cos(dec), cdec - dec)
-                if d < dmin:
-                    dmin = d
-                    auid = row['AUID']
-        #        print(f"Coord matched - auid: {auid}, d: {sqrt(dmin)*60}'")
-        return auid, dmin
-
-    @staticmethod
-    def updateCmb(cmb, r, auid=None, vizid=None):
-        if vizid:
-            cr = cmb.loc['VIZ_ID', vizid]
-        else:
-            cr = cmb.loc['AUID', auid]
-        cr['ROLE'] = r['ROLE']
-        cr['AUID'] = r['AUID']
-        cr['LABEL'] = r['LABEL']
-        cr['MAG_B'] = r['MAG_B']
-        cr['MAG_V'] = r['MAG_V']
-        cr['MAG_R'] = r['MAG_R']
-        cr['ERR_B'] = r['ERR_B']
-        cr['ERR_V'] = r['ERR_V']
-        cr['ERR_R'] = r['ERR_R']
-
-    @staticmethod
-    def insertCmb(cmb: Table, r):
-        n = [r['AUID'], '-', r['ROLE'], r['LABEL'], 'III', '-', 'N', r['RA'], r['RA_DEG'], r['DEC'], r['DEC_DEG'],
-             NO_MAG, NO_MAG, NO_MAG, NO_MAG, NO_MAG, NO_MAG, r['MAG_B'], r['ERR_B'], r['MAG_V'], r['ERR_V'], r['MAG_R'],
-             r['ERR_R']]
-        cmb.add_row(n)
 
     def addRefcatData(self, cmb: Table, refcat: Table) -> None:
 
@@ -570,28 +451,6 @@ class CatalogMatcher:
         xref = Table([match_idx, sep, dist, index])
         xm = xref["col1"] < SEP_PREC
         xref_good = xref[xm]
-        # missing_to_upgrade = missingRefcat[xref_good["col3"]]
-
-        # xmatch refcat to UCAC4
-        # xmt = self.catUCAC4.xmatch(foRefcat, 'RA_DEG', 'DEC_DEG')
-        # if xmt is None :
-        #     self.log.error("Adding refcat data to combined catalog failed.")
-        #     return
-        # self.log.debug(f'Refcat xmatch table contains {len(xmt)} records')
-        #
-        # missingRefcat = setdiff(foRefcat, xmt, 'AUID')
-        #
-        # cmb.add_index('VIZ_ID')
-        #
-        # for xr in xmt:
-        #     vizId = 'UCAC4-' + xr['UCAC4']
-        #     if vizId in cmb['VIZ_ID']:
-        #         try:
-        #             self.updateCmb(cmb, xr, vizid=vizId)
-        #
-        #         except KeyError:
-        #             self.log.debug(xr)
-        #
 
         # update cmb from refcat data found by coord matching
         # TODO: a mezőcsillagokat meg kell nézni, hogy olyat talált-e meg, aminek nincs VIZ_ID-je, és ha van, de eltérő, akkor Warning, és nem update-elni
@@ -602,13 +461,9 @@ class CatalogMatcher:
                 f_ix = f"{f}_1"
                 if ur[f_ix] != '-':
                     br[f] = ur[f_ix]
-        # mergedTable = join(xmt, cmb, keys='AUID', join_type='left')
-        # mask = mergedTable['VIZ_ID'] == '-'  # or mergedTable['VIZ_ID'] == '' or mergedTable['VIZ_ID'] == None
-        # nt = mergedTable[mask]
 
         # refcat records not found in cmb at all
         xref_bad = xref[~xm]
-        # missing_missing = missingRefcat[xref_bad["col3"]]
         nt = missingRefcat[xref_bad['col3']]
         fields = ["AUID", "ROLE", "RA", "RA_DEG", "DEC", "DEC_DEG", "MAG_V", "ERR_V", "MAG_B", "ERR_B", "MAG_R",
                   "ERR_R", "LABEL"]
@@ -619,35 +474,12 @@ class CatalogMatcher:
         ntFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}-{self.colors[0]}.nt"
         negative_transients.write(ntFileName, format='ascii.fixed_width', overwrite=True)
 
-        # self.log.debug(f'Negative transients: {len(nt)} found.')
-
-        # refCat: AUID         ROLE RA             RA_DEG         DEC            DEC_DEG        MAG_B     ERR_B     MAG_V     ERR_V     MAG_R     ERR_R     LABEL
-        # cmb:    'AUID','VIZ_ID','ROLE','LABEL','VIZ_FLAG','POS_FLAG','MATCH_FLAG','RA','RA_DEG','DEC','DEC_DEG',
-        #        'MAG_GI','ERR_GI','MAG_BI','ERR_BI','MAG_RI','ERR_RI','MAG_B','ERR_B','MAG_V','ERR_V','MAG_R','ERR_R']
-
-        # for r in nt:
-        #     n = [r['AUID'], '-', r['ROLE_1'], r['LABEL_1'], r['VIZ_FLAG'], r['POS_FLAG'], r['MATCH_FLAG'], r['RA_1'],
-        #          r['RA_DEG_1'], r['DEC_1'], r['DEC_DEG_1'],
-        #          r['MAG_GI'], r['ERR_GI'], r['MAG_BI'], r['ERR_BI'], r['MAG_RI'], r['ERR_RI'],
-        #          r['MAG_B_1'], r['ERR_B_1'], r['MAG_V_1'], r['ERR_V_1'], r['MAG_R_1'], r['ERR_R_1']]
-        #     cmb.add_row(n)
-        #
-        # self.log.debug(f'Stars missing from refcat: {len(missingRefcat)} found.')
-        # for r in missingRefcat:
-        #     auid, d = self.matchCatalogByCoords(cmb, float(r['RA_DEG']), float(r['DEC_DEG']))
-        #     self.log.debug(f"Match missingRefcat object {r['AUID']} {r['LABEL']} for {auid} within {d * 60}'")
-        #     # print(r)  # RBL
-        #     if d < 2.0 / 60.0:
-        #         self.updateCmb(cmb, r, auid=auid)
-        #     else:
-        #         self.insertCmb(cmb, r)
-
-    def addMgLimits(self, cmb):
+    def addMgLimits(self, cmb: Table):
         self.log.debug(f"Instrumental mg limits: Gi = {self.mgLimits['Gi']}, Bi = {self.mgLimits['Bi']}, Ri = {self.mgLimits['Ri']}")
         for cc in self.mgLimits.keys():
             pm.addTableComment(cmb, 'MgLimitInst' + cc, '%7.3f' % (self.mgLimits[cc]))
 
-    def save(self, combined):
+    def save(self, combined: Table):
         combinedFileName = f"{self.folder}/{pm.setup['PHOT_FOLDER_NAME']}/{self.baseName}.cmb"
         self.log.debug(f"Combined file name: {combinedFileName}")
         combined.write(combinedFileName, format='ascii.fixed_width', delimiter=' ', overwrite=True)
@@ -659,11 +491,12 @@ class CatalogMatcher:
         combined = self.matchCatalogs()
 
         # match combined catalog to UCAC4, APASS catalogs
-        self.log.print('Match combined catalog with UCAC4')
-        result = self.xmatchViz(combined)
-        if not result:
-            print("Error: something wrong with the xmatchViz")
-            return False
+        if not self.offline:
+            self.log.print('Match combined catalog with UCAC4')
+            result = self.xmatchViz(combined)
+            if not result:
+                print("Error: something wrong with the xmatchViz")
+                return False
 
         # load refcat
         refcat = self.loadRefcat()
@@ -690,6 +523,7 @@ if __name__ == '__main__':
         folder = None
         showGraphs = False
         saveGraphs = False
+        offline = False
 
         def __init__(self, argv):
             self.argv = argv
@@ -697,7 +531,7 @@ if __name__ == '__main__':
 
         def processCommands(self):
             try:
-                optlist, args = getopt(argv[1:], "c:", ['color=', 'show-graph', 'save-graph'])
+                optlist, args = getopt(argv[1:], "c:", ['color=', 'show-graph', 'save-graph', 'offline'])
             except GetoptError:
                 pm.printError('Invalid command line options')
                 return
@@ -711,6 +545,8 @@ if __name__ == '__main__':
                     self.showGraphs = True
                 elif o == '--save-graph':
                     self.saveGraphs = True
+                elif o == '--offline':
+                    self.offline = True
 
             if args:
                 self.folder = args[0]
@@ -725,8 +561,12 @@ if __name__ == '__main__':
 
             colors = ['Ri', 'Gi', 'Bi'] if self.color is None else [self.color]
 
-            matcher = CatalogMatcher('Combined', self.folder, colors, self.showGraphs, self.saveGraphs,
-                                     pm.Logger.LOG_MODE_DEBUG)
+            matcher = CatalogMatcher('Combined', self.folder, colors, {
+                "showGraphs": self.showGraphs,
+                "saveGraphs": self.saveGraphs,
+                "logMode": pm.Logger.LOG_MODE_DEBUG,
+                "offline": self.offline
+            })
             matcher.process()
 
 

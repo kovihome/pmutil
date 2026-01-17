@@ -24,8 +24,6 @@ fieldMgErrTrue = 'ERR_V'
 fieldAuid = 'AUID'
 fieldRole = 'ROLE'
 
-MAG_ERR_DEFAULT = 0.15
-
 
 class StdCoeffs:
     coeffs = None  # astropy.table.Table of std coeffs
@@ -50,7 +48,7 @@ class StdCoeffs:
         {'name': 'FIELD', 'format': '%-24s', 'dtype': 'U24'},
     ]
 
-    def __init__(self, coeffFileName, observer, date, camera, telescope, std_area):
+    def __init__(self, coeffFileName: str, observer: str, date: str, camera: str, telescope: str, std_area: str):
         self.fileName = coeffFileName
         self.observer = observer
         self.date = date
@@ -58,7 +56,7 @@ class StdCoeffs:
         self.telescope = telescope
         self.std_area = std_area
 
-    def open(self):
+    def open(self) -> None:
         if not exists(self.fileName):
             self.coeffs = Table()
             for field in self.fields:
@@ -147,6 +145,7 @@ class Photometry:
     evf = {'Gi': 'ERR_V', 'Bi': 'ERR_B', 'Ri': 'ERR_R'}
 
     def __init__(self, opt):
+        self.ePlot = None
         self.opt = opt
         self.log = pm.Logger(mode=opt['logMode'])
 
@@ -311,7 +310,7 @@ class Photometry:
             mvs = pms[self.mvf[color]]
             evs = pms[self.evf[color]]
             if self.isValidMg(mvs):
-                ei = float(pms[self.eif[color]]) if self.isValidMgErr(pms[self.eif[color]]) else MAG_ERR_DEFAULT
+                ei = float(pms[self.eif[color]]) if self.isValidMgErr(pms[self.eif[color]]) else pm.DEFAULT_MG_ERR
                 ev = float(evs) if self.isValidMgErr(evs) else ei
                 e = ei * ei + ev * ev
                 if e < emin:
@@ -327,8 +326,8 @@ class Photometry:
                     bestComp = pms
 
         if bestComp:
-            ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else MAG_ERR_DEFAULT
-            ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else MAG_ERR_DEFAULT
+            ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else pm.DEFAULT_MG_ERR
+            ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else pm.DEFAULT_MG_ERR
             e = pm.quad(ei, ev)
             bestComp['ROLE'] = 'K'
             self.log.debug(f'Best comp star: {bestComp["AUID"]}, mag: {bestComp[self.mvf[color]]}, err: {e:4.3f}')
@@ -345,7 +344,7 @@ class Photometry:
 
         zp = float(bestComp[self.mvf[color]]) - float(bestComp[self.mif[color]])
         p = [1.0, zp]
-        ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else MAG_ERR_DEFAULT
+        ei = float(bestComp[self.eif[color]]) if self.isValidMgErr(bestComp[self.eif[color]]) else pm.DEFAULT_MG_ERR
         ev = float(bestComp[self.evf[color]]) if self.isValidMgErr(bestComp[self.evf[color]]) else ei
         ep = pm.quad(ei, ev)
 
@@ -383,7 +382,7 @@ class Photometry:
     # standardization functions
 
     def mgd(self, s: str) -> float:
-        return float(s) if self.isValidMgErr(s) else MAG_ERR_DEFAULT
+        return float(s) if self.isValidMgErr(s) else pm.DEFAULT_MG_ERR
 
     def calculateCoeffs(self, mergedCat: Table) -> list[float]:
         # Tv:  slope of (V-v) -> (V-R)
@@ -778,7 +777,7 @@ if __name__ == '__main__':
             for o, a in optlist:
                 if a[:1] == ':':
                     a = a[1:]
-                elif o == '-c' or o == '--color':
+                if o == '-c' or o == '--color':
                     color = a.lower()
                     if color not in self.availableBands:
                         pm.printError(f'Invalid color: {a}, use on of these: Gi, g, Bi, b, Ri, r, all')

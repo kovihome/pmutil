@@ -338,8 +338,22 @@ TECH UPGRADE:
 	        /4. [NEW] ha nincsenek galaxisok, akkor
 	        /4.1 [NEW] coord match a ned-re
 
+	    - !!! meg kell különböztetni a refcat-ból jövő UCAC4 id-t meg az xmatch-ból jövőt, mert keveredés lehet
+	        refcat-ban 000-FFF-nnn szerepel, vagy valami hasonló
+	        - kérdés, hogy ha refcat-ban más az AUID-ja, akkor felül kell-e írni? valszeg utána egyszerűbb lesz fotometriákat összehasonlítani
+	            pl. sequence esetben
+
+		* !!! [#517 V1.3 - szaturalt objektumok flagelese]
+		    + az S flag bekerül a cmb táblába
+		    * nem biztos, hogy teljesen jól kezeli a sextractor a szaturáció limitet
+		        * a limit számolás rossz volt
+
+	    * kellene egy command line opció (--offline), hogy merge-nél ne használja a Vizier-t, ne töltsön le online adatokat.
+	        Ez segíthat olyankor, amikor a mostanihoz hasonlóan beteges a Vizier szerver elérése.
+
 	    * WARNING: FITSFixedWarning: 'datfix' made the change 'Set MJD-OBS to 59101.724178 from DATE-OBS'. [astropy.wcs.wcs]
 	        - A fits headerek közé fel kell venni az MJD-OBS headert
+	        - -> pmraw
 
 	    * [BUG] addRefcatData elszáll, ha talál negatív tranzienst
             Traceback (most recent call last):
@@ -369,16 +383,20 @@ TECH UPGRADE:
             ValueError: Unable to insert row because of exception in column 'RA_DEG':
             string operation on non-string array
 
-		- [#517 V1.3 - szaturalt objektumok flagelese]
-		    + az S flag bekerül a cmb táblába
-		    - nem biztos, hogy teljesen jól kezeli a sextractor a szaturáció limitet
+		- HMG konstansok konfigba keruljenek
+		    - egyelőre a pmbase-be kerültek
+		    + most SNR-rel adjuk meg a HMG feltételt
+		    + SNR = 7.2                       # SNR to determine limiting magnitude
+            + HMG_MAX_ERR = 0.15              # mg
+            + LIMIT_THRE = 0.5                # mg
+            - MG_LIMIT = 17.0                 # TODO: nem lehet-e ezt szamolni?
 
-		- NEW: HMG konstansok konfigba keruljenek
+            + MAG_ERR_DEFAULT = 0.15
 
 		- [FUTURE] galaxisok és egyéb mélyég objektumok keresése a merge során
 		    - A refcat-ba is bekerüljenek-e?
 
-		+ NEW: debug kiiratasok --debug modban
+		+ debug kiiratasok --debug modban
 
 		+ Temp folder kitisztitasa: .cat .xrf .xin file-ok
 

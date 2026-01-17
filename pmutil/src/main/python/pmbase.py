@@ -11,7 +11,7 @@ Created on Jan 1, 2020
 from os import getenv, makedirs, chmod, getcwd
 from os.path import isfile, exists
 from glob import glob
-from math import sqrt
+from math import sqrt, log
 import subprocess
 import stat
 
@@ -21,6 +21,11 @@ from astropy.time import Time
 from astropy.stats import SigmaClip
 from photutils.background import Background2D, MedianBackground
 import matplotlib.pyplot as plt
+
+
+DEFAULT_SNR = 7.2
+DEFAULT_MG_ERR = 2.5 / ( log(10.0) * DEFAULT_SNR )
+
 
 Color_Off = '\033[0m'  # Text Reset
 BRed = "\033[1;31m"  # Red
@@ -150,18 +155,19 @@ def loadPplSetup():
         'MASTER_DARK_FILE' : "master-dark",
         'MASTER_FLAT_FILE' : "master-flat",
 
-        # standardization
+        # instruments
         'DEF_NAMECODE' : "NNN",
         'DEF_CAMERA' : "Generic Camera",
+        'DYNRANGE' : "16",
         'DEF_TELESCOPE' : "Generic Telescope",
 
         # refcat
         'DEF_FIELD_STAR_MG_LIMIT' : "17.0",
 
         # dark library properties
-        'DARK_TEMP_FILE_THRE' : 2,
-        'DARK_TEMP_USE_THRE' : 5,
-        'DARK_TEMP_CREATE_THRE' : 3
+        'DARK_TEMP_FILE_THRE' : "2",
+        'DARK_TEMP_USE_THRE' : "5",
+        'DARK_TEMP_CREATE_THRE' : "3"
         }
 
     cfgFile = userhome + "/.pmlib/ppl.cfg"
