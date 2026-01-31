@@ -23,9 +23,17 @@ import xmltodict
 import re
 import urllib
 
-
 import pmbase as pm
-from pmviz import VizUCAC4
+from pmviz import VizierQuery, UCAC4
+
+# Old URL                  New URL                      Location
+# www.aavso.org/vsx/*      vsx.aavso.org/*              pmrefcat
+# www.aavso.org/apps/*     apps.aavso.org/*             pmrefcat
+# www.aavso.org/vsp/*      apps.aavso.org/vsp/*
+# www.aavso.org/cgi-bin/*  archive.aavso.org/cgi-bin/*
+
+AAVSO_VSX_URL = "https://vsx.aavso.org"
+AAVSO_VSP_URL = "https://apps.aavso.org/vsp"
 
 
 class RefCat:
@@ -59,7 +67,7 @@ class RefCat:
             ids = "star=%s" % (urllib.parse.quote_plus(objectName))
         else:
             ids = "ra=%s&dec=%s" % (pm.deg2hexa(ra/15.0), pm.deg2hexa(dec))
-        vspUrl = "https://www.aavso.org/apps/vsp/api/chart/?format=json&%s&fov=%d&maglimit=%4.1f&other=all" % (ids, fov, self.defMgLimit)
+        vspUrl = f"{AAVSO_VSP_URL}/api/chart/?format=json&%s&fov=%d&maglimit=%4.1f&other=all" % (ids, fov, self.defMgLimit)
         f = request.urlopen(vspUrl)
         respJson = f.read().decode('UTF-8')
 
@@ -133,7 +141,7 @@ class RefCat:
         """
         if objectName is not None:
             # https://www.aavso.org/vsx/index.php?view=results.csv&ident=R+Car
-            vsxUrl = f"https://www.aavso.org/vsx/index.php?view=api.object&format=json&ident={urllib.parse.quote_plus(objectName)}"
+            vsxUrl = f"{AAVSO_VSX_URL}/index.php?view=api.object&format=json&ident={urllib.parse.quote_plus(objectName)}"
             # ids = "star=%s" % (urllib.parse.quote_plus(objectName))
             f = request.urlopen(vsxUrl)
             respJson = f.read().decode('UTF-8')
@@ -149,7 +157,7 @@ class RefCat:
             sdec = "+" + sdec
         coords = sra + sdec
 
-        vsxUrl = "https://www.aavso.org/vsx/index.php?view=query.votable&format=d&coords=%s&size=%d&unit=2&geom=b" % (coords, fov)
+        vsxUrl = f"{AAVSO_VSX_URL}/index.php?view=query.votable&format=d&coords=%s&size=%d&unit=2&geom=b" % (coords, fov)
         # https://www.aavso.org/vsx/index.php?view=query.votable&coords=19:54:17+32:13:08&format=d&size=60&unit=2
         f = request.urlopen(vsxUrl)
         respVOTable = f.read().decode('UTF-8')
@@ -285,7 +293,7 @@ class RefCat:
 
 
     def loadFieldStars(self, target, fieldSize, mgLimit):
-        v = VizUCAC4(mgLimit)
+        v = VizierQuery(UCAC4, mgLimit)
         t = v.query(target, fieldSize)
         xt = v.xmatch(self.xmatchTable, 'RA_DEG', 'DEC_DEG')
         if t is None or xt is None:
@@ -296,7 +304,7 @@ class RefCat:
         for row in t:
             auid = row['AUID']
             label = row['LABEL']
-            mask = xt[v.cs['LABEL']] == row['LABEL'][6:]
+            mask = xt[UCAC4.cols['LABEL']] == row['LABEL'][6:]
             f = xt[mask]
             if len(f) > 0:
                 auid = '#' + f[0]['AUID']
