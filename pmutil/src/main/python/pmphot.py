@@ -16,6 +16,7 @@ import numpy as np
 from astropy.table import Table, Column
 
 import pmbase as pm
+from pmfits import FITS_HEADER_INSTRUMENT, FITS_HEADER_TELESCOPE, FITS_HEADER_DATE_OBS
 
 fieldMgInstrumental = 'MAG_BEST'
 fieldMgTrue = 'MAG_V'
@@ -153,11 +154,11 @@ class Photometry:
         """
         fileName: path/[Seq_nnn|Combined].cmb.pm
         """
-        self.fits = pm.getFitsHeaders(fileName, ['DATE-OBS', 'INSTRUME', 'TELESCOP'])
+        self.fits = pm.getFitsHeaders(fileName, [FITS_HEADER_DATE_OBS, FITS_HEADER_INSTRUMENT, FITS_HEADER_TELESCOPE])
 
     def getCamera(self) -> str:
-        if 'INSTRUME' in self.fits.keys() and self.fits['INSTRUME'] and len(self.fits['INSTRUME']) > 0:
-            return self.fits['INSTRUME']
+        if FITS_HEADER_INSTRUMENT in self.fits.keys() and self.fits[FITS_HEADER_INSTRUMENT] and len(self.fits[FITS_HEADER_INSTRUMENT]) > 0:
+            return self.fits[FITS_HEADER_INSTRUMENT]
         if 'camera' in self.opt and self.opt['camera'] and len(self.opt['camera']) > 0:
             return self.opt['camera']
         if 'DEF_CAMERA' in pm.setup.keys() and pm.setup['DEF_CAMERA'] and len(pm.setup['DEF_CAMERA']) > 0:
@@ -165,8 +166,8 @@ class Photometry:
         return 'Generic Camera'
 
     def getTelescope(self) -> str:
-        if 'TELESCOP' in self.fits.keys() and self.fits['TELESCOP'] and len(self.fits['TELESCOP']) > 0:
-            return self.fits['TELESCOP']
+        if FITS_HEADER_TELESCOPE in self.fits.keys() and self.fits[FITS_HEADER_TELESCOPE] and len(self.fits[FITS_HEADER_TELESCOPE]) > 0:
+            return self.fits[FITS_HEADER_TELESCOPE]
         if 'telescope' in self.opt and self.opt['telescope'] and len(self.opt['telescope']) > 0:
             return self.opt['telescope']
         if 'DEF_TELESCOPE' in pm.setup.keys() and pm.setup['DEF_TELESCOPE'] and len(pm.setup['DEF_TELESCOPE']) > 0:
