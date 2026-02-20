@@ -1,16 +1,18 @@
 pmutil TODO
 -----------
 
-+pplphotometry		547 451
++pplphotometry		*451 (606) (554) (544)
 -pmstack	
-+pplcalibration		pplSetup 613
++pplcalibration		(650)
 -pmtranzi	        548
-+pmbase				451
-+pmresult			451 544 547
-+pmphot				451
-+pmmerge	        451
-+NEW pmraw          613 (540)
-
++pmbase				*451
++pmresult			*451 (544)
++pmphot				*451 (606) (554) (544)
++pmmerge	        *451
+-pmraw              (540)
+-pmrefcat
+-pmclean            (576)
+-pmcolorize         (525)
 
 -----------
 
@@ -26,18 +28,32 @@ pmutil TODO
     "scipy>=1.4",	        1.14.1 -> 1.16.3
     "xmltodict>=0.12"	    0.14.2 -> 1.0.2
 
--NEW astropy.time.Time
+-NEW WARNING: AstropyDeprecationWarning: Calling `Table.loc/iloc/loc_indices[index_id, item]` to select `item` from index
+    `index_id` is deprecated. Instead select the index using the syntax
+    `Table.loc/iloc/loc_indices.with_index(index_id)[item]`.
+     [astropy.table.index]
 
--NEW astrowidgets.ginga ?
+    (gcx) color: Bi, zp: 26.9792, mel^2:  5.7621, ez^2:  0.0031, ez:  0.0557, N: 21, ev:  0.0205
+    ...warning
+    standard coeffs: Tv = -0.2089 Tvr = 1.2692 Tbv = 1.9934
+
+    Create report into 20250703_rx_lyr folder.
+    ...warning
+    Save AAVSO extended report to the file 20250703_rx_lyr/20250703_rx_lyr.extended.aavso
+
+    - astropy 7.2.0
+
+-NEW minden ppl- commandnak lehetne --clean opciója, amivel kitakarít maga után, és --archive opció, ami takarít és egyből el is archiválja
+    - de ez csak az adott commandhoz tartozó dolgokat törölje
+
+-NEW Configuration: a bin könyvtár helyett lehetne a /opt/pmutil könyvtárba is telepíteni
+
+-NEW astropy.time.Time
+    - pmraw
 
 -NEW astroquery:
 	+ II/336/apass9
-	+ B/vsx/vsx
-
-*NEW: 20190612-RXLyr, hibas comp star
-
-    Az ensemble_parameters abran latszik egy nagyon kilogo pont, de nem jottem ra, hogy melyik comp az
-    ettol tok rossz az adhoc std
+	- B/vsx/vsx
 
 -NEW: ppl-colorize elszall, ha nem adok meg foldert, ellenorizni kellene, es hibat kiiratni
 
@@ -93,7 +109,7 @@ NEW CALIBRATION BUGS:
 	
 	Error: no Bias folder found; add one, and rerun this script.
 	
-	- A kovetkezo modon mukodik:
+	- A következő modon mukodik:
 	
 	    kovi@ubuntu:~/photometry/20250703$ ppl-calibration -c all -F -e skip --debug 20250703
 
@@ -111,14 +127,6 @@ NEW CALIBRATION BUGS:
 	    ident = self.identifyRawFrames(self.LIGHT_FOLDERS[0])
 	                                   ~~~~~~~~~~~~~~~~~~^^^
 	IndexError: list index out of range
-	
--NEW: Light file prefix
-
-    - a Light file-oknak volt egy prefix-e, amit az EKOS tett oda (objektumnév), emiatt a konverzió lement, de a kalibráció már nem, üres maradt a könyvtár, semmi hibajelzés
-	
-	- a VControl doksiban az EKOS kezelésnél le kell írni, hogy hogy kell pontosan beállítani a neveket
-		
-	- esetleg a kalibrációt fel kell készíteni a prefixre, az is lehet alternatíva, hogy az EKOS prefixxel, de egy könyvtárba teszi a Light képeket	
 	
 +NEW: az egyik kép _bad lett, ezért nem találta, de fura hiba lett az eredménye:
 
@@ -164,7 +172,7 @@ NEW PHOTOMETRY BUGS:
 
 NEW IDEAS:
 
-- tqdm: progress bar
+/ tqdm: progress bar
     - a calibration-nel nem tudom hasznalni, mert kulso hivasok
 
 - amikor egy kulso program hibat ad vissza, akkor a hibauzenet utan a parancssort is irjuk ki
@@ -181,39 +189,39 @@ TECH UPGRADE:
 
 	Pkg			Lastest version		Actual version
 
-	ExifTool		13.32	2025-03-11	12.76			    !!! min 10.82 for CR3 support
+	ExifTool		13.45	2025-12-26	12.76			    !!! min 10.82 for CR3 support
 
 	FITSH			0.9.4	2021-02-04	0.9.3	2019-02-06
 
-	Astrometry.net	0.97	2024-12-02	0.96
+	Astrometry.net	0.98	2025-11-19	0.96                !!!
 
 	SExtractor		2.28.2  2025-01-19	2.28.0
 
 	//wcstools		3.9.7	2022-04-26	3.9.5	2017-03-30
 
-	python			3.13.5  2025-06-11	3.12.3
+	python			3.14.2  2025-12-05	3.12.3
 
-	python/astroalign	2.6.2	2024-11-15	2.4.1
+	python/astroalign	2.6.2	2025-09-24	2.4.1
 
-	python/astropy		7.2.0	2025-05-20	4.1			!!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
+	python/astropy		7.2.0	2025-11-25	4.1			    !!!	5.0 kellene, de ez python 3.8-at igenyel, ami ubuntu 20.0-t igenyel
 
-	python/astroquery	0.4.11	2025-03-18	0.4.1       !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
+	python/astroquery	0.4.11	2025-09-20	0.4.1           !!! >0.4.1 nem tamogatja a python 3.6-ot, min python 3.7 szukseges
 
-	python/matplotlib	3.10.8	2025-05-08	3.1.2			!!!
+	python/matplotlib	3.10.8	2025-12-10	3.1.2			!!!
 
-	python/numpy		2.3.5	2025-06-21	1.16.3			!!!
+	python/numpy		2.4.1	2026-01-10	1.16.3			!!!
 
-	python/pillow		12.0.0	2025-07-01	5.1.0			!!!
+	python/pillow		12.1.0	2026-01-02	5.1.0			!!!
 
-	python/photutils	2.3.0	2025-02-18	0.7.2			!!!
+	python/photutils	2.3.0	2025-09-16	0.7.2			!!!
 
-	python/rawpy        0.25.0  2025-05-12  0.23.1
+	python/rawpy        0.25.1  2025-08-03  0.23.1
 
-	python/scipy		1.16.3	2025-06-22	1.4.1			!!!
+	python/scipy		1.17.0	2026-01-10	1.4.1			!!!
 
-	python/xmltodict	1.0.2	2024-10-16	0.12.0
+	python/xmltodict	1.0.2	2025-09-17	0.12.0
 
-- SCAMP: grmatch helyett
+/ SCAMP: grmatch helyett
 
 / fiphot: sextractor helyett
 
@@ -242,25 +250,41 @@ TECH UPGRADE:
 		Med : *554
 		Low : *525, *544, 576
 
-(655) Upgrade AAVSO service URLs
-
-       Old URL 	            New URL                         Location
-    www.aavso.org/vsx/*     vsx.aavso.org/*                 pmrefcat
-    www.aavso.org/apps/*  	apps.aavso.org/*                pmrefcat
-    www.aavso.org/vsp/*     apps.aavso.org/vsp/*            (pmrefcat)
-    www.aavso.org/cgi-bin/* archive.aavso.org/cgi-bin/*
-
 --- calibration --------------------------------------------
 
-(650) Kalibrált 3D FITS file-ok kezelése (Seestar)
+-NEW: !!! [BUG] 20250703_rx_lyr - hibás kamera név került a Light fits file-ba, pedig ez már cr3-ból konvertálódott
+
+* (650) Kalibrált 3D FITS file-ok kezelése (Seestar)
 
     + 3D FITS csatornakra bontasa (pmfits)
 
-    - Opcionalisan Flat
+    * Opcionalisan Flat
 
-    - EXPTIME rendbetetele (pmfits)
+    * EXPTIME rendbetétele (pmfits)
+        + A Combined képben, a referencia kép DATE-LOC, DATE-IMG kerül bele, pedig az elsőnek kellene (vagyis az marad benne)
+            + stack-elésnél a DATE-LOC, DATE-IMG értékeket is felül kell írni
+        + MJD-OBS string típusú 6 tizedes jegyre, az MJD-AVG és MJD-END pedig float, melyik lenen a jó? float
+        + A DATE-IMG tartalmaz század mp-eket, a DATE-OBS már csak egész mp-eket, melyik a jó?
+        + Combined képnél az EXPSURE 29.9, azaz nem egyezik meg az EXPTIME értékével,
+            és EXPTIME=232 (8 kép esetén), egész mp-eket ad össze, nem float-okat
+        + A Combined DATE-OBS 4 órával kevesebb, mint a DATE-LOC, kétszer vonódik le a zónaidő
+            A Light képeknél még jó az érték
+        * Ha van STACKCNT, és van TOTALEXP, akkor az EXPTIME/EXPOSURE-ba a TOTELEXP-et kell írni
+            - az eredeti EXPTIME-ot el kell-e menteni valami másba? valszeg nem
+        * Ha nincs MJD-OBS, akkor azt számolni kell
+        * Ha van STACKCNT, akkor át kell másolni az NCOMBINE-ba, és az MCOMBINE-t is tölteni kell
+        * stack-eléskor számolni kell a DATE-END, MJD-END és MJD-AVG értékeket is
 
-    - Light azonositas:
+        * EXPTIME/EXPOSURE: exposure time in seconds (float)
+        * DATE-OBS/UTSTART: start time of the observation in UT (iso8601)
+        * DATE-END/UTSTOP: end time of the observation in UT (iso8601)
+        * DATE-AVG/MIDPOINT: mid-time of the observation in UT (iso8601)
+        * MJD-OBS/EXPSTART                / MJD of observation start
+        * MJD-AVG
+        * MJD-END/EXPEND
+        * NCOMBINE/STACKCNT
+
+    * Light azonositas:
         + RAW -> 3 x FITS -> Light folder (pmraw)
         - FITS3D no calibration -> 3 x FITS -> Light folder (pmfits)
         - FITS3D precalibrated, no flat -> 3 x FITS -> Calibrated folder (pmfits)
@@ -283,7 +307,18 @@ TECH UPGRADE:
 	- kerdes, hogy ha a tavcso tukrozi a kepet, akkor azt hogy tudjuk meghatarozni? lehet, hogy kellene egy opcio a tukrozesre
 	    - a normál newton távcsőnél legyen jó, a coudé vagy cass meg kapjon egy opciót, és/vagy config bejegyzést
 
+	- az lehetne még opció, hogy a ppl-colorize megnézi, hogy tükrözött-e a kép, ezt a WCS adatokból meg tudja állapítani,
+	    és ha igen, akkor áttükrözi.
+	    Még azt is megteheti, hogy elforgatja abba az irányba, hogy észak felül legyen.
+	    Ezekre lehetnének opciók, --north-up, --south-up, --mirrored, vagy ilyesmik.
+
 --- photometry ---------------------------------------------
+
+-NEW: 20190612-RXLyr, hibas comp star
+
+    - Az ensemble_parameters abran latszik egy nagyon kilogo pont, de nem jottem ra, hogy melyik comp az
+        ettol tok rossz az adhoc std
+    - 20250703_rx_lyr esetben is látszik valami hasonló
 
 (606) Check star kezelese
 	    - check star kereses es fotometria, keruljon a catalog-ba is
@@ -316,8 +351,9 @@ TECH UPGRADE:
 
 	+ refcat
 	- pm result stars ??? túl sok van belőlük
-	/ transients
-	/ deep sky objects
+	/ transients --> [548]
+    / [FUTURE] rajzolja rá a képre a galaxisokat, és egyéb mélyég objektumokat is, ha van megnyúltsági adatok, akkor a WCS alapján tud frame PA-t számolni,
+        és ellipszist rajzolni
 
 	+ pillow 5.3.0 needed
 
@@ -590,6 +626,26 @@ TECH UPGRADE:
 
 --- photometry ---------------------------------------------
 
+* (546) Észlelések mentése VSNET formátumban is
+
+    * VSNET formátum:
+        - mező szeparátor: space, lehet több is, úgy táblázatot lehet csinálni belőle
+        - 4 mező: NAME, OBSDATE, MAG, OBSERVER
+        - NAME: constellation + id, greek letters and 'nova' lowercase, otherwise uppercase (CYGSS)
+        - DATE: in UT, numbers only (20000720.123)
+            - 1 mp pontosság 5 tizedes lenne
+            - 4 tizedes 9 mp pontosság
+        - MAG: nincs megkötés, lehet 14.999 formátumban is akár, utána szűrőkód
+        - OBSERVER: nincs megkötés, lehet kód és név is
+
+        TRADV          260218.631   128  Stu.RASNZ active
+        TRAFL          260218.629   154  Stu.RASNZ outburst
+        ASASSN-14FF    260218.476   151  Stu.RASNZ outburst
+        NSV 11274      260218.667   141  Stu.RASNZ active
+        NSV 35         260218.453   154  Stu.RASNZ active
+        SSS_J134850.1-310835 260218.562   121  Stu.RASNZ outburst
+
+
 (535) ppl-refcat: legyen olyan opció, hogy az objektum nevét a könyvtárnévből találja ki
 
 	opcio: -g --guess, ha nem siker-l a konyvtarnevbol meghatarozni, akkor a kordinatabol csinalja
@@ -694,15 +750,9 @@ TECH UPGRADE:
 	pl: -D max-distance=4
 
 	COMMON_ARGS:
-		saturation nnn
-	FISTAR_ARGS:
-		algorithm [uplink]
-		prominence fff.f
-		model [elliptic]
-	GRMATCH_ARGS:
-		triangulation maxinp=100,maxref=100,conformable,auto,unitarity=0.002
-		order nnn
-		max-distance nnn
+		DYNRANGE n
+    	SNR f
+    	CATALOG_MG_LEVEL f
 	FICOMBINE_ARGS:
 		m [sum] (combination algorithm)
 
@@ -774,6 +824,14 @@ TECH UPGRADE:
 (482) a command mentes file (calibration, photometry) futtathato script legyen (shebang, cd az indito konyvtarra)	
 
 --- calibration --------------------------------------------
+
+(674) Light file prefix
+
+    - a Light file-oknak volt egy prefix-e, amit az EKOS tett oda (objektumnév), emiatt a konverzió lement, de a kalibráció már nem, üres maradt a könyvtár, semmi hibajelzés
+
+	- a VControl doksiban az EKOS kezelésnél le kell írni, hogy hogy kell pontosan beállítani a neveket
+
+	- esetleg a kalibrációt fel kell készíteni a prefixre, az is lehet alternatíva, hogy az EKOS prefixxel, de egy könyvtárba teszi a Light képeket
 
 (531) calibration: ha a Seq folderben letezik Combined, akkor ne hozza oket letre csak overwritetal
 

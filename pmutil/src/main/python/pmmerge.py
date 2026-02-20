@@ -22,10 +22,11 @@ from astropy.wcs import WCS
 from scipy.spatial import cKDTree
 
 import pmbase as pm
+from pmfits import FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2
 from pmviz import VizierQuery, UCAC4, APASS
 
 PX_PREC = 2.0                   # Pixel coordinate matching precision
-SEP_PREC = 2.0 / 3600.0         # Coordinate matching precisin in degrees
+SEP_PREC = 2.0 / 3600.0         # Coordinate matching precision in degrees
 
 # sextractor catalog field names
 CAT_ID_FIELD = "NUMBER"
@@ -67,8 +68,8 @@ class CatalogMatcher:
         self.hmgPlot = None
 
     def hmg(self, pmTable: Table, nr: int) -> list[float]:
-        mgIsoCorrArr = pmTable['MAG_ISOCOR']
-        mgIsoCorrErrArr = pmTable['MAGERR_ISOCOR']
+        mgIsoCorrArr = pmTable[MAG_FIELD]
+        mgIsoCorrErrArr = pmTable[MAGERR_FIELD]
         mgBestArr = pmTable['MAG_BEST']
         mgBestErrArr = pmTable['MAGERR_BEST']
         logm1 = []
@@ -102,9 +103,9 @@ class CatalogMatcher:
 
     @staticmethod
     def readFrameSize(fitsFileName: str) -> tuple[int, int]:
-        h = pm.getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
-        xf = int(h['NAXIS1'])
-        yf = int(h['NAXIS2'])
+        h = pm.getFitsHeaders(fitsFileName, [FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2])
+        xf = int(h[FITS_HEADER_NAXIS1])
+        yf = int(h[FITS_HEADER_NAXIS2])
         return xf, yf
 
     def determineOnFrameStatus(self, x_obj: float, y_obj: float, im_w: int, im_h: int) -> str:

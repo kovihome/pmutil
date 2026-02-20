@@ -10,11 +10,57 @@ Created on Jun 24, 2024
 from getopt import GetoptError, getopt
 from sys import argv
 from astropy.io import fits
+from astropy.time import Time
 
+FITS_HEADER_BZERO = "BZERO"
+FITS_HEADER_BSCALE = "BSCALE"
 FITS_HEADER_NAXIS = "NAXIS"
+FITS_HEADER_NAXIS1 = "NAXIS1"
+FITS_HEADER_NAXIS2 = "NAXIS2"
 FITS_HEADER_HISTORY = "HISTORY"
 FITS_HEADER_FILTER = "FILTER"
 FITS_HEADER_BAYER = "BAYERPAT"
+FITS_HEADER_CAMERA_TEMPERATURE = "CCD-TEMP"
+FITS_HEADER_DATE_OBS = "DATE-OBS"
+FITS_HEADER_DATE_END = "DATE-END"
+FITS_HEADER_DATE_AVG = "DATE-AVG"
+FITS_HEADER_MJD_OBS = "MJD-OBS"
+FITS_HEADER_MJD_END = "MJD-END"
+FITS_HEADER_MJD_AVG = "MJD-AVG"
+FITS_HEADER_EXPTIME = "EXPTIME"
+FITS_HEADER_INSTRUMENT = "INSTRUME"
+FITS_HEADER_OBSERVER = "OBSERVER"
+FITS_HEADER_TELESCOPE = "TELESCOP"
+
+FITS_HEADER_CREATOR = "CREATOR"
+FITS_HEADER_IMAGE_TYPE = "IMAGETYP"
+FITS_HEADER_PHOTOMETRY_SYSTEM = "PHOTSYS"
+FITS_HEADER_XBIN = "XBINNING"
+FITS_HEADER_YBIN = "YBINNING"
+FITS_HEADER_DATE_LOCAL = "DATE-LOC"
+FITS_HEADER_DATE_IMAGE = "DATE-IMG"
+FITS_HEADER_EXPOSURE = "EXPSURE"
+FITS_HEADER_GAIN = "GAIN"
+FITS_HEADER_ISO = "ISO"
+FITS_HEADER_XPIX_SIZE = "XPIXSZ"
+FITS_HEADER_YPIX_SIZE = "YPIXSZ"
+FITS_HEADER_WHITE_BALANCE = "WB"
+
+FITS_HEADER_DATE_MID = "DATE-MID" # --> DATE-AVG
+FITS_HEADER_STACK_COUNT = "STACKCNT"
+FITS_HEADER_COMBINATION_COUNT = "NCOMBINE"
+FITS_HEADER_COMBINATION_MODE = "MCOMBINE"
+FITS_HEADER_CAMERA_TEMPERATURE_STD = "STD-TEMP"
+
+# WCS generated headers
+FITS_HEADER_WCS_CRVAL1 = "CRVAL1"
+FITS_HEADER_WCS_CRVAL2 = "CRVAL2"
+FITS_HEADER_WCS_CTYPE1 = "CTYPE1"
+FITS_HEADER_WCS_CTYPE2 = "CTYPE2"
+
+# SeeStar specific headers
+FITS_HEADER_TOTALEXP = "TOTALEXP"
+
 
 class FitsSeparator:
     def __init__(self, opt):
@@ -38,7 +84,7 @@ class FitsSeparator:
             new_base_filename = f"{output_path}/{fits_filename[:fits_filename.rfind('.')]}"
             # Get header and image data
             data = hdul[0].data  # vagy hdul[ext].data, ha nem az első HDU-ban van
-            original_header = hdul[0].header
+            original_header = self.adjust_headers(hdul[0].header)
             naxis = int(original_header[FITS_HEADER_NAXIS])
             bayer_pattern = original_header[FITS_HEADER_BAYER] if FITS_HEADER_BAYER in original_header else None
             if naxis == 3:
@@ -51,6 +97,29 @@ class FitsSeparator:
                     self.separateBayer2D(data, original_header, new_base_filename)
                 else:
                     self.copyWithColor(data, original_header, new_base_filename)
+
+    @staticmethod
+    def adjust_headers(header):
+        # adjust EXPTIME, when STACKCNT and TOTALEXP exist
+        if FITS_HEADER_STACK_COUNT in header:
+            if FITS_HEADER_TOTALEXP in header:
+                totalexp = header[FITS_HEADER_TOTALEXP]
+                exp = header[FITS_HEADER_EXPTIME]
+                if int(totalexp) > int(exp):
+                    header[FITS_HEADER_EXPTIME] = totalexp
+                    header[FITS_HEADER_EXPOSURE] = totalexp
+            if FITS_HEADER_COMBINATION_COUNT not in header:
+                header[FITS_HEADER_COMBINATION_COUNT] = header[FITS_HEADER_STACK_COUNT]
+                header[FITS_HEADER_COMBINATION_MODE] = "sum"
+
+        # calculate MJD-OBS
+        if FITS_HEADER_MJD_OBS not in header:
+            dateobs = header[FITS_HEADER_DATE_OBS]
+            utc = Time(dateobs, format='isot', scale='utc')
+            mjd = utc.mjd
+            header[FITS_HEADER_MJD_OBS] = (mjd, "MJD of observation start")
+
+        return header
 
     @staticmethod
     def separate_channel(data, bayer_pattern, color, second = False):

@@ -20,6 +20,8 @@ from matplotlib import pyplot as plt
 
 import pmbase as pm
 
+REPORT_TYPE_AAVSO = "aavso"
+REPORT_TYPE_VSNET = "vsnet"
 
 # manage catalog file
 def loadCatalog(refFileName):
@@ -55,6 +57,7 @@ class ReportProcessor:
     }
 
     def __init__(self, opt):
+        self.mgLimits = None
         self.airmasses = {}
         self.opt = opt
 
@@ -149,7 +152,8 @@ class ReportProcessor:
         return (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype, cname, cmag,
                 kname, kmag, airmass, group, chart, notes)
 
-    def convertToAAVSORecord(self, data):
+    @staticmethod
+    def convertToAAVSORecord(data):
         # (starid.upper(), date, fainter, magnitude, magerr, flt, trans, mtype,
         #  cname, cmag, kname, kmag, airmass, group, chart, notes)
         return f'{data[0]},{data[1]},{data[2]}{data[3]},{data[4]},{data[5]},{data[6]},{data[7]},{data[8]},{data[9]},{data[10]},{data[11]},{data[12]},{data[13]},{data[14]},{data[15]}\n'
@@ -170,24 +174,113 @@ class ReportProcessor:
                     self.addToLCData(aavsoData)
         return aavsoResults
 
-    def saveAAVSOReport(self, aavso, outFolder, obsName, postfix=""):
+    @staticmethod
+    def saveAAVSOReport(aavso, outFolder, obsName, postfix=""):
         r = outFolder.split('/')
         fileName = r[-1]
-
         outFileName = outFolder + '/' + fileName + postfix + '.extended.aavso'
         pm.printInfo(f"Save AAVSO extended report to the file {outFileName}")
-        r = open(outFileName, 'w')
 
-        r.write('#TYPE=Extended\n')
-        r.write(f'#OBSCODE={obsName}\n')
-        r.write('#SOFTWARE=pmutil v1.2\n')
-        r.write('#DELIM=,\n')
-        r.write('#DATE=JD\n')
-        r.write('#OBSTYPE=DSLR\n')
+        with open(outFileName, 'w') as f:
+            f.write('#TYPE=Extended\n')
+            f.write(f'#OBSCODE={obsName}\n')
+            f.write('#SOFTWARE=pmutil v1.2\n')
+            f.write('#DELIM=,\n')
+            f.write('#DATE=JD\n')
+            f.write('#OBSTYPE=DSLR\n')
+            f.write(aavso)
 
-        r.write(aavso)
+    def convertToVSNETData(self, res, color: str):
+        """
+            VSNET formátum:
+                - mező szeparátor: space, lehet több is, úgy táblázatot lehet csinálni belőle
+                - 4 mező: NAME, OBSDATE, MAG, OBSERVER
+                - NAME: constellation + id, greek letters and 'nova' lowercase, otherwise uppercase (CYGSS)
+                - DATE: in UT, numbers only (20000720.123)
+                    - 1 mp pontosság 5 tizedes lenne
+                    - 4 tizedes 9 mp pontosság
+                - MAG: nincs megkötés, lehet 14.999 formátumban is akár, utána szűrőkód
+                - OBSERVER: nincs megkötés, lehet kód és név is
+        """
+        cc = color[:1]
+        sc = self.aavso_std_colors[color]
 
-        r.close()
+        CONSTELLATIONS = [
+            "AND","ANT","APS","AQR","AQL","ARA","ARI","AUR","BOO","CAE",
+            "CAM","CNC","CVN","CMA","CMI","CAP","CAR","CAS","CEN","CEP",
+            "CET","CHA","CIR","COL","COM","CRA","CRB","CRV","CRT","CRU",
+            "CYG","DEL","DOR","DRA","EQU","ERI","FOR","GEM","GRU","HER",
+            "HOR","HYA","HYI","IND","LAC","LEO","LMI","LEP","LIB","LUP",
+            "LYN","LYR","MEN","MIC","MON","MUS","NOR","OCT","OPH","ORI",
+            "PAV","PEG","PER","PHE","PIC","PSC","PSA","PUP","PYX","RET",
+            "SGE","SGR","SCO","SCL","SCT","SER","SEX","TAU","TEL","TRI",
+            "TRA","TUC","UMA","UMI","VEL","VIR","VOL","VUL"
+        ]
+
+        GREEK_LETTERS = [
+            "ALF", "BET", "GAM", "DEL", "EPS", "ZET", "ETA", "TET", "IOT", "KAP", "LAM", "MIU",
+            "NIU", "KSI", "OMI", "PI", "RHO", "SIG", "TAU", "UPS", "PHI", "KHI", "PSI", "OME"
+        ]
+
+        # format star id into vsnet style
+        star_name = res['LABEL'].replace('_', ' ')
+        sn = star_name.rsplit(' ', 1)
+        if len(sn) == 2 and len(sn[1]) == 3 and sn[1].upper() in CONSTELLATIONS:
+            sn_id = sn[0].lower() if (len(sn[0]) > 2 and sn[0].upper() in GREEK_LETTERS) or "nova" in sn[0].lower() else sn[0].upper()
+            star_name = sn[1].upper() + sn_id
+        star_name = star_name.replace(' ', '')
+
+        # format observation date
+        obs_date = Time(res['JD'], format='jd', scale='utc')
+        date_s = f"{obs_date.strftime("%Y%m%d")}{round(obs_date.mjd % 1, 5)}"
+
+        visFlag = res['VIZ_FLAG']['GBR'.index(cc)]
+        fainter = "<" if visFlag in "IB" else ""
+
+        if fainter == '<':
+            magnitude = self.mgLimits[color]
+            aavsoColor = self.aavso_colors[color]
+        else:
+            # std = True
+            m = res['MAG_STD' + sc]
+            aavsoColor = self.aavso_std_colors[color]
+            if str(m) == '-' or str(m) == '99.0' or m == 99.0:
+                m = res['MAG_T' + cc]
+                aavsoColor = self.aavso_colors[color]
+                # std = False
+            if str(m) == '-':
+                return None
+
+            magnitude = f"{float(m):4.3f}"
+
+        return star_name, date_s, fainter, magnitude, aavsoColor, self.opt['name']
+
+    @staticmethod
+    def convertToVSNETRecord(data):
+        # (starid, date, fainter, magnitude, flt, observer)
+        return f'{data[0]:<20} {data[1]} {data[2]}{data[3]}{data[4]:<2} {data[5]}\n'
+
+    def convertToVSNETRecords(self, pmt: Table, colors: list[str]) -> list:
+        varMask = pmt['ROLE'] == 'V'
+        vt = pmt[varMask]
+        vsnetResults = []
+        for v in vt:
+            for c in colors:
+                vsnetData = self.convertToVSNETData(v, c)
+                if vsnetData:
+                    vsnet = self.convertToVSNETRecord(vsnetData)
+                    vsnetResults.append(vsnet)
+        return vsnetResults
+
+    @staticmethod
+    def saveVSNETReport(vsnet, outFolder, postfix=""):
+        r = outFolder.split('/')
+        fileName = r[-1]
+        outFileName = outFolder + '/' + fileName + postfix + '.vsnet'
+        pm.printInfo(f"Save VSNET report to the file {outFileName}")
+
+        with open(outFileName, 'w') as f:
+            f.write(vsnet)
 
     def addToLCData(self, aavsoData):
         name = aavsoData[0]
@@ -252,7 +345,8 @@ class ReportProcessor:
             pm.printDebug(f"Save LC of {name} into file {lcfile}")
             plot.showOrSave(lcfile)
 
-    def findCompStar(self, results):
+    @staticmethod
+    def findCompStar(results):
         auid = pm.getTableComment(results, 'CompStar')
         return results.loc['AUID', auid] if auid else None
 
@@ -263,7 +357,9 @@ class ReportProcessor:
         self.mgLimits = {'Gi': hmgGi, 'Bi': hmgBi, 'Ri': hmgRi}
 
     def processFiles(self, fileNames, postfix=""):
+        report_types = self.opt['rpt'] if isinstance(self.opt['rpt'], list) else [self.opt['rpt']]
         aavso = []
+        vsnet = []
         for fileName in fileNames:
             pmResult = loadCatalog(fileName)
             pmResult.add_index('AUID')
@@ -274,11 +370,18 @@ class ReportProcessor:
 
             self.getMgLimits(pmResult)
 
-            aavso += self.convertToAAVSORecords(pmResult, ['Ri', 'Gi', 'Bi'])
-        aavso.sort()
+            if REPORT_TYPE_AAVSO in report_types:
+                aavso += self.convertToAAVSORecords(pmResult, ['Ri', 'Gi', 'Bi'])
+            if REPORT_TYPE_VSNET in report_types:
+                vsnet += self.convertToVSNETRecords(pmResult, ['Ri', 'Gi', 'Bi'])
 
-        if self.opt['rpt'] == 'aavso':
+        aavso.sort()
+        vsnet.sort()
+
+        if REPORT_TYPE_AAVSO in report_types:
             self.saveAAVSOReport(''.join(aavso), self.opt['out'], self.opt['name'], postfix)
+        if REPORT_TYPE_VSNET in report_types:
+            self.saveVSNETReport(''.join(vsnet), self.opt['out'], postfix)
 
     def process(self):
 
@@ -305,9 +408,9 @@ if __name__ == '__main__':
 
     class MainApp:
 
-        opt = {
+        opt: dict[str, str|list[str]|None] = {
             'out': None,  # output folder
-            'rpt': 'aavso',  # report format, default: aavso extended
+            'rpt': REPORT_TYPE_AAVSO,  # report format, default: aavso extended
             'name': '?',  # observer name code
             'method': 'gcx',
             # mg calculation method: comp - use best comp star, gcx - m=1 linear fit ensemble, lfit - general linear fit ensemble
@@ -320,7 +423,7 @@ if __name__ == '__main__':
 
         def processCommands(self):
             try:
-                optlist, args = getopt.getopt(sys.argv[1:], "o:r:n:", ['--out', '--report', '--name'])
+                optlist, args = getopt.getopt(sys.argv[1:], "o:n:", ['out=', 'name=', 'vsn'])
             except getopt.GetoptError:
                 pm.printError('Invalid command line options')
                 return
@@ -328,17 +431,20 @@ if __name__ == '__main__':
             for o, a in optlist:
                 if a[:1] == ':':
                     a = a[1:]
-                elif o == '-o':
+                if o == '-o' or o == '--out':
                     self.opt['out'] = a
-                elif o == '-r':
-                    if a == 'aavso':
-                        self.opt['rpt'] = a
-                    else:
-                        pm.printError("Invalid report type: " + a + ". Create default aavso extended report instead")
-                elif o == '-n':
+                elif o == '--vsn':
+                    self.opt['rpt'] = [REPORT_TYPE_AAVSO, REPORT_TYPE_VSNET]
+                elif o == '-n' or o == '--name':
                     self.opt['name'] = a
 
-            self.opt['files'] = args
+            baseFolder = args[0].replace("\\", "/")
+            if baseFolder.endswith("/"):
+                baseFolder = baseFolder[:-1]
+            if self.opt['out'] is None:
+                self.opt['out'] = baseFolder
+
+            self.opt['files'] = [f"{baseFolder}/Photometry/Combined.cmb.pm"]
 
         def run(self):
             self.processCommands()

@@ -55,7 +55,8 @@ class Colorize:
         if 'scaleMethod' in self.opt:
             self.SCALE_METHOD = self.opt['scaleMethod']
 
-    def doSubtractBackground(self, rgb):
+    @staticmethod
+    def doSubtractBackground(rgb):
         sigma_clip = SigmaClip(sigma=3.0)
         bkg_estimator = MedianBackground()
         for j in range(3):
@@ -67,7 +68,8 @@ class Colorize:
     #            plt.imshow(bkg.background, origin='lower', cmap='Greys_r')
     #            plt.show()
 
-    def doHistScaling(self, img):
+    @staticmethod
+    def doHistScaling(img):
         # Contrast stretching
         p2, p98 = np.percentile(img, (2, 98))
         img_rescale = exposure.rescale_intensity(img, in_range=(p2, p98))
@@ -152,7 +154,7 @@ class Colorize:
 
         return rc
 
-    def plotStars(self, img, imgFileName):
+    def plotStars(self, imgFileName):
         # TODO: plot photometry result stars (p option)
         # TODO: plot transient result stars and moving objects (t and m options)
 
@@ -237,9 +239,10 @@ class Colorize:
                     return
 
         if self.opt['plot'] is not None:
-            self.plotStars(img, imgFileName)
+            self.plotStars(imgFileName)
 
-    def areCombinedImagesExists(self, folder:str, ext:str, colors: list[str]) -> bool:
+    @staticmethod
+    def areCombinedImagesExists(folder:str, ext:str, colors: list[str]) -> bool:
         for color in colors:
             if not exists(f"{folder}/Combined-{color}.{ext}"):
                 return False
@@ -310,7 +313,7 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-m' or o == '--method':
+            if o == '-m' or o == '--method':
                 if a not in Colorize.scaleMethods:
                     pm.printError(f"Invalid scaling method value: {a}")
                 self.opt['scaleMethod'] = a

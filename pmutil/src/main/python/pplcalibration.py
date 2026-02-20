@@ -19,33 +19,22 @@ from shutil import copyfile
 from sys import argv
 
 import astroalign as aa
+import numpy as np
 from astropy.io import fits
 from astropy.stats import SigmaClip
+from astropy.time import Time, TimeDelta
 from photutils.background import Background2D, MedianBackground
 
 import pmbase as pm
 import pmconventions as pmc
+from pmfits import FitsSeparator, FITS_HEADER_CAMERA_TEMPERATURE, FITS_HEADER_DATE_OBS, FITS_HEADER_EXPTIME, \
+    FITS_HEADER_INSTRUMENT, FITS_HEADER_OBSERVER, \
+    FITS_HEADER_STACK_COUNT, FITS_HEADER_TELESCOPE, FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2, FITS_HEADER_DATE_MID, \
+    FITS_HEADER_COMBINATION_COUNT, FITS_HEADER_COMBINATION_MODE, FITS_HEADER_CREATOR, FITS_HEADER_IMAGE_TYPE, \
+    FITS_HEADER_CAMERA_TEMPERATURE_STD, FITS_HEADER_DATE_AVG, FITS_HEADER_MJD_AVG, FITS_HEADER_DATE_END, \
+    FITS_HEADER_MJD_END, FITS_HEADER_EXPOSURE, FITS_HEADER_MJD_OBS, FITS_HEADER_DATE_LOCAL, FITS_HEADER_DATE_IMAGE
 from pmhotpix import BadPixelEliminator
 from pmraw import RawConverter
-from pmfits import FitsSeparator
-
-# FITS header names
-FITS_HEADER_NAXIS = "NAXIS"
-FITS_HEADER_DATE_OBS = "DATE-OBS"
-FITS_HEADER_EXPTIME = "EXPTIME"
-FITS_HEADER_STACKCNT = "STACKCNT"
-FITS_HEADER_BAYER = "BAYERPAT"
-FITS_HEADER_OBSERVER = "OBSERVER"
-FITS_HEADER_INSTRUMENT = "INSTRUME"
-FITS_HEADER_TELESCOPE = "TELESCOP"
-# 'IMAGETYP'
-# 'NAXIS1'
-# 'NAXIS2'
-# 'CREATOR'
-# 'DATE-MID'
-# 'NCOMBINE'
-# 'MCOMBINE'
-# 'CCD-TEMP'
 
 
 class Pipeline:
@@ -57,6 +46,7 @@ class Pipeline:
     COMMON_ARGS = "--saturation 16000 --trim"
 
     FLATLIB_FOLDER = os.path.expanduser("~/.pmlib/flat")
+    DARKLIB_FOLDER = os.path.expanduser("~/.pmlib/dark")
 
     TEMPDIR = "temp"
 
@@ -84,42 +74,58 @@ class Pipeline:
 
     @staticmethod
     def imSizeArg(fitsFileName):
-        h = pm.getFitsHeaders(fitsFileName, ['NAXIS1', 'NAXIS2'])
-        return f"--image 0:0:{int(h['NAXIS1']) - 1:d}:{int(h['NAXIS2']) - 1:d}"
+        h = pm.getFitsHeaders(fitsFileName, [FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2])
+        return f"--image 0:0:{int(h[FITS_HEADER_NAXIS1]) - 1:d}:{int(h[FITS_HEADER_NAXIS2]) - 1:d}"
 
     @staticmethod
     def sumDateObs(targetFile, sourceFiles):
-        e_sum = 0
-        m_sum = 0
+        e_sum = 0.0
         t_min = None
+        t_max = None
         count = 0
+        jd_sum = 0.0
+        h_local = None
         for sourceFile in sourceFiles:
-            h = pm.getFitsHeaders(sourceFile, [FITS_HEADER_DATE_OBS, FITS_HEADER_EXPTIME])
+            h = pm.getFitsHeaders(sourceFile, [FITS_HEADER_DATE_OBS, FITS_HEADER_EXPTIME, FITS_HEADER_DATE_LOCAL])
             if h is not None:
-                fmt = '%Y-%m-%dT%H:%M:%S.%f' if h[FITS_HEADER_DATE_OBS].find(".") != -1 else '%Y-%m-%dT%H:%M:%S'
-                t = time.mktime(time.strptime(h[FITS_HEADER_DATE_OBS], fmt))
-                e = int(h[FITS_HEADER_EXPTIME])
+                at = Time(h[FITS_HEADER_DATE_OBS], format="isot", scale="utc")
+                e = float(h[FITS_HEADER_EXPTIME])
                 e_sum = e_sum + e
-                m_sum = m_sum + (t + e / 2) * e
-                if t_min is None or t < t_min:
-                    t_min = t
+                e_day = e / 86400.0
+                jd_sum = jd_sum + (at.jd + e_day / 2) * e
+                if t_min is None or at < t_min:
+                    t_min = at
+                    if FITS_HEADER_DATE_LOCAL in h:
+                        h_local = h[FITS_HEADER_DATE_LOCAL]
+                ae = TimeDelta(e, format="sec")
+                if t_max is None or (at + ae) > t_max:
+                    t_max = at + ae
+                
                 count += 1
 
-        m_avg = m_sum / e_sum
-        d = datetime(*time.gmtime(m_avg)[:6])
-        t_obs = datetime(*time.gmtime(t_min)[:6])
+        d2 = Time(jd_sum / e_sum, format="jd")
         headers = {
-            FITS_HEADER_DATE_OBS: t_obs.isoformat(),
-            FITS_HEADER_EXPTIME: e_sum,
-            'DATE-MID': (d.isoformat(), 'Effective center of time of observation'),
-            'NCOMBINE': (count, 'number of images used for stacking'),
-            FITS_HEADER_STACKCNT: (count, 'number of images used for stacking'),
-            'MCOMBINE': ('sum', 'combination mode')
+            FITS_HEADER_DATE_OBS: t_min.isot,
+            FITS_HEADER_EXPTIME: round(e_sum, 2),
+            FITS_HEADER_EXPOSURE: round(e_sum, 2),
+            FITS_HEADER_DATE_MID: (d2.isot, 'effective center of time of observation'),
+            FITS_HEADER_DATE_AVG: (d2.isot, 'mid-time of the observation in UT(iso8601)'),
+            FITS_HEADER_DATE_END: (t_max.isot	, 'end-time of the observation in UT(iso8601)'),
+            FITS_HEADER_MJD_OBS: t_min.mjd,
+            FITS_HEADER_MJD_AVG: (d2.mjd, 'MJD of observation mid-time'),
+            FITS_HEADER_MJD_END: (t_max.mjd, 'MJD of observation end'),
+            FITS_HEADER_COMBINATION_COUNT: (count, 'number of images used for stacking'),
+            FITS_HEADER_STACK_COUNT: (count, 'number of images used for stacking'),
+            FITS_HEADER_COMBINATION_MODE: ('sum', 'combination mode')
         }
+        if h_local is not None:
+            headers[FITS_HEADER_DATE_LOCAL] = h_local
+            headers[FITS_HEADER_DATE_IMAGE] = h_local
+            
         pm.setFitsHeaders(targetFile, headers)
         print(
-                f'observation start time: {t_obs.isoformat()}, observation center time: {d.isoformat()}, cumulated '
-                f'exptime: {str(e_sum)} sec')
+                f'observation start time: {t_min.isot}, observation center time: {d2.isot}, cumulated '
+                f'exptime: {e_sum:.2f} sec')
 
     def invoked(self, cmd):
         if self.opt['debug']:
@@ -133,7 +139,7 @@ class Pipeline:
 
     @staticmethod
     def def_fits_headers(imtype):
-        hx = {'CREATOR': f"pmutil {pmc.PMUTIL_VERSION_SHORT}", 'IMAGETYP': imtype}
+        hx = {FITS_HEADER_CREATOR: f"pmutil {pmc.PMUTIL_VERSION_SHORT}", FITS_HEADER_IMAGE_TYPE: imtype}
         if 'DEF_NAMECODE' in pm.setup:
             hx[FITS_HEADER_OBSERVER] = pm.setup['DEF_NAMECODE']
         if 'DEF_CAMERA' in pm.setup and pm.setup['DEF_CAMERA'] != 'Generic Camera':
@@ -199,6 +205,22 @@ class Pipeline:
                 f"ficalib -i {' '.join(BIASLIST)} {self.COMMON_ARGS} {self.imSizeArg(BIASLIST[0])} -o {' '.join(R_BIASLIST)}")
         pm.invoke(f"ficombine {' '.join(R_BIASLIST)} --mode median -o {masterBiasFile}")
 
+        # TODO: Calculate master bias quality values (temperature sigma, adu sigma, etc.)
+
+        # save bias into dark library
+        instrument: str = pm.getFitsHeader(masterBiasFile, FITS_HEADER_INSTRUMENT)
+        if instrument is None:
+            instrument = pm.setup["DEF_CAMERA"] if instrument != "Generic Camera" else None
+        if instrument is not None:
+            instrument = instrument.translate({ord(c): '' for c in " /."})
+            darklibFileName = f"{self.DARKLIB_FOLDER}/{pm.setup['MASTER_DARK_FILE']}-{color}-{instrument}.fits"
+            if not os.path.exists(darklibFileName):
+                copyfile(masterBiasFile, darklibFileName)
+                pm.printInfo(f"Master dark was saved into dark library: {darklibFileName}")
+            else:
+                # TODO: check master bias quality, and save it, if it is better than saved one
+                pass
+
         # cleanup: remove temp files
         for f in R_BIASLIST:
             os.remove(f)
@@ -228,21 +250,53 @@ class Pipeline:
                 f"ficalib -i {' '.join(DARKLIST)} {self.COMMON_ARGS} {self.imSizeArg(DARKLIST[0])} -o {' '.join(R_DARKLIST)} --input-master-bias {masterBiasFile}")
         pm.invoke(f"ficombine {' '.join(R_DARKLIST)} --mode median -o {masterDarkFile}")
 
+        # TODO: Calculate dark quality values (temperature sigma, adu sigma, etc.)
+
         # Calculate average ccd temperature from .cr2 files, and set it into the master dark
-        tsum = 0
-        count = 0
+        # tsum = 0
+        # count = 0
+        temps = []
         for f in DARKLIST:
-            hdr = pm.getFitsHeader(f, 'CCD-TEMP')
+            hdr = pm.getFitsHeader(f, FITS_HEADER_CAMERA_TEMPERATURE)
             if hdr:
                 if ' ' in hdr:
                     hdr = hdr.split()[0]
                 ccdtemp = int(hdr)
-                tsum += ccdtemp
-                count += 1
-        if count > 0:
-            AVGTEMP = int((tsum + (count / 2)) / count)
-            print(f"average dark temperature: {AVGTEMP:d} C")
-            pm.setFitsHeaders(masterDarkFile, {'CCD-TEMP': (f"{AVGTEMP:d}.", "CCD Temperature (Celsius)")})
+                temps.append(ccdtemp)
+                # tsum += ccdtemp
+                # count += 1
+        if len(temps) > 0:
+            # AVGTEMP = int((tsum + (count / 2)) / count)
+            AVGTEMP = int(np.mean(temps))
+            STDTEMP = np.std(temps)
+            print(f"Average dark temperature: {AVGTEMP:d} C with stddev: {STDTEMP:.1f}")
+            pm.setFitsHeaders(masterDarkFile, {
+                FITS_HEADER_CAMERA_TEMPERATURE: (f"{AVGTEMP:d}.", "CCD Temperature (Celsius)"),
+                FITS_HEADER_CAMERA_TEMPERATURE_STD: (f"{STDTEMP:.1f}.", "CCD Temperature standard deviation")
+            })
+
+            # save dark into dark library
+            thre = pm.setup["DARK_TEMP_THRE"] if "DARK_TEMP_THRE" in pm.setup else 1
+            std_criteria = float(pm.setup["DARK_TEMP_CREATE_THRE"]) if "DARK_TEMP_CREATE_THRE" in pm.setup else float(thre) / 2.0
+            if STDTEMP <= std_criteria:
+                temp_in_kelvin = int(round((AVGTEMP + 273) / thre) * thre)
+                instrument = pm.getFitsHeader(masterDarkFile, FITS_HEADER_INSTRUMENT)
+                if instrument is None:
+                    instrument = pm.setup["DEF_CAMERA"] if instrument != "Generic Camera" else None
+                if instrument is not None:
+                    instrument = instrument.translate({ord(c): '' for c in " /."})
+                    darklibFileName = f"{self.DARKLIB_FOLDER}/{pm.setup['MASTER_DARK_FILE']}-{color}-{instrument}-{temp_in_kelvin}K.fits"
+                    if not os.path.exists(darklibFileName):
+                        copyfile(masterDarkFile, darklibFileName)
+                        pm.printInfo(f"Master dark was saved into dark library: {darklibFileName}")
+                    else:
+                        # check master dark quality, and save it, if it is better than saved one
+                        lib_std_criteria = float(pm.getFitsHeader(darklibFileName, FITS_HEADER_CAMERA_TEMPERATURE_STD))
+                        if std_criteria < lib_std_criteria:
+                            copyfile(masterDarkFile, darklibFileName)
+                            pm.printInfo(f"Master dark was overwritten in dark library: {darklibFileName}")
+                else:
+                    pm.printWarning("Camera is not specified in the FITS image file nor in the pmutil config ; master dark is not saved into the dark library")
 
         # cleanup: remove temp files
         for f in R_DARKLIST:
@@ -373,8 +427,8 @@ class Pipeline:
 
         # post process calibrated images
         print(f"Subtract background for {CALIB_PATTERN}")
-        h = pm.getFitsHeaders(R_IOBJLIST[0], ['NAXIS1', 'NAXIS2'])
-        bp_max = [int(h['NAXIS1']), int(h['NAXIS2'])]
+        h = pm.getFitsHeaders(R_IOBJLIST[0], [FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2])
+        bp_max = [int(h[FITS_HEADER_NAXIS1]), int(h[FITS_HEADER_NAXIS2])]
         bpe = BadPixelEliminator()
         bpe.loadBadPixelsForDark(MD, color, bp_max)
 
@@ -632,7 +686,7 @@ class Pipeline:
         if identification["type"] == "fits":
 
             # get FITS headers
-            headers = pm.getFitsHeaders(fitsFiles[0], [FITS_HEADER_STACKCNT])
+            headers = pm.getFitsHeaders(fitsFiles[0], [FITS_HEADER_STACK_COUNT])
 
             # check flat existence
             if (self.FLAT_FOLDER is None or self.FLAT_FOLDER == "") and not self.opt["useMasterFlat"] and self.opt[
@@ -640,7 +694,7 @@ class Pipeline:
                 identification["flat"] = True
 
             # check precalibration
-            if FITS_HEADER_STACKCNT in headers:
+            if FITS_HEADER_STACK_COUNT in headers:
                 identification["stack"] = True
                 identification["pre"] = True  # not 100% sure, but for Seestar is OK
 
@@ -811,7 +865,7 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c' or o == '--color':
+            if o == '-c' or o == '--color':
                 color = a.lower()
                 if color not in self.availableBands:
                     pm.printError(f'Invalid color: {a}, use on of these: Gi, g, Bi, b, Ri, r, all')

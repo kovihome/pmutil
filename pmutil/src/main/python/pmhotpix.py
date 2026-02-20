@@ -8,15 +8,17 @@ Created on Feb 22, 2020
 @author: kovi
 """
 from getopt import getopt, GetoptError
-from sys import argv
 from os.path import exists
-from astropy.io import fits
-from astropy.table import Table
-import numpy as np
-from scipy.ndimage import gaussian_filter, median_filter
-from astropy.stats import sigma_clipped_stats
+from sys import argv
 
-from pmbase import printError, printInfo, loadPplSetup, Blue, Color_Off, BGreen
+import numpy as np
+from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
+from astropy.table import Table
+from scipy.ndimage import gaussian_filter, median_filter
+
+import pmbase as pm
+from pmfits import FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2
 
 
 class BadPixelDetector:
@@ -39,8 +41,8 @@ class BadPixelDetector:
         nthre = mean - 16 * std
         maxpx = 2**14-1
         if self.debug:
-            printDebug("mean: %4.1f, median: %4.1f, std: %4.1f" % (mean, median, std))
-            print("thre [16 * std + mean]: %4.1f / %4.1f" % (pthre, nthre))
+            pm.printDebug("mean: %4.1f, median: %4.1f, std: %4.1f" % (mean, median, std))
+            pm.printDebug("thre [16 * std + mean]: %4.1f / %4.1f" % (pthre, nthre))
 
         blurredImage = gaussian_filter(image, sigma=2)
         diff = image - blurredImage
@@ -60,10 +62,11 @@ class BadPixelDetector:
                 #print("%5d  %5d  %7.1f  %7.1f  %5.1f%%  dead" % (hotPixels[1][j], hotPixels[0][j], v, (mean-v)/std, -100*v/maxpx))
                 badPixels.append({'x': hotPixels[1][j], 'y': hotPixels[0][j], 'adu': v, 'snr': (mean-v)/std, 'level': -100*v/maxpx, 'type': 'dead'})
                 countDead += 1
-        print("Hot pxs: %d, dead pixels: %d" % (countHot, countDead))
+        pm.printDebug("Hot pxs: %d, dead pixels: %d" % (countHot, countDead))
         return badPixels
 
-    def saveBadPixels(self, badPixels, cosmeticFileName):
+    @staticmethod
+    def saveBadPixels(badPixels, cosmeticFileName):
         cf = open(cosmeticFileName, 'w')
         cf.write("    X      Y      ADU      SNR   LEVEL  TYPE\n")
         for bp in badPixels:
@@ -75,7 +78,6 @@ class BadPixelDetector:
         cosmeticFileName = fileName[:fileName.rindex('/')] + '/bad_pixels-' + color
         self.saveBadPixels(bpxs, cosmeticFileName)
         return bpxs
-        
 
 
 class BadPixelEliminator:
@@ -86,7 +88,8 @@ class BadPixelEliminator:
     def __init__(self, badPixelFileName = None, debug = False):
         self.debug = debug
         if badPixelFileName:
-            self.loadBadPixels(badPixelFileName)
+            h = pm.getFitsHeaders(badPixelFileName, [FITS_HEADER_NAXIS1, FITS_HEADER_NAXIS2])
+            self.loadBadPixels(badPixelFileName, [int(h[FITS_HEADER_NAXIS1]), int(h[FITS_HEADER_NAXIS2])])
 
     def loadBadPixelsForDark(self, masterDarkFileName, color, maxpx):
         cosmeticFileName = masterDarkFileName[:masterDarkFileName.rindex('/')] + '/bad_pixels-' + color
@@ -131,8 +134,8 @@ class MainApp:
 
     def printTitle(self):
         print()
-        print(BGreen + "pmhotpix, version 1.1.0 " + Color_Off)
-        print(Blue + "Detect and eliminate bad pixels." + Color_Off)
+        print(pm.BGreen + "pmhotpix, version 1.1.0 " + pm.Color_Off)
+        print(pm.Blue + "Detect and eliminate bad pixels." + pm.Color_Off)
         print()
 
     def usage(self):
@@ -147,7 +150,7 @@ class MainApp:
         try:
             optlist, args = getopt (self.argv[1:], "u:h", ['use=', 'help'])
         except GetoptError:
-            printError ('Invalid command line options')
+            pm.printError ('Invalid command line options')
             return
 
         for o, a in optlist:

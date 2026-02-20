@@ -22,8 +22,10 @@ from astropy.table import Table
 import pmbase as pm
 from pmconventions import PMUTIL_VERSION
 from pmphot import Photometry
-from pmresult import ReportProcessor
+from pmresult import ReportProcessor, REPORT_TYPE_AAVSO, REPORT_TYPE_VSNET
 from pmmerge import CatalogMatcher
+from pmfits import FITS_HEADER_COMBINATION_COUNT, FITS_HEADER_WCS_CRVAL1, FITS_HEADER_WCS_CRVAL2, \
+    FITS_HEADER_WCS_CTYPE1, FITS_HEADER_WCS_CTYPE2, FITS_HEADER_COMBINATION_MODE
 
 
 class Pipeline:
@@ -201,7 +203,7 @@ class Pipeline:
                 seqFile = f"{seqFolder}/{baseFile}-{color}.fits"
                 astFile = f"{photFolder}/{baseFile}-{color}.ast.fits"
 
-                astFitsHeaders = pm.getFitsHeaders(seqFile, ["CRVAL1", "CRVAL2", "CTYPE1", "CTYPE2"])
+                astFitsHeaders = pm.getFitsHeaders(seqFile, [FITS_HEADER_WCS_CRVAL1, FITS_HEADER_WCS_CRVAL2, FITS_HEADER_WCS_CTYPE1, FITS_HEADER_WCS_CTYPE2])
                 if len(astFitsHeaders) == 0:
                     self.do_astrometry(seqFile, astFile, photFolder)
                 else:
@@ -308,7 +310,7 @@ class Pipeline:
             pm.printInfo(f"Create report into {REPORT_FOLDER} folder.")
             opt = {
                 'out': REPORT_FOLDER,  # output folder
-                'rpt': 'aavso',  # report format, default: aavso extended
+                'rpt': REPORT_TYPE_AAVSO if not self.opt['vsn'] else [REPORT_TYPE_AAVSO, REPORT_TYPE_VSNET],  # report format, default: aavso extended
                 'name': self.obsCode, # self.opt['nameCode'],  # observer name code
                 'method': self.opt['method'],  # mg calculation method, comp - single com star, gcx/lfit - ensemble
                 'showGraphs': self.opt['showGraphs'],
@@ -324,9 +326,9 @@ class Pipeline:
     @staticmethod
     def calculateSaturationLevel(astFile: str) -> int:
         dynrange = int(pm.setup['DYNRANGE'] if 'DYNRANGE' in pm.setup else 16)
-        headers = pm.getFitsHeaders(astFile, ["NCOMBINE", "MCOMBINE"])
+        headers = pm.getFitsHeaders(astFile, [FITS_HEADER_COMBINATION_COUNT, FITS_HEADER_COMBINATION_MODE])
         max_level = 2**dynrange
-        image_count = int(headers["NCOMBINE"] if headers["MCOMBINE"] == "sum" else 1)
+        image_count = int(headers[FITS_HEADER_COMBINATION_COUNT] if headers[FITS_HEADER_COMBINATION_MODE] == "sum" else 1)
         return (max_level - int(sqrt(max_level))) * image_count
 
 
@@ -347,12 +349,13 @@ class MainApp:
         'logMode': pm.Logger.LOG_MODE_INFO,  # logging mode
         'files': None,
         'baseFolder': None,  # base folder, optional
+        'vsn': False,       # VSNET report
     }
 
     availableBands = ['gi', 'g', 'bi', 'b', 'ri', 'r', 'all']
 
     mgCalcMethods = {
-        'comp': 'Best comparision star',
+        'comp': 'Best comparison star',
         'gcx': 'GCX''s robust averaging ensemble',
         'lfit': 'Linear fit ensemble',
     }
@@ -360,37 +363,34 @@ class MainApp:
     def __init__(self, argv):
         self.argv = argv
 
-    def printTitle(self):
+    @staticmethod
+    def printTitle():
         print()
         print(pm.BGreen + f"ppl-photometry, version {PMUTIL_VERSION}" + pm.Color_Off)
         print(pm.Blue + "Make photometry on calibrated FITS images." + pm.Color_Off)
         print()
 
-    def usage(self):
+    @staticmethod
+    def usage():
         print("Usage: ppl-photometry [OPTIONS]... [BASE_FOLDER]")
         print()
         print("Mandatory arguments to long options are mandatory for short options too.")
-        print(
-                "  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
+        print("  -c,  --color arg        set filter(s), arg is the color code, default color is 'Gi', for available color codes see below")
         print("  -n,  --name nameCode    set observer code for the AAVSO report")
         print("  -t,  --method method    magnitude calculation method ; values are: comp, gcx, lfit")
         print("       --show-graph       show graphs or plots for diagnostic or illustration purpose")
         print("       --save-graph       save graphs or plots for diagnostic or illustration purpose")
-        print(
-                "       --camera           set camera name ; this overrides DEF_CAMERA settings in ppl.cfg, but does not override the INSTRUME FITS header value")
-        print(
-                "       --telescope        set telescope name ; this overrides DEF_TELESCOPE settings in ppl.cfg, but does not override the TELESCOP FITS header value")
+        print("       --camera           set camera name ; this overrides DEF_CAMERA settings in ppl.cfg, but does not override the INSTRUME FITS header value")
+        print("       --telescope        set telescope name ; this overrides DEF_TELESCOPE settings in ppl.cfg, but does not override the TELESCOP FITS header value")
         print("  -w,  --overwrite        force to overwrite existing results")
         print("       --offline          offline mode: does not use online catalog data for identification")
         print("       --debug            print debug info")
         print("  -h,  --help             print this page")
         print("standardization:")
-        print(
-                "  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
-        print(
-                "  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
-        print(
-                "  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
+        print("  -m,  --make-std         create standard coefficients from a Standard Area and save them (for all color photometry)")
+        print("  -s,  --use-std          use standard coefficients ; calculate standard magnitudes (for all color photometry)")
+        print("  -a,  --adhoc-std        create standard coefficients and use them for calculate standard magnitudes (for all color photometry)")
+        print("       --vsn              save report in VSNET format too")
         print()
         print("Available filter color codes are:")
         print("  Gi | G | gi | g         green channel")
@@ -403,7 +403,7 @@ class MainApp:
         try:
             optlist, args = getopt(self.argv[1:], "c:n:msat:wdh",
                                    ['color=', 'name=', 'make-std', 'use-std', 'adhoc-std', 'show-graph', 'save-graph',
-                                    'method=', 'overwrite', 'offline', 'camera=', 'telescope=', 'debug', 'help'])
+                                    'method=', 'overwrite', 'debug', 'help', 'camera=', 'telescope=', 'offline', 'vsn'])
         except GetoptError:
             pm.printError('Invalid command line options.')
             return
@@ -411,7 +411,7 @@ class MainApp:
         for o, a in optlist:
             if a[:1] == ':':
                 a = a[1:]
-            elif o == '-c' or o == '--color':
+            if o == '-c' or o == '--color':
                 color = a.lower()
                 if color not in self.availableBands:
                     pm.printError(f'Invalid color: {a}, use on of these: Gi, g, Bi, b, Ri, r, all')
@@ -443,6 +443,8 @@ class MainApp:
                     self.opt['method'] = a
             elif o == '--offline':
                 self.opt['offline'] = True
+            elif o == '--vsn':
+                self.opt['vsn'] = True
             elif o == '-w' or o == '--overwrite':
                 self.opt['overwrite'] = True
             elif o == '--debug':

@@ -81,27 +81,6 @@ warn_version() {
 	else
 		print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
 	fi
-
-
-	# readarray -td. actver <<<"$1" 
-	# readarray -td. minver <<<"$2" 
-
-	# local num=${#actver[@]}
-	# if [ ${#minver[@]} -lt "$num" ]; then
-	#	num=${#minver[@]}
-	#fi
-	
-	#for (( j = 0; j < $num; j += 1 )) ; do
-	#	local a=${actver[$j]}
-	#	local m=${minver[$j]}
-        #        echo "actual: '$a', minimal: '$m'"
-	#	if [ "${actver[$j]}" -lt "${minver[$j]}" ]; then
-	#		print_warning "$3 version '$1' is lesser than required minimal version of '$2'."
-	#		return
-	#	fi
-	#done 
-	
-	#echo "$3 version '$1' OK."
 }
 
 warn_py_module() {
@@ -126,7 +105,7 @@ warn_py_module "matplotlib" "3.1"
 warn_py_module "numpy" "1.18"
 warn_py_module "photutils" "0.7"
 warn_py_module "pillow" "5.3"
-#warn_py_module "regions" "0.5"
+warn_py_module "regions" "0.5"
 warn_py_module "rawpy" "0.17"
 warn_py_module "scikit-image" "0.25"
 warn_py_module "scipy" "1.4"
@@ -207,10 +186,8 @@ copy_source "python/pmrefcat.py" "pmrefcat.py"
 copy_source "python/pmcolorize.py" "pmcolorize.py"
 copy_source "python/pmclean.py" "pmclean.py"
 copy_source "python/pmbase.py" "pmbase.py"
-#copy_source "python/pmdisco.py" "pmdisco.py"
 copy_source "python/pmphot.py" "pmphot.py"
-#copy_source "python/pmfilter.py" "pmfilter.py"
-copy_source "python/pmresult.py" "pmresult.py" 
+copy_source "python/pmresult.py" "pmresult.py"
 copy_source "python/img_scale.py" "img_scale.py"
 copy_source "python/pmhotpix.py" "pmhotpix.py"
 copy_source "python/pmconventions.py" "pmconventions.py"
@@ -225,7 +202,7 @@ create_link "pmrefcat.py" "ppl-refcat"
 create_link "pmclean.py" "ppl-clean"
 create_link "pmcolorize.py" "ppl-colorize"
 
-chmod 0755 ${DEST_FOLDER}/*
+chmod 0755 "${DEST_FOLDER}"/*
 
 #############################
 # copy external config files

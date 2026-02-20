@@ -17,6 +17,13 @@ from astropy.io import fits
 from astropy.time import Time
 
 import pmbase as pm
+from pmfits import FITS_HEADER_FILTER, FITS_HEADER_DATE_OBS, FITS_HEADER_MJD_OBS, FITS_HEADER_EXPTIME, \
+    FITS_HEADER_INSTRUMENT, FITS_HEADER_TELESCOPE, FITS_HEADER_CAMERA_TEMPERATURE, FITS_HEADER_OBSERVER, \
+    FITS_HEADER_BSCALE, FITS_HEADER_BZERO, FITS_HEADER_CREATOR, FITS_HEADER_IMAGE_TYPE, \
+    FITS_HEADER_PHOTOMETRY_SYSTEM, FITS_HEADER_XBIN, FITS_HEADER_YBIN, FITS_HEADER_DATE_LOCAL, FITS_HEADER_DATE_IMAGE, \
+    FITS_HEADER_EXPOSURE, FITS_HEADER_GAIN, FITS_HEADER_ISO, FITS_HEADER_XPIX_SIZE, FITS_HEADER_YPIX_SIZE, \
+    FITS_HEADER_WHITE_BALANCE
+
 
 class RawConverter:
     def __init__(self, opt, defhdrs=None):
@@ -37,28 +44,28 @@ class RawConverter:
             "FITS (Flexible Image Transport System) format is defined in 'Astronomy and Astrophysics', volume 376, page 359; bibcode: 2001A&A...376..359H ")
 
         # BZERO, BSCALE
-        hdr("BZERO", float(0), "offset data range to that of unsigned short")
-        hdr("BSCALE", float(1), "default scaling factor")
+        hdr(FITS_HEADER_BZERO, float(0), "offset data range to that of unsigned short")
+        hdr(FITS_HEADER_BSCALE, float(1), "default scaling factor")
 
         # CREATOR
         # TODO: app name and version from parameters
-        cr = self.def_headers["CREATOR"] if "CREATOR" in self.def_headers else "pmutils 1.2"
-        hdr("CREATOR", cr, f"Created by {cr}")
+        cr = self.def_headers[FITS_HEADER_CREATOR] if FITS_HEADER_CREATOR in self.def_headers else "pmutils 1.2"
+        hdr(FITS_HEADER_CREATOR, cr, f"Created by {cr}")
 
         # IMAGETYP
         # TODO: image type from file name
-        imt = self.def_headers["IMAGETYP"] if "IMAGETYP" in self.def_headers else "LIGHT"
-        hdr("IMAGETYP", imt, "Type of exposure")
+        imt = self.def_headers[FITS_HEADER_IMAGE_TYPE] if FITS_HEADER_IMAGE_TYPE in self.def_headers else "LIGHT"
+        hdr(FITS_HEADER_IMAGE_TYPE, imt, "Type of exposure")
 
         # PHOTSYS
-        hdr("PHOTSYS", "Instrumental", "Photometry filter system")
+        hdr(FITS_HEADER_PHOTOMETRY_SYSTEM, "Instrumental", "Photometry filter system")
 
         # FILTER
-        hdr("FILTER", color, "Spectral filter or colorspace component")
+        hdr(FITS_HEADER_FILTER, color, "Spectral filter or colorspace component")
 
         # XBINNING, YBINNING
-        hdr("XBINNING", 1, "X axis binning factor")
-        hdr("YBINNING", 1, "Y axis binning factor")
+        hdr(FITS_HEADER_XBIN, 1, "X axis binning factor")
+        hdr(FITS_HEADER_YBIN, 1, "Y axis binning factor")
 
         # DATE-OBS
         # DATE-IMG, DATE-LOC
@@ -83,10 +90,10 @@ class RawConverter:
         if dt_str is not None:
             dt_s = dt.replace(tzinfo=None).isoformat().rstrip('0')
             dt_utc_s = dt.astimezone(timezone.utc).replace(tzinfo=None).isoformat().rstrip('0')
-            hdr("DATE-LOC", dt_s, "Time of observation (local)")
-            hdr("DATE-IMG", dt_s, "Time of observation (local)")
-            hdr("DATE-OBS", dt_utc_s, "Time of observation (UTC)")
-            hdr("MJD-OBS", f"{Time(dt_utc_s).mjd:.6f}", "Time of observation (MJD)")
+            hdr(FITS_HEADER_DATE_LOCAL, dt_s, "Time of observation (local)")
+            hdr(FITS_HEADER_DATE_IMAGE, dt_s, "Time of observation (local)")
+            hdr(FITS_HEADER_DATE_OBS, dt_utc_s, "Time of observation (UTC)")
+            hdr(FITS_HEADER_MJD_OBS, Time(dt_utc_s).mjd, "Time of observation (MJD)")
 
         # EXPTIME, EXPSURE
         if "ExposureTime" in exif:
@@ -95,40 +102,40 @@ class RawConverter:
                 exposure_time = float(et.split("/")[0]) / float(et.split("/")[1])
             else:
                 exposure_time = float(et)
-            hdr("EXPSURE", exposure_time, "[s] Exposure time")
-            hdr("EXPTIME", exposure_time, "[s] Exposure time")
+            hdr(FITS_HEADER_EXPOSURE, exposure_time, "[s] Exposure time")
+            hdr(FITS_HEADER_EXPTIME, exposure_time, "[s] Exposure time")
 
         # INSTRUME
         inst = None
-        if "INSTRUME" in self.def_headers:
-            inst = self.def_headers["INSTRUME"]
+        if FITS_HEADER_INSTRUMENT in self.def_headers:
+            inst = self.def_headers[FITS_HEADER_INSTRUMENT]
         elif "Model" in exif:
             inst = exif["Model"]
         if inst is not None:
-            hdr("INSTRUME", inst, "Imaging instrument name")
+            hdr(FITS_HEADER_INSTRUMENT, inst, "Imaging instrument name")
 
         # TELESCOP
         scope = None
-        if "TELESCOP" in self.def_headers:
-            scope = self.def_headers["TELESCOP"]
+        if FITS_HEADER_TELESCOPE in self.def_headers:
+            scope = self.def_headers[FITS_HEADER_TELESCOPE]
         elif "LensModel" in exif and exif["LensModel"] != "":
             scope = exif["LensModel"]
         if scope is not None:
-            hdr("TELESCOP", scope, "Name of telescope")
+            hdr(FITS_HEADER_TELESCOPE, scope, "Name of telescope")
 
         # ISO, GAIN
         if "ISO" in exif:
-            hdr("GAIN", int(exif["ISO"]), "Sensor gain (ISO)")
-            hdr("ISO", int(exif["ISO"]), "ISO speed")
+            hdr(FITS_HEADER_GAIN, int(exif["ISO"]), "Sensor gain (ISO)")
+            hdr(FITS_HEADER_ISO, int(exif["ISO"]), "ISO speed")
 
         # CCD-TEMP
         if "CameraTemperature" in exif:
-            hdr("CCD-TEMP", exif["CameraTemperature"], "CCD Temperature (Celsius)")
+            hdr(FITS_HEADER_CAMERA_TEMPERATURE, exif["CameraTemperature"], "CCD Temperature (Celsius)")
 
         # XPIXSZ, YPIXSZ
         if "FocalPlaneXResolution" in exif and "FocalPlaneYResolution" in exif:
-            hdr("XPIXSZ", 25400 / float(exif["FocalPlaneXResolution"]), "[um] Pixel X axis size")
-            hdr("YPIXSZ", 25400 / float(exif["FocalPlaneYResolution"]), "[um] Pixel Y axis size")
+            hdr(FITS_HEADER_XPIX_SIZE, 25400 / float(exif["FocalPlaneXResolution"]), "[um] Pixel X axis size")
+            hdr(FITS_HEADER_YPIX_SIZE, 25400 / float(exif["FocalPlaneYResolution"]), "[um] Pixel Y axis size")
 
         # APERTURE
         # TODO: aperture
@@ -145,12 +152,12 @@ class RawConverter:
 
         # OBSERVER
         ob = None
-        if "OBSERVER" in self.def_headers:
-            ob = self.def_headers["OBSERVER"]
+        if FITS_HEADER_OBSERVER in self.def_headers:
+            ob = self.def_headers[FITS_HEADER_OBSERVER]
         elif "Artist" in exif:
             ob = exif["Artist"]
         if ob is not None:
-            hdr("OBSERVER", ob, "Observer name")
+            hdr(FITS_HEADER_OBSERVER, ob, "Observer name")
 
         # WB from BlueBalance and RedBalance
         wb = None
@@ -161,9 +168,10 @@ class RawConverter:
         elif color == "Gi":
             wb = 1.0
         if wb is not None:
-            hdr("WB", wb, f"White balance for {color} filter")
+            hdr(FITS_HEADER_WHITE_BALANCE, wb, f"White balance for {color} filter")
 
-    def get_exif_data(self, raw_filename: str):
+    @staticmethod
+    def get_exif_data(raw_filename: str):
         exif_data = {}
         exif = pm.invoke(f"exiftool -s -g {raw_filename}")
         for line in exif.split('\n'):
