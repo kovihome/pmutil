@@ -115,7 +115,11 @@ def loadPplSetup():
         from pathlib import Path
         userhome = str(Path.home())
 
-    PMLIB = f"{userhome}/.pmlib"
+    # look up PMUTIL_CONFIG environment variable
+    PMLIB = getenv("PMUTIL_CONFIG")
+    if not PMLIB:
+        PMLIB = f"{userhome}/.pmlib"
+        
     pplSetup = {
         'PMLIB' : PMLIB,
         'DARKLIB' : f"{PMLIB}/dark",
@@ -170,9 +174,9 @@ def loadPplSetup():
         'DARK_TEMP_CREATE_THRE' : "3"
         }
 
-    cfgFile = userhome + "/.pmlib/ppl.cfg"
+    cfgFile = f"{PMLIB}/ppl.cfg"
     if exists(cfgFile):
-        with open(userhome + "/.pmlib/ppl.cfg") as f:
+        with open(cfgFile) as f:
             for line in f:
                 if not line.startswith('#') and not line.startswith("PMLIB") and line.strip() != "":
                     r = line.split('=')

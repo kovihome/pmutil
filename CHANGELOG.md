@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]](https://github.com/kovihome/pmutil) - transient search
 ### Added
+- Create report in VSNET format
+- Offline mode
 - Using precalibrated FITS (SeeStar FITS images)
 - New algorithm for aligning and stacking
 - Save graphs with --saveGraph option
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Archivate raw images and result files
 
 ### Modified
+- Use new AAVSO urls
 - FITS headers contain instrument and camera name
 - Use observer namecode from FITS header
 - Store mag limit in catalog files
